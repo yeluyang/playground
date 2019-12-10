@@ -2,6 +2,7 @@
 
 members = [
     "rgrep",
+    "server",
 ]
 
 exclude = [
