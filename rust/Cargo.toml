@@ -3,6 +3,8 @@
 members = [
     "rgrep",
     "server",
+
+    "pingcap/talent-plan/kvs",
 ]
 
 exclude = [
