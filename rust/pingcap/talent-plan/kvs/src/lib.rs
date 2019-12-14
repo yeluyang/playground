@@ -2,7 +2,7 @@ pub struct KvStore {}
 
 impl KvStore {
     pub fn new() -> KvStore {
-        unimplemented!();
+        KvStore {}
     }
     pub fn set(&mut self, _: String, _: String) {
         unimplemented!();
