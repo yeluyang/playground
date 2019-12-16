@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 
 /// KvStore
+#[derive(Default)]
 pub struct KvStore {
     data: HashMap<String, String>,
 }
@@ -12,9 +13,7 @@ pub struct KvStore {
 impl KvStore {
     /// create an empty object of KvStore and return it
     pub fn new() -> KvStore {
-        KvStore {
-            data: HashMap::new(),
-        }
+        Default::default()
     }
     /// insert a key-value into KvStore
     ///
@@ -24,14 +23,12 @@ impl KvStore {
     ///
     /// # Example
     /// ```rust
-    /// # use kvs::KvStore;
-    /// # fn main() {
+    /// use kvs::KvStore;
     /// let key = String::from("key");
     /// let value = String::from("value");
     /// let mut kvs = KvStore::new();
     /// kvs.set(key.clone(), value.clone());
     /// assert_eq!(kvs.get(key).unwrap(), value);
-    /// # }
     /// ```
     pub fn set(&mut self, key: String, value: String) {
         self.data.insert(key, value);
@@ -43,8 +40,7 @@ impl KvStore {
     ///
     /// # Example
     /// ```rust
-    /// # use kvs::KvStore;
-    /// # fn main() {
+    /// use kvs::KvStore;
     /// let key = String::from("key");
     /// let value = String::from("value");
     ///
@@ -53,7 +49,6 @@ impl KvStore {
     ///
     /// kvs.set(key.clone(), value.clone());
     /// assert_eq!(kvs.get(key).unwrap(), value);
-    /// # }
     /// ```
     pub fn get(&self, key: String) -> Option<String> {
         match self.data.get(&key) {
@@ -68,12 +63,11 @@ impl KvStore {
     ///
     /// # Example
     /// ```rust
-    /// # use kvs::KvStore;
-    /// # fn main() {
+    /// use kvs::KvStore;
     /// let key = String::from("key");
     /// let mut kvs = KvStore::new();
     /// kvs.remove(key);
-    /// # }
+    /// ```
     pub fn remove(&mut self, key: String) {
         self.data.remove(&key);
     }

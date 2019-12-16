@@ -26,7 +26,7 @@ fn main() {
         ])
         .get_matches();
 
-    match matches.occurrences_of("verbose")  {
+    match matches.occurrences_of("verbose") {
         0 => env::set_var("RUST_LOG", "OFF"),
         1 => env::set_var("RUST_LOG", "ERROR"),
         2 => env::set_var("RUST_LOG", "WARN"),

@@ -11,11 +11,11 @@ pub struct Config {
 
 impl Config {
     pub fn new(query: &str, file_path: &str, ignore_case: bool) -> Config {
-        return Config {
+        Config {
             query: query.to_owned(),
             file_path: file_path.to_owned(),
-            ignore_case: ignore_case,
-        };
+            ignore_case,
+        }
     }
 }
 
@@ -44,5 +44,5 @@ fn search<'a>(query: &str, text: &'a str, ignore_case: bool) -> Vec<&'a str> {
             results.push(line);
         }
     }
-    return results;
+    results
 }

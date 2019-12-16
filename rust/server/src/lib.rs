@@ -11,7 +11,7 @@ use std::{
 
 pub fn handle(mut stream: net::TcpStream) {
     let mut buffer = [0; 512];
-    stream.read(&mut buffer).unwrap();
+    stream.read_exact(&mut buffer).unwrap();
 
     let get = b"GET / HTTP/1.1\r\n";
     let sleep = b"GET /sleep HTTP/1.1\r\n";
@@ -29,7 +29,7 @@ pub fn handle(mut stream: net::TcpStream) {
 
     let response = format!("{}{}", status_line, contents);
 
-    stream.write(response.as_bytes()).unwrap();
+    stream.write_all(response.as_bytes()).unwrap();
     stream.flush().unwrap();
 }
 
@@ -46,14 +46,12 @@ impl<F: FnOnce()> FnBox for F {
 type Job = Box<dyn FnBox + Send + 'static>;
 
 struct Worker {
-    id: usize,
     handle: Option<thread::JoinHandle<()>>,
 }
 
 impl Worker {
     fn new(id: usize, job_receiver: sync::Arc<sync::Mutex<mpsc::Receiver<Option<Job>>>>) -> Worker {
-        return Worker {
-            id: id,
+        Worker {
             handle: Some(thread::spawn(move || loop {
                 log::info!("worker{{id={}}} waiting", id);
                 let job = job_receiver.lock().unwrap().recv().unwrap();
@@ -62,7 +60,7 @@ impl Worker {
                     None => break,
                 }
             })),
-        };
+        }
     }
 }
 
@@ -83,7 +81,7 @@ impl ThreadPool {
         for i in 0..pool_size {
             t.workers.push(Worker::new(i, sync::Arc::clone(&receiver)));
         }
-        return t;
+        t
     }
 
     pub fn execute<F>(&self, f: F)
