@@ -3,6 +3,7 @@
 members = [
     "rgrep",
     "server",
+    "city-pop",
 
     "pingcap/talent-plan/kvs",
 ]
