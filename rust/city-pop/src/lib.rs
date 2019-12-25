@@ -4,7 +4,7 @@ extern crate serde;
 use csv::Reader;
 use serde::Deserialize;
 
-use std::fs::File;
+use std::{error::Error, fs::File, path::Path};
 
 #[cfg(test)]
 mod tests;
@@ -23,14 +23,39 @@ pub struct Row {
     longitude: Option<f64>,
 }
 
-pub fn find_city_in_csv(city_name: String, file_path: String) -> Option<Row> {
-    let fd = File::open(file_path).unwrap();
+#[derive(Debug)]
+pub struct PopulationCount {
+    city: String,
+    country: String,
+    count: u64,
+}
+
+pub fn search<P: AsRef<Path>>(
+    file_path: P,
+    city_name: String,
+) -> Result<PopulationCount, Box<dyn Error>> {
+    let fd = File::open(file_path)?;
     let mut rdr = Reader::from_reader(fd);
+    let mut found = None;
     for row in rdr.deserialize() {
-        let row: Row = row.unwrap();
+        let row: Row = row?;
         if row.city == city_name {
-            return Some(row);
+            match row.population {
+                None => {}
+                Some(count) => {
+                    found = Some(PopulationCount {
+                        city: row.city,
+                        country: row.country,
+                        count,
+                    });
+                }
+            };
         }
     }
-    None
+    match found {
+        Some(found) => Ok(found),
+        None => Err(From::from(
+            "No matching cities with a population were found.",
+        )),
+    }
 }

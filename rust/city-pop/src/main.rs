@@ -19,10 +19,12 @@ fn main() {
         println!("{}", matches.usage());
         process::exit(1);
     }
-    let result = find_city_in_csv(
-        matches.value_of("CITY_NAME").unwrap().to_owned(),
+
+    match search(
         matches.value_of("DATA_PATH").unwrap().to_owned(),
-    )
-    .unwrap();
-    println!("{:?}", result);
+        matches.value_of("CITY_NAME").unwrap().to_owned(),
+    ) {
+        Ok(result) => println!("{:?}", result),
+        Err(err) => eprintln!("failed to search: {}", err),
+    };
 }
