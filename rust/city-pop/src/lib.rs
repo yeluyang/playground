@@ -34,6 +34,7 @@ pub fn search<P: AsRef<Path>>(
     file_path: P,
     city_name: String,
 ) -> Result<PopulationCount, Box<dyn Error>> {
+    println!("searching");
     let fd = File::open(file_path)?;
     let mut rdr = Reader::from_reader(fd);
     let mut found = None;
@@ -50,6 +51,7 @@ pub fn search<P: AsRef<Path>>(
                     });
                 }
             };
+            break;
         }
     }
     match found {
