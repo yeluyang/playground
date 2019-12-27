@@ -35,7 +35,6 @@ pub fn search<P: AsRef<Path>>(
     file_path: P,
     city_name: String,
 ) -> Result<PopulationCount, CliError> {
-    println!("searching");
     let fd = File::open(file_path.as_ref())?;
     let mut rdr = Reader::from_reader(fd);
     let mut found = None;

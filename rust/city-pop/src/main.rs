@@ -13,6 +13,10 @@ fn main() {
     let matches = App::new(clap::crate_name!())
         .author(clap::crate_authors!())
         .version(clap::crate_version!())
+        .args(&[Arg::with_name("verbose")
+            .short("v")
+            .long("verbose")
+            .multiple(true)])
         .args(&[Arg::with_name("city_name")
             .short("c")
             .long("city_name")
@@ -30,7 +34,14 @@ fn main() {
             matches.value_of("city_name").unwrap().to_owned(),
         ) {
             Ok(result) => println!("{:?}", result),
-            Err(err) => eprintln!("failed to search: {}", err),
+            Err(err) => match err {
+                CliError::NotFound(_, _) => {
+                    if matches.occurrences_of("verbose") > 0 {
+                        eprintln!("failed to search: {}", err)
+                    }
+                }
+                _ => eprintln!("failed to search: {}", err),
+            },
         }
     } else {
         print!("> ");
