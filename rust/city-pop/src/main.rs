@@ -13,7 +13,10 @@ fn main() {
     let matches = App::new(clap::crate_name!())
         .author(clap::crate_authors!())
         .version(clap::crate_version!())
-        .args(&[Arg::with_name("city_name").short("city").long("city_name")])
+        .args(&[Arg::with_name("city_name")
+            .short("c")
+            .long("city_name")
+            .takes_value(true)])
         .args(&[Arg::with_name("DATA_PATH").required(true)])
         .get_matches();
     if matches.args.is_empty() {
