@@ -2,9 +2,9 @@ extern crate clap;
 
 use clap::{App, Arg, SubCommand};
 
-use kvs::{self, KvStore};
+use kvs::{self, KvStore, Result};
 
-fn main() {
+fn main() -> Result<()> {
     let matches = App::new(clap::crate_name!())
         .version(clap::crate_version!())
         .author(clap::crate_authors!())
@@ -23,9 +23,16 @@ fn main() {
             m.value_of("KEY").unwrap().to_owned(),
             m.value_of("VALUE").unwrap().to_owned(),
         ),
-        ("get", Some(m)) => {
-            kv_store.get(m.value_of("KEY").unwrap().to_owned());
-        }
+        ("get", Some(m)) => kv_store
+            .get(m.value_of("KEY").unwrap().to_owned())
+            .map_err(|err| {
+                eprintln!("{}", err);
+                err
+            })
+            .map(|opt| match opt {
+                Some(val) => println!("{}", val),
+                None => unreachable!(),
+            }),
         ("rm", Some(m)) => kv_store.remove(m.value_of("KEY").unwrap().to_owned()),
         _ => unreachable!(),
     }

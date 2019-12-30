@@ -2,7 +2,10 @@
 
 //! kvs
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
+
+mod errors;
+pub use errors::{Error, Result};
 
 /// KvStore
 #[derive(Default)]
@@ -15,6 +18,7 @@ impl KvStore {
     pub fn new() -> KvStore {
         Default::default()
     }
+
     /// insert a key-value into KvStore
     ///
     /// # Arguments
@@ -30,9 +34,11 @@ impl KvStore {
     /// kvs.set(key.clone(), value.clone());
     /// assert_eq!(kvs.get(key).unwrap(), value);
     /// ```
-    pub fn set(&mut self, key: String, value: String) {
+    pub fn set(&mut self, key: String, value: String) -> Result<()> {
         self.data.insert(key, value);
+        Ok(())
     }
+
     /// get the value of key
     ///
     /// # Arguments
@@ -50,12 +56,13 @@ impl KvStore {
     /// kvs.set(key.clone(), value.clone());
     /// assert_eq!(kvs.get(key).unwrap(), value);
     /// ```
-    pub fn get(&self, key: String) -> Option<String> {
-        match self.data.get(&key) {
-            Some(value) => Some(value.to_owned()),
-            None => None,
-        }
+    pub fn get(&self, key: String) -> Result<Option<String>> {
+        self.data
+            .get(&key)
+            .map(|val| Some(val.to_owned()))
+            .ok_or(Error::KeyNotFound(key))
     }
+
     /// remove a key-value from object of KvStore
     ///
     /// # Arguments
@@ -68,7 +75,10 @@ impl KvStore {
     /// let mut kvs = KvStore::new();
     /// kvs.remove(key);
     /// ```
-    pub fn remove(&mut self, key: String) {
-        self.data.remove(&key);
+    pub fn remove(&mut self, key: String) -> Result<()> {
+        self.data
+            .remove(&key)
+            .ok_or(Error::KeyNotFound(key))
+            .map(|_| ())
     }
 }
