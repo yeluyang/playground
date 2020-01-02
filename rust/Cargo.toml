@@ -1,11 +1,11 @@
 [workspace]
 
 members = [
-    "rgrep",
-    "server",
-    "city-pop",
+    "projects/rgrep",
+    "projects/server",
+    "projects/city-pop",
+    "projects/pingcap/talent-plan/kvs",
 
-    "pingcap/talent-plan/kvs",
     "examples/serde_examples",
 ]
 
