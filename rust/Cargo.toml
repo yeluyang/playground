@@ -6,6 +6,7 @@ members = [
     "city-pop",
 
     "pingcap/talent-plan/kvs",
+    "examples/serde_examples",
 ]
 
 exclude = [
