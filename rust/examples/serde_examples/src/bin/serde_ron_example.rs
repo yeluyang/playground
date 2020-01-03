@@ -18,7 +18,7 @@ fn main() {
     println!("from ron string = {}", c_from_ron_str);
     assert_eq!(cfg, c_from_ron_str);
 
-    // ser to file.ron
+    // write ron string to file.ron
     File::create("tmp/tmp.ron")
         .unwrap()
         .write_all(c_ron_str.as_bytes())

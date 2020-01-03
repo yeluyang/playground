@@ -16,7 +16,7 @@ fn main() {
     println!("from json string = {}", c_from_json_str.to_string());
     assert_eq!(cfg, c_from_json_str);
 
-    // ser to file.json
+    // write json string to file.json
     File::create("tmp/tmp.json")
         .unwrap()
         .write_all(c_json_str.as_bytes())
