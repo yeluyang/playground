@@ -1,10 +1,10 @@
 [workspace]
 
 members = [
-    "projects/rgrep",
-    "projects/server",
-    "projects/city-pop",
-    "projects/pingcap/talent-plan/kvs",
+    "projects/cmd/rgrep",
+    "projects/cmd/server",
+    "projects/cmd/city-pop",
+    "projects/cmd/pingcap/talent-plan/kvs",
 
     "examples/serde_examples",
 ]
