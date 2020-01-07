@@ -7,19 +7,24 @@ extern crate serde;
 
 use serde::{Deserialize, Serialize};
 
+// TODO: ron cannot support i128 and u128, should convert it manually
+// TODO: bson cannot support unsigned, should convert it manually
+
 // normal derive
 #[derive(Debug, PartialEq, Default)]
 // serde derive
 #[derive(Deserialize, Serialize)]
 pub struct Config {
+    id: isize,
     var: String,
-    tuple: (f32, f64),
-    map: HashMap<u8, char>,
-    tuple_struct: TupleStruct,
-    nested: Nested,
-    array: Vec<i32>,
+    tuple: ((), i8, i16, i32, i64),
+    array: Vec<char>,
+    map: HashMap<isize, bool>,
+    // refer: Box<String>, TODO
     enum_var: EnumVariant,
-    refer: Box<String>,
+    tuple_struct: TupleStruct,
+    array_struct: Vec<Nested>,
+    nested: Nested,
 }
 
 impl Display for Config {
@@ -32,7 +37,19 @@ impl Display for Config {
 #[derive(Debug, PartialEq, Default)]
 // serde derive
 #[derive(Deserialize, Serialize)]
-struct TupleStruct((), bool);
+struct TupleStruct(
+    (),
+    bool,
+    char,
+    i8,
+    i16,
+    i32,
+    i64,
+    String,
+    HashMap<isize, bool>,
+    Vec<Nested>,
+    EnumVariant,
+);
 
 // normal derive
 #[derive(Debug, PartialEq)]
@@ -40,9 +57,9 @@ struct TupleStruct((), bool);
 #[derive(Deserialize, Serialize)]
 enum EnumVariant {
     None,
-    Var(u8),
-    Tuple(u8, String),
-    Struct { v: u8, s: String },
+    Var(char),
+    Tuple((), bool, i8, i16, i32, i64),
+    Struct { i: isize, s: String },
 }
 
 impl Default for EnumVariant {
@@ -56,6 +73,13 @@ impl Default for EnumVariant {
 // serde derive
 #[derive(Deserialize, Serialize)]
 struct Nested {
-    a: String,
-    b: char,
+    id: isize,
+    var: String,
+    tuple: ((), i8, i16, i32, i64),
+    array: Vec<isize>,
+    map: HashMap<char, bool>,
+    // refer: Box<String>, TODO
+    enum_var: EnumVariant,
+    tuple_struct: TupleStruct,
+    array_struct: Vec<Nested>,
 }
