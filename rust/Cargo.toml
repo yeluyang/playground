@@ -6,6 +6,8 @@ members = [
     "projects/cmd/city-pop",
     "projects/cmd/pingcap/talent-plan/kvs",
 
+    "projects/lib/buff_io",
+
     "examples/serde_examples",
 ]
 
