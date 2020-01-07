@@ -9,6 +9,7 @@ members = [
     "projects/lib/buff_io",
 
     "examples/serde_examples",
+    "examples/env_examples",
 ]
 
 exclude = [
