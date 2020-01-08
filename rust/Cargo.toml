@@ -7,6 +7,7 @@ members = [
     "projects/cmd/pingcap/talent-plan/kvs",
 
     "projects/lib/buff_io",
+    "projects/lib/segment_io",
 
     "examples/serde_examples",
     "examples/env_examples",
