@@ -8,8 +8,12 @@ fn main() {
     let cfg = Config::default();
 
     // ser to json string
-    let c_json_str = serde_json::to_string_pretty(&cfg).unwrap();
-    println!("json string = {}", c_json_str);
+    let c_json_str = serde_json::to_string(&cfg).unwrap();
+    println!(
+        "json string={{len={}, val={}}}",
+        c_json_str.as_bytes().len(),
+        c_json_str
+    );
 
     // deser from json string
     let c_from_json_str: Config = serde_json::from_str(&c_json_str).unwrap();

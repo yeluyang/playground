@@ -11,7 +11,11 @@ fn main() {
 
     // ser to ron string
     let c_ron_str = ser::to_string(&cfg).unwrap();
-    println!("ron string = {}", c_ron_str);
+    println!(
+        "ron string={{len={}, val={}}}",
+        c_ron_str.as_bytes().len(),
+        c_ron_str
+    );
 
     // deser from ron string
     let c_from_ron_str: Config = de::from_str(&c_ron_str).unwrap();

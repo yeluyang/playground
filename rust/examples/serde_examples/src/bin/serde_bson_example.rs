@@ -13,7 +13,11 @@ fn main() {
     let c_bson_doc = c_bson.as_document().unwrap().clone();
     println!("bson document = {}", c_bson_doc);
     let c_bson_str = c_bson_doc.to_string();
-    println!("bson string = {}", c_bson_str);
+    println!(
+        "bson string={{len={}, val={}}}",
+        c_bson_str.as_bytes().len(),
+        c_bson_str
+    );
 
     // de from bson object
     let c_from_bson: Config = bson::from_bson(c_bson).unwrap();
