@@ -18,9 +18,9 @@ fn test_header() {
         seq_id: 512,
         total: 256,
     };
-    assert_eq!(h1.to_bytes().len(), HEADER_SIZE);
+    assert_eq!(h1.to_bytes().unwrap().len(), HEADER_SIZE);
 
-    let h2 = Header::from(&h1.to_bytes());
+    let h2 = Header::from(&h1.to_bytes().unwrap()).unwrap();
     assert_eq!(h2, h1);
 }
 

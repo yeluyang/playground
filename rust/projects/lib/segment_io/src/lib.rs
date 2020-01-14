@@ -33,26 +33,26 @@ impl Header {
         }
     }
 
-    pub fn from(bs: &[u8]) -> Self {
+    pub fn from(bs: &[u8]) -> io::Result<Self> {
         assert_eq!(bs.len(), HEADER_SIZE);
 
         let mut h = Header::default();
 
         let mut rdr = Cursor::new(Vec::from(bs));
 
-        h.length = rdr.read_u128::<Endian>().unwrap();
-        h.seq_id = rdr.read_u128::<Endian>().unwrap();
-        h.total = rdr.read_u128::<Endian>().unwrap();
+        h.length = rdr.read_u128::<Endian>()?;
+        h.seq_id = rdr.read_u128::<Endian>()?;
+        h.total = rdr.read_u128::<Endian>()?;
 
-        h
+        Ok(h)
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> io::Result<Vec<u8>> {
         let mut wtr = Vec::new();
 
-        wtr.write_u128::<Endian>(self.length).unwrap();
-        wtr.write_u128::<Endian>(self.seq_id).unwrap();
-        wtr.write_u128::<Endian>(self.total).unwrap();
+        wtr.write_u128::<Endian>(self.length)?;
+        wtr.write_u128::<Endian>(self.seq_id)?;
+        wtr.write_u128::<Endian>(self.total)?;
 
         if wtr.len() != HEADER_SIZE {
             panic!(
@@ -62,7 +62,7 @@ impl Header {
             );
         }
 
-        wtr
+        Ok(wtr)
     }
 }
 
@@ -84,20 +84,38 @@ impl SegmentFile {
     pub fn create<P: AsRef<Path>>(path: P) -> io::Result<SegmentFile> {
         SegmentFile::new(File::create(path)?)
     }
+
+    pub fn pop(&mut self) -> io::Result<Vec<u8>> {
+        let h_buf: &mut [u8] = &mut [0u8; HEADER_SIZE];
+        self.buff.read_exact(h_buf)?;
+        let h = Header::from(h_buf)?;
+
+        let mut data = vec![0u8; h.length as usize];
+        self.buff.read_exact(data.as_mut_slice())?;
+
+        Ok(data)
+    }
+
+    pub fn append(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let h = Header::new(buf.len());
+        self.buff.write_all(h.to_bytes()?.as_slice())?;
+        let len = self.buff.write(buf)?;
+        Ok(len)
+    }
 }
 
 impl Read for SegmentFile {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let h_buf: &mut [u8] = &mut [0u8; HEADER_SIZE];
-        self.buff.read_exact(h_buf)?;
-        let h = Header::from(h_buf);
-
-        if buf.len() < h.length as usize {
-            panic!("length of buffer={}, expected={}", buf.len(), h.length);
+        let data = self.pop()?;
+        let len = data.len();
+        if buf.len() < len as usize {
+            panic!(
+                "length of buffer={}, at least greater than {}",
+                buf.len(),
+                len
+            );
         }
 
-        let mut data = vec![0u8; h.length as usize];
-        let len = self.buff.read(data.as_mut_slice())?;
         buf[..len].clone_from_slice(&data[..len]);
         Ok(len)
     }
@@ -105,10 +123,7 @@ impl Read for SegmentFile {
 
 impl Write for SegmentFile {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let h = Header::new(buf.len());
-        self.buff.write_all(h.to_bytes().as_slice())?;
-        let len = self.buff.write(buf)?;
-        Ok(len)
+        self.append(buf)
     }
     fn flush(&mut self) -> io::Result<()> {
         self.buff.flush()
