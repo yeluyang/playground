@@ -17,7 +17,7 @@ fn main() -> Result<()> {
             SubCommand::with_name("rm").args(&[Arg::with_name("KEY").required(true)]),
         ])
         .get_matches();
-    let mut kv_store = KvStore::new();
+    let mut kv_store = KvStore::open("tmp")?;
     match matches.subcommand() {
         ("set", Some(m)) => kv_store.set(
             m.value_of("KEY").unwrap().to_owned(),
