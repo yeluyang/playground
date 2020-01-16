@@ -103,10 +103,7 @@ impl KvStore {
     /// assert_eq!(kvs.get(key).unwrap(), value);
     /// ```
     pub fn get(&self, key: String) -> Result<Option<String>> {
-        self.data
-            .get(&key)
-            .map(|val| Some(val.to_owned()))
-            .ok_or(Error::KeyNotFound(key))
+        Ok(self.data.get(&key).map(|val| val.to_owned()))
     }
 
     /// remove a key-value from object of KvStore

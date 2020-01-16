@@ -45,7 +45,7 @@ fn cli_rm_non_existent_key() {
         .current_dir(&temp_dir)
         .assert()
         .failure()
-        .stdout(eq("Key not found").trim());
+        .stderr(contains("KeyNotFound").trim());
 }
 
 // `kvs set <KEY> <VALUE>` should print nothing and exit with zero.

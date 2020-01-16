@@ -17,7 +17,7 @@ fn main() -> Result<()> {
             SubCommand::with_name("rm").args(&[Arg::with_name("KEY").required(true)]),
         ])
         .get_matches();
-    let mut kv_store = KvStore::open("tmp")?;
+    let mut kv_store = KvStore::open(std::env::current_dir()?)?;
     match matches.subcommand() {
         ("set", Some(m)) => kv_store.set(
             m.value_of("KEY").unwrap().to_owned(),
@@ -31,7 +31,7 @@ fn main() -> Result<()> {
             })
             .map(|opt| match opt {
                 Some(val) => println!("{}", val),
-                None => unreachable!(),
+                None => println!("Key not found"),
             }),
         ("rm", Some(m)) => kv_store.remove(m.value_of("KEY").unwrap().to_owned()),
         _ => unreachable!(),
