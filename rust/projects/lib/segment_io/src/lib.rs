@@ -93,7 +93,15 @@ impl SegmentFile {
 
     pub fn pop(&mut self) -> io::Result<Vec<u8>> {
         let h_buf: &mut [u8] = &mut [0u8; HEADER_SIZE];
-        self.buff.read_exact(h_buf)?;
+        let len = self.buff.read(h_buf)?;
+        if len == 0 {
+            return Ok(Vec::new() as Vec<u8>);
+        } else if len != HEADER_SIZE {
+            panic!(
+                "length of bytes from file mismatch header size: {} vs {}",
+                len, HEADER_SIZE
+            );
+        }
         let h = Header::from(h_buf)?;
 
         let mut data = vec![0u8; h.length as usize];
