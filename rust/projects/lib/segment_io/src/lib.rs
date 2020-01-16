@@ -111,9 +111,8 @@ impl SegmentFile {
     }
 
     pub fn append(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let h = Header::new(buf.len());
-        self.buff.write_all(h.to_bytes()?.as_slice())?;
-        let len = self.buff.write(buf)?;
+        let len = self.write(buf)?;
+        self.flush()?;
         Ok(len)
     }
 }
@@ -137,7 +136,9 @@ impl Read for SegmentFile {
 
 impl Write for SegmentFile {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.append(buf)
+        let h = Header::new(buf.len());
+        self.buff.write_all(h.to_bytes()?.as_slice())?;
+        Ok(self.buff.write(buf)?)
     }
     fn flush(&mut self) -> io::Result<()> {
         self.buff.flush()
