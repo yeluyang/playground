@@ -3,7 +3,10 @@ mod error;
 #[cfg(test)]
 mod tests;
 
-use std::{fs::File, path::Path};
+use std::{
+    fs::{File, OpenOptions},
+    path::Path,
+};
 
 pub use error::{Error, Result};
 
@@ -22,11 +25,17 @@ impl LogStructuredMergeTree {
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Result<LogStructuredMergeTree> {
-        LogStructuredMergeTree::new(File::open(path)?)
+        LogStructuredMergeTree::new(OpenOptions::new().read(true).append(true).open(path)?)
     }
 
     pub fn create<P: AsRef<Path>>(path: P) -> Result<LogStructuredMergeTree> {
-        LogStructuredMergeTree::new(File::create(path)?)
+        LogStructuredMergeTree::new(
+            OpenOptions::new()
+                .read(true)
+                .append(true)
+                .create(true)
+                .open(path)?,
+        )
     }
 
     pub fn read_next(&mut self) -> Result<Option<Vec<u8>>> {

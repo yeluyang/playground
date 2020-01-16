@@ -1,5 +1,5 @@
 use std::{
-    fs::File,
+    fs::{File, OpenOptions},
     io::{self, Cursor, Read, Seek, SeekFrom, Write},
     mem,
     path::Path,
@@ -78,11 +78,17 @@ impl SegmentFile {
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<SegmentFile> {
-        SegmentFile::new(File::open(path)?)
+        SegmentFile::new(OpenOptions::new().read(true).append(true).open(path)?)
     }
 
     pub fn create<P: AsRef<Path>>(path: P) -> io::Result<SegmentFile> {
-        SegmentFile::new(File::create(path)?)
+        SegmentFile::new(
+            OpenOptions::new()
+                .read(true)
+                .append(true)
+                .create(true)
+                .open(path)?,
+        )
     }
 
     pub fn pop(&mut self) -> io::Result<Vec<u8>> {
