@@ -25,14 +25,21 @@ impl LogStructuredMergeTree {
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Result<LogStructuredMergeTree> {
-        LogStructuredMergeTree::new(OpenOptions::new().read(true).append(true).open(path)?)
+        LogStructuredMergeTree::new(
+            OpenOptions::new()
+                .read(true)
+                .append(true)
+                .create(true)
+                .open(path)?,
+        )
     }
 
     pub fn create<P: AsRef<Path>>(path: P) -> Result<LogStructuredMergeTree> {
         LogStructuredMergeTree::new(
             OpenOptions::new()
                 .read(true)
-                .append(true)
+                .write(true)
+                .truncate(true)
                 .create(true)
                 .open(path)?,
         )

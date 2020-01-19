@@ -78,14 +78,21 @@ impl SegmentFile {
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<SegmentFile> {
-        SegmentFile::new(OpenOptions::new().read(true).append(true).open(path)?)
+        SegmentFile::new(
+            OpenOptions::new()
+                .read(true)
+                .append(true)
+                .create(true)
+                .open(path)?,
+        )
     }
 
     pub fn create<P: AsRef<Path>>(path: P) -> io::Result<SegmentFile> {
         SegmentFile::new(
             OpenOptions::new()
                 .read(true)
-                .append(true)
+                .write(true)
+                .truncate(true)
                 .create(true)
                 .open(path)?,
         )
