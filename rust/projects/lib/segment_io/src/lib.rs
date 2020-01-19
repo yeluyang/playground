@@ -98,11 +98,11 @@ impl SegmentFile {
         )
     }
 
-    pub fn pop(&mut self) -> io::Result<Vec<u8>> {
+    fn read_header(&mut self) -> io::Result<Option<Header>> {
         let h_buf: &mut [u8] = &mut [0u8; HEADER_SIZE];
         let len = self.buff.read(h_buf)?;
         if len == 0 {
-            return Ok(Vec::new() as Vec<u8>);
+            return Ok(None);
         } else if len != HEADER_SIZE {
             panic!(
                 "length of bytes from file mismatch header size: {} vs {}",
@@ -111,43 +111,81 @@ impl SegmentFile {
         }
         let h = Header::from(h_buf)?;
 
-        let mut data = vec![0u8; h.length as usize];
-        self.buff.read_exact(data.as_mut_slice())?;
+        Ok(Some(h))
+    }
 
-        Ok(data)
+    // TODO: impl next and iter
+    pub fn pop(&mut self) -> io::Result<Option<Vec<u8>>> {
+        if let Some(h) = self.read_header()? {
+            let mut data = vec![0u8; h.length as usize];
+            self.buff.read_exact(data.as_mut_slice())?;
+            Ok(Some(data))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn append(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let len = self.write(buf)?;
-        self.flush()?;
+        self.buff.seek(SeekFrom::End(0))?;
+        let h = Header::new(buf.len());
+        self.buff.write_all(h.to_bytes()?.as_slice())?;
+        Ok(self.buff.write(buf)?)
+    }
+
+    pub fn seek_header(&mut self, n: usize) -> io::Result<u64> {
+        self.buff.seek(SeekFrom::Start(0))?;
+
+        if n <= 1 {
+            return Ok(0u64);
+        }
+
+        let mut i = 1usize;
+        let mut len = 0u64;
+        while let Some(h) = self.read_header()? {
+            len = self.buff.seek(SeekFrom::Current(h.length as i64))?;
+            if i == n - 1 {
+                break;
+            }
+            i += 1;
+        }
         Ok(len)
     }
 }
 
 impl Read for SegmentFile {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let data = self.pop()?;
-        let len = data.len();
-        if buf.len() < len as usize {
-            panic!(
-                "length of buffer={}, at least greater than {}",
-                buf.len(),
-                len
-            );
+        if let Some(data) = self.pop()? {
+            let len = data.len();
+            if buf.len() < len as usize {
+                panic!(
+                    "length of buffer={}, at least greater than {}",
+                    buf.len(),
+                    len
+                );
+            }
+            buf[..len].clone_from_slice(&data[..len]);
+            Ok(len)
+        } else {
+            Ok(0)
         }
-
-        buf[..len].clone_from_slice(&data[..len]);
-        Ok(len)
     }
 }
 
 impl Write for SegmentFile {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let h = Header::new(buf.len());
-        self.buff.write_all(h.to_bytes()?.as_slice())?;
-        Ok(self.buff.write(buf)?)
+        self.append(buf)
     }
     fn flush(&mut self) -> io::Result<()> {
         self.buff.flush()
+    }
+}
+
+impl Seek for SegmentFile {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        let p = match pos {
+            SeekFrom::Start(p) => p as usize,
+            _ => unimplemented!(),
+        };
+        self.seek_header(p)
     }
 }

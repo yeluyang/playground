@@ -1,6 +1,6 @@
 use std::{
     fs,
-    io::{Read, Write},
+    io::{Read, Seek, SeekFrom, Write},
     path::Path,
 };
 
@@ -67,5 +67,14 @@ fn test_segment_file_io() {
         assert_eq!(&buf[..bs.len()], bs.as_slice());
         let c: Case = serde_json::from_slice(&buf[..bs.len()]).unwrap();
         assert_eq!(&c, case);
+    }
+
+    for (i, _) in cases.iter().enumerate() {
+        let bs = serde_json::to_vec(&cases[i]).unwrap();
+        s_file.seek(SeekFrom::Start((i + 1) as u64)).unwrap();
+        assert_eq!(s_file.read(buf.as_mut_slice()).unwrap(), bs.len());
+        assert_eq!(&buf[..bs.len()], bs.as_slice());
+        let c: Case = serde_json::from_slice(&buf[..bs.len()]).unwrap();
+        assert_eq!(&c, &cases[i]);
     }
 }
