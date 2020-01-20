@@ -5,25 +5,38 @@ use serde::{Deserialize, Serialize};
 
 extern crate serde_json;
 
-use crate::LogStructuredMergeTree;
+use crate::{LogStructuredMergeTree, Record};
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct TestRecord {
+    id: usize,
+    data: Vec<String>,
+}
+
+impl From<Vec<u8>> for TestRecord {
+    fn from(data: Vec<u8>) -> Self {
+        serde_json::from_slice(data.as_slice()).expect("failed to get TestRecord from bytes")
+    }
+}
+
+impl Record for TestRecord {
+    fn to_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).expect("failed to ser TestRecord to bytes")
+    }
+}
 
 #[test]
-fn test_lsmt() {
-    #[derive(Debug, PartialEq, Serialize, Deserialize)]
-    struct Case {
-        id: usize,
-        data: Vec<String>,
-    }
+fn test_lsmt_io() {
     let cases = [
-        Case {
+        TestRecord {
             id: 0,
             data: vec![],
         },
-        Case {
+        TestRecord {
             id: 1,
             data: vec!["hello".to_owned(), "world".to_owned()],
         },
-        Case {
+        TestRecord {
             id: 2,
             data: vec!["end".to_owned()],
         },
@@ -37,18 +50,13 @@ fn test_lsmt() {
     {
         let mut lsmter = LogStructuredMergeTree::create(&file_path).unwrap();
         for case in &cases {
-            let bs = serde_json::to_vec(case).unwrap();
-            lsmter.append(bs.as_slice()).unwrap();
+            lsmter.append(case).unwrap();
         }
     }
 
     let mut lsmter = LogStructuredMergeTree::open(&file_path).unwrap();
     for case in &cases {
-        let bs = serde_json::to_vec(case).unwrap();
-        let data = lsmter.read_next().unwrap().unwrap();
-        assert_eq!(data.len(), bs.len());
-        assert_eq!(data, bs);
-        let c: Case = serde_json::from_slice(data.as_slice()).unwrap();
+        let c = lsmter.read_next::<TestRecord>().unwrap().unwrap();
         assert_eq!(&c, case);
     }
 }
