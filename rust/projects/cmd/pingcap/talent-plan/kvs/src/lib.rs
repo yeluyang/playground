@@ -55,8 +55,7 @@ impl KvStore {
             wal: LogStructuredMergeTree::new(fd)?,
         };
 
-        while let Some(data) = kvs_store.wal.read_next()? {
-            let cmd = Command::from(data.as_slice());
+        while let Some(cmd) = kvs_store.wal.read_next::<Command>()? {
             kvs_store.play(&cmd)?;
         }
 
@@ -81,7 +80,7 @@ impl KvStore {
     pub fn set(&mut self, key: String, value: String) -> Result<()> {
         let cmd = Command::Set { key, value };
         self.play(&cmd)?;
-        self.wal.append(cmd.as_bytes().as_slice())?;
+        self.wal.append(&cmd)?;
         Ok(())
     }
 
@@ -121,7 +120,7 @@ impl KvStore {
     pub fn remove(&mut self, key: String) -> Result<()> {
         let cmd = Command::Remove { key };
         self.play(&cmd)?;
-        self.wal.append(cmd.as_bytes().as_slice())?;
+        self.wal.append(&cmd)?;
         Ok(())
     }
 
