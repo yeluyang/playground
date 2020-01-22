@@ -56,4 +56,13 @@ impl LogStructuredMergeTree {
         self.fd.append(r.to_bytes().as_slice())?;
         Ok(())
     }
+
+    pub fn read_by_seek<T: From<Vec<u8>>>(&mut self, n: usize) -> Result<Option<T>> {
+        self.fd.seek_header(n)?;
+        if let Some(data) = self.fd.pop()? {
+            Ok(Some(T::from(data)))
+        } else {
+            Ok(None)
+        }
+    }
 }

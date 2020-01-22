@@ -59,4 +59,9 @@ fn test_lsmt_io() {
         let c = lsmter.read_next::<TestRecord>().unwrap().unwrap();
         assert_eq!(&c, case);
     }
+
+    for (i, case) in cases.iter().enumerate() {
+        let c = lsmter.read_by_seek::<TestRecord>(i + 1).unwrap().unwrap();
+        assert_eq!(&c, case);
+    }
 }
