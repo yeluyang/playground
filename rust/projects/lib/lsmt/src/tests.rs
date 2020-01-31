@@ -23,6 +23,9 @@ impl Record for TestRecord {
     fn to_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).expect("failed to ser TestRecord to bytes")
     }
+    fn get_entry_key(&self) -> String {
+        format!("{}", self.id)
+    }
 }
 
 #[test]

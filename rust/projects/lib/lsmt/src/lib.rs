@@ -1,7 +1,7 @@
 mod error;
 
-mod record;
-pub use record::Record;
+mod entry;
+pub use entry::{LogEntry, Record};
 
 #[cfg(test)]
 mod tests;
@@ -48,21 +48,17 @@ impl LogStructuredMergeTree {
         )
     }
 
-    pub fn read_next<T: From<Vec<u8>>>(&mut self) -> Result<Option<T>> {
-        Ok(self.fd.pop()?.map(T::from))
+    pub fn read_next<T: Record>(&mut self) -> Result<Option<T>> {
+        Ok(self.fd.pop()?.map(LogEntry::from).map(|l| T::from(l.data)))
     }
 
     pub fn append<T: Record>(&mut self, r: &T) -> Result<()> {
-        self.fd.append(r.to_bytes().as_slice())?;
+        self.fd.append(LogEntry::from(r).to_bytes().as_slice())?;
         Ok(())
     }
 
-    pub fn read_by_seek<T: From<Vec<u8>>>(&mut self, n: usize) -> Result<Option<T>> {
+    pub fn read_by_seek<T: Record>(&mut self, n: usize) -> Result<Option<T>> {
         self.fd.seek_header(n)?;
-        if let Some(data) = self.fd.pop()? {
-            Ok(Some(T::from(data)))
-        } else {
-            Ok(None)
-        }
+        self.read_next()
     }
 }
