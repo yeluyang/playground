@@ -8,9 +8,6 @@ use std::{
 extern crate byteorder;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
-extern crate buff_io;
-use buff_io::Buffer;
-
 #[cfg(test)]
 mod tests;
 
@@ -67,14 +64,13 @@ impl Header {
 }
 
 pub struct SegmentFile {
-    buff: Buffer<File>,
+    inner: File,
 }
 
 impl SegmentFile {
-    pub fn new(fd: File) -> io::Result<SegmentFile> {
-        let mut buff = Buffer::new(fd)?;
-        buff.seek(SeekFrom::Start(0))?;
-        Ok(SegmentFile { buff })
+    pub fn new(mut fd: File) -> io::Result<SegmentFile> {
+        fd.seek(SeekFrom::Start(0))?;
+        Ok(SegmentFile { inner: fd })
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<SegmentFile> {
@@ -100,7 +96,7 @@ impl SegmentFile {
 
     fn read_header(&mut self) -> io::Result<Option<Header>> {
         let h_buf: &mut [u8] = &mut [0u8; HEADER_SIZE];
-        let len = self.buff.read(h_buf)?;
+        let len = self.inner.read(h_buf)?;
         if len == 0 {
             return Ok(None);
         } else if len != HEADER_SIZE {
@@ -118,7 +114,7 @@ impl SegmentFile {
     pub fn pop(&mut self) -> io::Result<Option<Vec<u8>>> {
         if let Some(h) = self.read_header()? {
             let mut data = vec![0u8; h.length as usize];
-            self.buff.read_exact(data.as_mut_slice())?;
+            self.inner.read_exact(data.as_mut_slice())?;
             Ok(Some(data))
         } else {
             Ok(None)
@@ -126,14 +122,14 @@ impl SegmentFile {
     }
 
     pub fn append(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.buff.seek(SeekFrom::End(0))?;
+        self.inner.seek(SeekFrom::End(0))?;
         let h = Header::new(buf.len());
-        self.buff.write_all(h.to_bytes()?.as_slice())?;
-        Ok(self.buff.write(buf)?)
+        self.inner.write_all(h.to_bytes()?.as_slice())?;
+        Ok(self.inner.write(buf)?)
     }
 
     pub fn seek_header(&mut self, n: usize) -> io::Result<u64> {
-        self.buff.seek(SeekFrom::Start(0))?;
+        self.inner.seek(SeekFrom::Start(0))?;
 
         if n <= 1 {
             return Ok(0u64);
@@ -142,7 +138,7 @@ impl SegmentFile {
         let mut i = 1usize;
         let mut len = 0u64;
         while let Some(h) = self.read_header()? {
-            len = self.buff.seek(SeekFrom::Current(h.length as i64))?;
+            len = self.inner.seek(SeekFrom::Current(h.length as i64))?;
             if i == n - 1 {
                 break;
             }
@@ -176,7 +172,7 @@ impl Write for SegmentFile {
         self.append(buf)
     }
     fn flush(&mut self) -> io::Result<()> {
-        self.buff.flush()
+        self.inner.flush()
     }
 }
 
