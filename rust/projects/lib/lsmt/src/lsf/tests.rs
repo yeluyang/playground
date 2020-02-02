@@ -1,11 +1,14 @@
-use std::{fs, path::Path};
+use std::{fs, ops::RangeInclusive, path::Path};
 
 extern crate serde;
 use serde::{Deserialize, Serialize};
 
 extern crate serde_json;
 
-use crate::{LogStructuredMergeTree, Record};
+use super::{
+    entry::{LogEntryPointer, LogFileHeader, Record},
+    ls_file::LogStructuredFile,
+};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct TestRecord {
@@ -51,20 +54,30 @@ fn test_lsmt_io() {
     }
     let file_path = tmp_dir.join("tmp.wal");
     {
-        let mut lsmter = LogStructuredMergeTree::create(&file_path).unwrap();
+        let mut ls_fd = LogStructuredFile::create(
+            &file_path,
+            LogFileHeader::new(RangeInclusive::new(0, 0), false, 0),
+        )
+        .unwrap();
         for case in &cases {
-            lsmter.append(case).unwrap();
+            ls_fd.append(case).unwrap();
         }
     }
 
-    let mut lsmter = LogStructuredMergeTree::open(&file_path).unwrap();
+    let mut ls_fd = LogStructuredFile::open(&file_path).unwrap();
     for case in &cases {
-        let c = lsmter.read_next::<TestRecord>().unwrap().unwrap();
+        let c = ls_fd.pop::<TestRecord>().unwrap().unwrap();
         assert_eq!(&c, case);
     }
 
-    for (i, case) in cases.iter().enumerate() {
-        let c = lsmter.read_by_seek::<TestRecord>(i + 1).unwrap().unwrap();
+    for case in &cases {
+        let c = ls_fd
+            .read_by_pointer::<TestRecord>(&LogEntryPointer {
+                file_id: 0,
+                entry_key: case.get_entry_key(),
+            })
+            .unwrap()
+            .unwrap();
         assert_eq!(&c, case);
     }
 }

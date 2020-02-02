@@ -65,6 +65,7 @@ impl Header {
 
 pub struct SegmentFile {
     inner: File,
+    // TODO add array cache pair: header to pos
 }
 
 impl SegmentFile {
@@ -110,7 +111,6 @@ impl SegmentFile {
         Ok(Some(h))
     }
 
-    // TODO: impl next and iter
     pub fn pop(&mut self) -> io::Result<Option<Vec<u8>>> {
         if let Some(h) = self.read_header()? {
             let mut data = vec![0u8; h.length as usize];
