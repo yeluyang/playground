@@ -72,10 +72,7 @@ fn test_lsmt_io() {
 
     for case in &cases {
         let c = ls_fd
-            .read_by_pointer::<TestRecord>(&LogEntryPointer {
-                file_id: 0,
-                entry_key: case.get_entry_key(),
-            })
+            .read_by_pointer::<TestRecord>(&LogEntryPointer::new(0, case.get_entry_key()))
             .unwrap()
             .unwrap();
         assert_eq!(&c, case);

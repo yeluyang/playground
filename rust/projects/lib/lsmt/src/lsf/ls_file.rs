@@ -1,4 +1,5 @@
 use std::{
+    cmp::Ordering,
     fs::{File, OpenOptions},
     path::Path,
 };
@@ -46,7 +47,8 @@ impl LogStructuredFile {
         }
     }
 
-    pub fn create<P: AsRef<Path>>(path: P, header: LogFileHeader) -> Result<LogStructuredFile> {
+    pub fn create<P: AsRef<Path>>(dir: P, header: LogFileHeader) -> Result<LogStructuredFile> {
+        let path = dir.as_ref().join(format!("{}.wal", header.ids.end()));
         let mut ls_fd = LogStructuredFile::new(
             OpenOptions::new()
                 .read(true)
@@ -64,30 +66,52 @@ impl LogStructuredFile {
         Ok(self.fd.pop()?.map(LogEntry::from))
     }
 
-    fn write_end(&mut self, l: LogEntry) -> Result<()> {
-        self.fd.append(l.to_bytes().as_slice())?;
-        Ok(())
-    }
-
-    pub fn pop<T: Record>(&mut self) -> Result<Option<T>> {
+    fn read_next_data(&mut self) -> Result<Option<LogEntry>> {
         while let Some(l) = self.read_next()? {
             match l {
-                LogEntry::Data(data) => return Ok(Some(T::from(data.data))),
+                LogEntry::Data(_) => return Ok(Some(l)),
                 _ => continue, // skip log file header and log index
             }
         }
         Ok(None)
     }
 
-    pub fn pop_pointer<T: Record>(&mut self) -> Result<Option<LogEntryPointer>> {
-        Ok(self.pop::<T>()?.map(|r| LogEntryPointer {
-            file_id: *self.header.ids.start(),
-            entry_key: r.get_entry_key(),
-        }))
+    fn write_end(&mut self, l: LogEntry) -> Result<()> {
+        self.fd.append(l.to_bytes().as_slice())?;
+        Ok(())
     }
 
-    pub fn append<T: Record>(&mut self, r: &T) -> Result<()> {
-        self.write_end(LogEntry::from(r))
+    pub fn pop<T: Record>(&mut self) -> Result<Option<T>> {
+        if let Some(l) = self.read_next_data()? {
+            match l {
+                LogEntry::Data(data) => Ok(Some(T::from(data.data))),
+                _ => unreachable!(),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn pop_pointer(&mut self) -> Result<Option<LogEntryPointer>> {
+        if let Some(l) = self.read_next_data()? {
+            match l {
+                LogEntry::Data(data) => Ok(Some(LogEntryPointer::new(
+                    *self.header.ids.start(),
+                    data.key,
+                ))),
+                _ => unreachable!(),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn append<T: Record>(&mut self, r: &T) -> Result<LogEntryPointer> {
+        self.write_end(LogEntry::from(r))?;
+        Ok(LogEntryPointer::new(
+            *self.header.ids.start(),
+            r.get_entry_key(),
+        ))
     }
 
     fn read_by_seek<T: Record>(&mut self, n: usize) -> Result<Option<T>> {
@@ -103,5 +127,35 @@ impl LogStructuredFile {
             }
         }
         Ok(None)
+    }
+
+    pub fn compact(&mut self) -> Result<()> {
+        unimplemented!()
+    }
+}
+
+impl Eq for LogStructuredFile {}
+
+impl PartialEq for LogStructuredFile {
+    fn eq(&self, other: &Self) -> bool {
+        self.header == other.header
+    }
+}
+
+impl PartialOrd for LogStructuredFile {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for LogStructuredFile {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.header.ids.end() < other.header.ids.end() {
+            Ordering::Less
+        } else if self.eq(other) {
+            Ordering::Equal
+        } else {
+            Ordering::Greater
+        }
     }
 }

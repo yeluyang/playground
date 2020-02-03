@@ -10,12 +10,18 @@ pub trait Record: From<Vec<u8>> {
     fn get_entry_key(&self) -> String;
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Eq, Clone, Serialize, Deserialize)]
 pub struct LogFileHeader {
     pub version: usize,
     pub ids: RangeInclusive<usize>,
     pub compacted: bool,
     pub entry_count: usize,
+}
+
+impl PartialEq for LogFileHeader {
+    fn eq(&self, other: &Self) -> bool {
+        self.ids == other.ids && self.compacted == other.compacted
+    }
 }
 
 impl Default for LogFileHeader {
@@ -37,7 +43,7 @@ impl LogFileHeader {
 
 #[derive(Serialize, Deserialize)]
 pub struct LogEntryData {
-    key: String,
+    pub key: String,
     pub data: Vec<u8>,
 }
 
@@ -72,4 +78,10 @@ impl<T: Record> From<&T> for LogEntry {
 pub struct LogEntryPointer {
     pub file_id: usize,
     pub entry_key: String,
+}
+
+impl LogEntryPointer {
+    pub fn new(file_id: usize, entry_key: String) -> Self {
+        LogEntryPointer { file_id, entry_key }
+    }
 }
