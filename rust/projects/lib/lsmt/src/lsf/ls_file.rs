@@ -115,12 +115,12 @@ impl LogStructuredFile {
     }
 
     fn read_by_seek<T: Record>(&mut self, n: usize) -> Result<Option<T>> {
-        self.fd.seek_header(n + 1)?; // +1 to skip log file header
+        self.fd.seek_segment(n + 1)?; // +1 to skip log file header
         self.pop()
     }
 
     pub fn read_by_pointer<T: Record>(&mut self, p: &LogEntryPointer) -> Result<Option<T>> {
-        self.fd.seek_header(1)?;
+        self.fd.seek_segment(1)?;
         while let Some(r) = self.pop::<T>()? {
             if r.get_entry_key() == p.entry_key {
                 return Ok(Some(r));

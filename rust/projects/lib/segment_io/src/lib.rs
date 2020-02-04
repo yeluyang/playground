@@ -2,6 +2,7 @@ use std::{
     fs::{File, OpenOptions},
     io::{self, Cursor, Read, Seek, SeekFrom, Write},
     mem,
+    ops::RangeInclusive,
     path::Path,
 };
 
@@ -65,23 +66,37 @@ impl Header {
 
 pub struct SegmentFile {
     inner: File,
-    // TODO add array cache pair: header to pos
+    index: Vec<RangeInclusive<u64>>,
 }
 
 impl SegmentFile {
     pub fn new(mut fd: File) -> io::Result<SegmentFile> {
         fd.seek(SeekFrom::Start(0))?;
-        Ok(SegmentFile { inner: fd })
+        Ok(SegmentFile {
+            inner: fd,
+            index: vec![],
+        })
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<SegmentFile> {
-        SegmentFile::new(
+        let mut seg = SegmentFile::new(
             OpenOptions::new()
                 .read(true)
                 .append(true)
                 .create(true)
                 .open(path)?,
-        )
+        )?;
+        loop {
+            let start = seg.inner.seek(SeekFrom::Current(0))?;
+            if let Some(h) = seg.read_header()? {
+                let end = seg.inner.seek(SeekFrom::Current(h.length as i64))?;
+                seg.index.push(RangeInclusive::new(start, end));
+            } else {
+                break;
+            }
+        }
+        seg.inner.seek(SeekFrom::Start(0))?;
+        Ok(seg)
     }
 
     pub fn create<P: AsRef<Path>>(path: P) -> io::Result<SegmentFile> {
@@ -99,16 +114,15 @@ impl SegmentFile {
         let h_buf: &mut [u8] = &mut [0u8; HEADER_SIZE];
         let len = self.inner.read(h_buf)?;
         if len == 0 {
-            return Ok(None);
+            Ok(None)
         } else if len != HEADER_SIZE {
             panic!(
                 "length of bytes from file mismatch header size: {} vs {}",
                 len, HEADER_SIZE
             );
+        } else {
+            Ok(Some(Header::from(h_buf)?))
         }
-        let h = Header::from(h_buf)?;
-
-        Ok(Some(h))
     }
 
     pub fn pop(&mut self) -> io::Result<Option<Vec<u8>>> {
@@ -122,29 +136,27 @@ impl SegmentFile {
     }
 
     pub fn append(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.seek(SeekFrom::End(0))?;
+        let start = self.inner.seek(SeekFrom::End(0))?;
+        let mut end = start;
+
         let h = Header::new(buf.len());
-        self.inner.write_all(h.to_bytes()?.as_slice())?;
-        Ok(self.inner.write(buf)?)
+        end += self.inner.write(h.to_bytes()?.as_slice())? as u64;
+
+        let len = self.inner.write(buf)?;
+        end += len as u64;
+
+        self.index.push(RangeInclusive::new(start, end));
+        Ok(len)
     }
 
-    pub fn seek_header(&mut self, n: usize) -> io::Result<u64> {
-        self.inner.seek(SeekFrom::Start(0))?;
-
-        if n <= 1 {
-            return Ok(0u64);
+    pub fn seek_segment(&mut self, n: usize) -> io::Result<Option<u64>> {
+        if n < self.index.len() {
+            self.inner
+                .seek(SeekFrom::Start(*self.index[n].start()))
+                .map(Some)
+        } else {
+            Ok(None)
         }
-
-        let mut i = 1usize;
-        let mut len = 0u64;
-        while let Some(h) = self.read_header()? {
-            len = self.inner.seek(SeekFrom::Current(h.length as i64))?;
-            if i == n - 1 {
-                break;
-            }
-            i += 1;
-        }
-        Ok(len)
     }
 }
 
@@ -180,8 +192,17 @@ impl Seek for SegmentFile {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let p = match pos {
             SeekFrom::Start(p) => p as usize,
+            SeekFrom::End(mut p) => {
+                if p < 0 {
+                    p *= -1;
+                }
+                if p as usize >= self.index.len() {
+                    return Ok(0);
+                }
+                self.index.len() - 1 - p as usize
+            }
             _ => unimplemented!(),
         };
-        self.seek_header(p)
+        Ok(self.seek_segment(p)?.unwrap_or(0))
     }
 }

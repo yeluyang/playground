@@ -53,28 +53,61 @@ fn test_segment_file_io() {
 
     {
         let mut s_file = SegmentFile::create("tmp/tmp.txt").unwrap();
-        for case in &cases {
+        for (i, case) in cases.iter().enumerate() {
+            assert_eq!(s_file.index.len(), i);
+
             let bs = serde_json::to_vec(case).unwrap();
             assert_eq!(s_file.write(bs.as_slice()).unwrap(), bs.len());
+        }
+        assert_eq!(s_file.index.len(), cases.len());
+
+        let mut last_pos = 0u64;
+        for rng in s_file.index.iter() {
+            assert_eq!(rng.start(), &last_pos);
+            last_pos = *rng.end();
         }
     }
 
     let mut s_file = SegmentFile::open("tmp/tmp.txt").unwrap();
+    assert_eq!(s_file.index.len(), cases.len());
     let mut buf = vec![0u8; 2048];
+
     for case in &cases {
         let bs = serde_json::to_vec(case).unwrap();
         assert_eq!(s_file.read(buf.as_mut_slice()).unwrap(), bs.len());
         assert_eq!(&buf[..bs.len()], bs.as_slice());
+
         let c: Case = serde_json::from_slice(&buf[..bs.len()]).unwrap();
         assert_eq!(&c, case);
     }
 
-    for (i, _) in cases.iter().enumerate() {
-        let bs = serde_json::to_vec(&cases[i]).unwrap();
-        s_file.seek(SeekFrom::Start((i + 1) as u64)).unwrap();
+    for (i, case) in cases.iter().enumerate() {
+        assert_eq!(
+            &s_file.seek(SeekFrom::Start(i as u64)).unwrap(),
+            s_file.index[i].start()
+        );
+
+        let bs = serde_json::to_vec(case).unwrap();
         assert_eq!(s_file.read(buf.as_mut_slice()).unwrap(), bs.len());
         assert_eq!(&buf[..bs.len()], bs.as_slice());
+
         let c: Case = serde_json::from_slice(&buf[..bs.len()]).unwrap();
-        assert_eq!(&c, &cases[i]);
+        assert_eq!(&c, case);
     }
+    assert_eq!(s_file.seek(SeekFrom::Start(cases.len() as u64)).unwrap(), 0);
+
+    for (i, case) in cases.iter().rev().enumerate() {
+        assert_eq!(
+            &s_file.seek(SeekFrom::End(i as i64)).unwrap(),
+            s_file.index[s_file.index.len() - 1 - i].start()
+        );
+
+        let bs = serde_json::to_vec(case).unwrap();
+        assert_eq!(s_file.read(buf.as_mut_slice()).unwrap(), bs.len(),);
+        assert_eq!(&buf[..bs.len()], bs.as_slice());
+
+        let c: Case = serde_json::from_slice(&buf[..bs.len()]).unwrap();
+        assert_eq!(&c, case);
+    }
+    assert_eq!(s_file.seek(SeekFrom::End(cases.len() as i64)).unwrap(), 0);
 }
