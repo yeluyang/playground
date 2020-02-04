@@ -40,7 +40,7 @@ impl LogStructuredMergeTree {
         if fds.is_empty() {
             fds.push(LogStructuredFile::create(
                 &cfg.lsmt_dir,
-                LogFileHeader::new(RangeInclusive::new(0, 0), false, 0),
+                LogFileHeader::new(RangeInclusive::new(0, 0), false),
             )?)
         }
         fds.sort();

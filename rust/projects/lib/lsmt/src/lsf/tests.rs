@@ -26,13 +26,13 @@ impl Record for TestRecord {
     fn to_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).expect("failed to ser TestRecord to bytes")
     }
-    fn get_entry_key(&self) -> String {
+    fn key(&self) -> String {
         format!("{}", self.id)
     }
 }
 
 #[test]
-fn test_lsmt_io() {
+fn test_lsf_io() {
     let cases = [
         TestRecord {
             id: 0,
@@ -52,19 +52,26 @@ fn test_lsmt_io() {
     if !tmp_dir.exists() {
         fs::create_dir(tmp_dir).unwrap();
     }
-    let file_path = tmp_dir.join("tmp.wal");
+    let mut file_path = String::default();
     {
         let mut ls_fd = LogStructuredFile::create(
-            &file_path,
-            LogFileHeader::new(RangeInclusive::new(0, 0), false, 0),
+            &tmp_dir,
+            LogFileHeader::new(RangeInclusive::new(0, 0), false),
         )
         .unwrap();
-        for case in &cases {
+        file_path = ls_fd.path();
+        assert_eq!(ls_fd.index.len(), 0);
+        for (i, case) in cases.iter().enumerate() {
+            assert_eq!(ls_fd.index.len(), i);
             ls_fd.append(case).unwrap();
+            assert_eq!(ls_fd.index.len(), i + 1);
         }
+        assert_eq!(ls_fd.index.len(), cases.len());
     }
 
     let mut ls_fd = LogStructuredFile::open(&file_path).unwrap();
+    assert_eq!(ls_fd.index.len(), cases.len());
+
     for case in &cases {
         let c = ls_fd.pop::<TestRecord>().unwrap().unwrap();
         assert_eq!(&c, case);
@@ -72,7 +79,7 @@ fn test_lsmt_io() {
 
     for case in &cases {
         let c = ls_fd
-            .read_by_pointer::<TestRecord>(&LogEntryPointer::new(0, case.get_entry_key()))
+            .read_by_pointer::<TestRecord>(&LogEntryPointer::new(0, case.key()))
             .unwrap()
             .unwrap();
         assert_eq!(&c, case);

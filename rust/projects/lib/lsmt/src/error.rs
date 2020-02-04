@@ -11,6 +11,7 @@ pub enum Error {
     HeaderMissing(String),
     EmptyFile(String),
     InvalidPath(OsString),
+    IncompleteWrite(String),
 }
 
 impl Display for Error {
@@ -32,6 +33,11 @@ impl Display for Error {
                 "failed to open log structed file: invalid path, path={:?}",
                 path,
             ),
+            Self::IncompleteWrite(ref path) => write!(
+                f,
+                "failed to open log structed file: incomplete write, path={}",
+                path,
+            ),
         }
     }
 }
@@ -46,7 +52,7 @@ impl From<io::Error> for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub fn get_path_string<P: AsRef<Path>>(path: P) -> Result<String> {
+pub fn path_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
     path.as_ref()
         .to_str()
         .map(|s| s.to_owned())

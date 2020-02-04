@@ -7,15 +7,17 @@ extern crate serde_json as serde_fmt;
 
 pub trait Record: From<Vec<u8>> {
     fn to_bytes(&self) -> Vec<u8>;
-    fn get_entry_key(&self) -> String;
+    fn key(&self) -> String;
 }
+
+pub type LogEntryKey = String;
+pub type LogEntryIndex = HashMap<LogEntryKey, usize>;
 
 #[derive(Eq, Clone, Serialize, Deserialize)]
 pub struct LogFileHeader {
     pub version: usize,
     pub ids: RangeInclusive<usize>,
     pub compacted: bool,
-    pub entry_count: usize,
 }
 
 impl PartialEq for LogFileHeader {
@@ -26,31 +28,30 @@ impl PartialEq for LogFileHeader {
 
 impl Default for LogFileHeader {
     fn default() -> Self {
-        Self::new(RangeInclusive::new(0, 0), false, 0)
+        Self::new(RangeInclusive::new(0, 0), false)
     }
 }
 
 impl LogFileHeader {
-    pub fn new(ids: RangeInclusive<usize>, compacted: bool, entry_count: usize) -> Self {
+    pub fn new(ids: RangeInclusive<usize>, compacted: bool) -> Self {
         LogFileHeader {
             version: 0,
             ids,
             compacted,
-            entry_count,
         }
     }
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct LogEntryData {
-    pub key: String,
+    pub key: LogEntryKey,
     pub data: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub enum LogEntry {
     FileHeader(LogFileHeader),
-    Index(HashMap<String, usize>),
+    Index(usize, LogEntryIndex),
     Data(LogEntryData),
 }
 
@@ -69,7 +70,7 @@ impl From<Vec<u8>> for LogEntry {
 impl<T: Record> From<&T> for LogEntry {
     fn from(r: &T) -> Self {
         LogEntry::Data(LogEntryData {
-            key: r.get_entry_key(),
+            key: r.key(),
             data: r.to_bytes(),
         })
     }
@@ -77,11 +78,11 @@ impl<T: Record> From<&T> for LogEntry {
 
 pub struct LogEntryPointer {
     pub file_id: usize,
-    pub entry_key: String,
+    pub key: LogEntryKey,
 }
 
 impl LogEntryPointer {
-    pub fn new(file_id: usize, entry_key: String) -> Self {
-        LogEntryPointer { file_id, entry_key }
+    pub fn new(file_id: usize, key: String) -> Self {
+        LogEntryPointer { file_id, key }
     }
 }

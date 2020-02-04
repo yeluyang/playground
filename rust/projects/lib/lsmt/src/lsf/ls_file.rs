@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    fs::{File, OpenOptions},
+    io::{Seek, SeekFrom},
     path::Path,
 };
 
@@ -9,64 +9,76 @@ use segment_io::SegmentFile;
 
 use crate::error::{self, Error, Result};
 
-use super::entry::{LogEntry, LogEntryPointer, LogFileHeader, Record};
+use super::entry::{LogEntry, LogEntryIndex, LogEntryPointer, LogFileHeader, Record};
 
 pub struct LogStructuredFile {
+    path: String,
     header: LogFileHeader,
+    pub(super) index: LogEntryIndex,
+    entry_count: usize,
     fd: SegmentFile,
 }
 
 impl LogStructuredFile {
-    pub fn new(fd: File, file_header: LogFileHeader) -> Result<LogStructuredFile> {
+    pub fn new<P: AsRef<Path>>(
+        path: P,
+        fd: SegmentFile,
+        file_header: LogFileHeader,
+    ) -> Result<LogStructuredFile> {
         Ok(LogStructuredFile {
+            path: error::path_to_string(path)?,
             header: file_header,
-            fd: SegmentFile::new(fd)?,
+            index: LogEntryIndex::default(),
+            entry_count: 0,
+            fd,
         })
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Result<LogStructuredFile> {
-        let mut ls_fd = LogStructuredFile::new(
-            OpenOptions::new()
-                .read(true)
-                .append(true)
-                .create(true)
-                .open(&path)?,
-            LogFileHeader::default(),
-        )?;
+        let mut ls_fd =
+            LogStructuredFile::new(&path, SegmentFile::open(&path)?, LogFileHeader::default())?;
 
         if let Some(l) = ls_fd.read_next()? {
             match l {
                 LogEntry::FileHeader(h) => {
                     ls_fd.header = h;
-                    Ok(ls_fd)
                 }
-                _ => Err(Error::HeaderMissing(error::get_path_string(path)?)),
+                _ => return Err(Error::HeaderMissing(error::path_to_string(path)?)),
             }
         } else {
-            Err(Error::EmptyFile(error::get_path_string(path)?))
-        }
+            return Err(Error::EmptyFile(error::path_to_string(path)?));
+        };
+
+        ls_fd.fd.seek(SeekFrom::End(0))?;
+        match ls_fd.read_next()?.unwrap() {
+            LogEntry::Index(entry_count, index) => {
+                ls_fd.index = index;
+                ls_fd.entry_count = entry_count;
+            }
+            _ => return Err(Error::IncompleteWrite(error::path_to_string(path)?)),
+        };
+
+        ls_fd.fd.seek(SeekFrom::Start(0))?;
+        Ok(ls_fd)
     }
 
     pub fn create<P: AsRef<Path>>(dir: P, header: LogFileHeader) -> Result<LogStructuredFile> {
         let path = dir.as_ref().join(format!("{}.wal", header.ids.end()));
-        let mut ls_fd = LogStructuredFile::new(
-            OpenOptions::new()
-                .read(true)
-                .write(true)
-                .truncate(true)
-                .create(true)
-                .open(path)?,
-            header,
-        )?;
+        let mut ls_fd = LogStructuredFile::new(&path, SegmentFile::create(&path)?, header)?;
         ls_fd.write_end(LogEntry::FileHeader(ls_fd.header.clone()))?;
+        ls_fd.write_end(LogEntry::Index(ls_fd.entry_count + 1, ls_fd.index.clone()))?;
         Ok(ls_fd)
+    }
+
+    pub fn path(&self) -> String {
+        self.path.clone()
     }
 
     fn read_next(&mut self) -> Result<Option<LogEntry>> {
         Ok(self.fd.pop()?.map(LogEntry::from))
     }
 
-    fn read_next_data(&mut self) -> Result<Option<LogEntry>> {
+    fn read_next_record(&mut self) -> Result<Option<LogEntry>> {
         while let Some(l) = self.read_next()? {
             match l {
                 LogEntry::Data(_) => return Ok(Some(l)),
@@ -76,13 +88,8 @@ impl LogStructuredFile {
         Ok(None)
     }
 
-    fn write_end(&mut self, l: LogEntry) -> Result<()> {
-        self.fd.append(l.to_bytes().as_slice())?;
-        Ok(())
-    }
-
     pub fn pop<T: Record>(&mut self) -> Result<Option<T>> {
-        if let Some(l) = self.read_next_data()? {
+        if let Some(l) = self.read_next_record()? {
             match l {
                 LogEntry::Data(data) => Ok(Some(T::from(data.data))),
                 _ => unreachable!(),
@@ -93,7 +100,7 @@ impl LogStructuredFile {
     }
 
     pub fn pop_pointer(&mut self) -> Result<Option<LogEntryPointer>> {
-        if let Some(l) = self.read_next_data()? {
+        if let Some(l) = self.read_next_record()? {
             match l {
                 LogEntry::Data(data) => Ok(Some(LogEntryPointer::new(
                     *self.header.ids.start(),
@@ -106,27 +113,23 @@ impl LogStructuredFile {
         }
     }
 
-    pub fn append<T: Record>(&mut self, r: &T) -> Result<LogEntryPointer> {
-        self.write_end(LogEntry::from(r))?;
-        Ok(LogEntryPointer::new(
-            *self.header.ids.start(),
-            r.get_entry_key(),
-        ))
+    fn write_end(&mut self, l: LogEntry) -> Result<()> {
+        self.fd.append(l.to_bytes().as_slice())?;
+        self.entry_count += 1;
+        Ok(())
     }
 
-    fn read_by_seek<T: Record>(&mut self, n: usize) -> Result<Option<T>> {
-        self.fd.seek_segment(n + 1)?; // +1 to skip log file header
-        self.pop()
+    pub fn append<T: Record>(&mut self, r: &T) -> Result<LogEntryPointer> {
+        self.write_end(LogEntry::from(r))?;
+        self.index.insert(r.key(), self.entry_count - 1);
+        self.write_end(LogEntry::Index(self.entry_count + 1, self.index.clone()))?;
+        Ok(LogEntryPointer::new(*self.header.ids.start(), r.key()))
     }
 
     pub fn read_by_pointer<T: Record>(&mut self, p: &LogEntryPointer) -> Result<Option<T>> {
-        self.fd.seek_segment(1)?;
-        while let Some(r) = self.pop::<T>()? {
-            if r.get_entry_key() == p.entry_key {
-                return Ok(Some(r));
-            }
-        }
-        Ok(None)
+        let header_count = self.index[&p.key];
+        self.fd.seek_segment(header_count)?;
+        self.pop()
     }
 
     pub fn compact(&mut self) -> Result<()> {
