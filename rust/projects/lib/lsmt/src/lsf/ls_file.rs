@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    io::{Seek, SeekFrom},
+    io::{Seek, SeekFrom, Write},
     path::Path,
 };
 
@@ -13,9 +13,9 @@ use super::entry::{LogEntry, LogEntryIndex, LogEntryPointer, LogFileHeader, Reco
 
 pub struct LogStructuredFile {
     path: String,
-    header: LogFileHeader,
-    pub(super) index: LogEntryIndex,
-    entry_count: usize,
+    pub(crate) header: LogFileHeader,
+    pub(crate) index: LogEntryIndex,
+    pub(crate) entry_count: usize,
     fd: SegmentFile,
 }
 
@@ -115,6 +115,7 @@ impl LogStructuredFile {
 
     fn write_end(&mut self, l: LogEntry) -> Result<()> {
         self.fd.append(l.to_bytes().as_slice())?;
+        self.fd.flush()?;
         self.entry_count += 1;
         Ok(())
     }

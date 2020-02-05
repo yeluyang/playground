@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, fs, ops::RangeInclusive, path::Path};
+use std::{fs, ops::RangeInclusive, path::Path};
 
 mod error;
 pub use error::{Error, Result};
@@ -10,6 +10,7 @@ use lsf::{LogFileHeader, LogStructuredFile};
 #[cfg(test)]
 mod tests;
 
+#[derive(Clone)]
 pub struct Config {
     pub lsmt_dir: String,
     pub file_size: usize,
@@ -19,7 +20,7 @@ pub struct Config {
 pub struct LogStructuredMergeTree {
     cfg: Config,
 
-    fds: VecDeque<LogStructuredFile>,
+    fds: Vec<LogStructuredFile>,
 
     fd_cursor: usize,
 }
@@ -33,8 +34,10 @@ impl LogStructuredMergeTree {
         let mut fds = vec![];
         for entry in fs::read_dir(lsmt_dir)? {
             let path = entry?.path();
-            if path.ends_with(".wal") {
-                fds.push(LogStructuredFile::open(path)?);
+            if let Some(ext) = path.extension() {
+                if ext == "wal" {
+                    fds.push(LogStructuredFile::open(path)?);
+                }
             }
         }
         if fds.is_empty() {
@@ -44,10 +47,10 @@ impl LogStructuredMergeTree {
             )?)
         }
         fds.sort();
-        for fd in &mut fds {
-            fd.compact()?;
-        }
-        let fds = VecDeque::from(fds);
+        // TODO
+        // for fd in &mut fds {
+        //     fd.compact()?;
+        // }
         Ok(LogStructuredMergeTree {
             cfg,
             fds,
@@ -68,10 +71,23 @@ impl LogStructuredMergeTree {
     }
 
     pub fn append<T: Record>(&mut self, r: &T) -> Result<LogEntryPointer> {
-        self.fds
-            .back_mut()
-            .expect("no *.wal files in directory")
-            .append(r)
+        if self.fds.last().unwrap().entry_count >= 2 * (self.cfg.file_size + 1) {
+            let next_id = *self.fds.last().unwrap().header.ids.end() + 1;
+            self.fds.push(LogStructuredFile::create(
+                &self.cfg.lsmt_dir,
+                LogFileHeader::new(RangeInclusive::new(next_id, next_id), false),
+            )?)
+        }
+        self.fds.last_mut().unwrap().append(r)
+    }
+
+    pub fn read_by_pointer<T: Record>(&mut self, p: &LogEntryPointer) -> Result<Option<T>> {
+        for fd in &mut self.fds {
+            if fd.header.ids.contains(&p.file_id) {
+                return fd.read_by_pointer(p);
+            }
+        }
+        Ok(None)
     }
 
     fn merge() {

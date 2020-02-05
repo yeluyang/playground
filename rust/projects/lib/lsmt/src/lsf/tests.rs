@@ -1,8 +1,5 @@
 use std::{fs, ops::RangeInclusive, path::Path};
 
-extern crate serde;
-use serde::{Deserialize, Serialize};
-
 extern crate serde_json;
 
 use super::{
@@ -10,26 +7,7 @@ use super::{
     ls_file::LogStructuredFile,
 };
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct TestRecord {
-    id: usize,
-    data: Vec<String>,
-}
-
-impl From<Vec<u8>> for TestRecord {
-    fn from(data: Vec<u8>) -> Self {
-        serde_json::from_slice(data.as_slice()).expect("failed to get TestRecord from bytes")
-    }
-}
-
-impl Record for TestRecord {
-    fn to_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(self).expect("failed to ser TestRecord to bytes")
-    }
-    fn key(&self) -> String {
-        format!("{}", self.id)
-    }
-}
+use crate::tests::TestRecord;
 
 #[test]
 fn test_lsf_io() {
@@ -48,7 +26,7 @@ fn test_lsf_io() {
         },
     ];
 
-    let tmp_dir = Path::new("tmp");
+    let tmp_dir = Path::new("tmp/test_lsf_io");
     if !tmp_dir.exists() {
         fs::create_dir(tmp_dir).unwrap();
     }
