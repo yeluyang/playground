@@ -2,14 +2,10 @@
 
 //! kvs
 
-use std::{
-    collections::HashMap,
-    fs::{self, OpenOptions},
-    path::Path,
-};
+use std::{collections::HashMap, fs, path::Path};
 
 extern crate lsmt;
-use lsmt::LogStructuredMergeTree;
+use lsmt::{LogEntryPointer, LogStructuredMergeTree};
 
 mod errors;
 pub use errors::{Error, Result};
@@ -19,8 +15,7 @@ use command::Command;
 
 /// KvStore
 pub struct KvStore {
-    seq_id: usize,
-    data: HashMap<String, String>,
+    data: HashMap<String, LogEntryPointer>,
     wal: LogStructuredMergeTree,
 }
 
@@ -35,28 +30,21 @@ impl KvStore {
             fs::create_dir(&dir)?;
         }
 
-        let persistent_path = dir.as_ref().join("0.wal");
-        let fd = if persistent_path.exists() {
-            OpenOptions::new()
-                .append(true)
-                .read(true)
-                .open(persistent_path)?
-        } else {
-            OpenOptions::new()
-                .append(true)
-                .read(true)
-                .create(true)
-                .open(persistent_path)?
-        };
-
         let mut kvs_store = KvStore {
-            seq_id: 0,
             data: HashMap::default(),
-            wal: LogStructuredMergeTree::new(fd)?,
+            wal: LogStructuredMergeTree::open(lsmt::Config {
+                lsmt_dir: dir
+                    .as_ref()
+                    .to_str()
+                    .map(|s| s.to_owned())
+                    .ok_or(Error::InvalidPath(dir.as_ref().as_os_str().to_os_string()))?,
+                file_size: 100,
+                merge_threshold: 4,
+            })?,
         };
 
-        while let Some(cmd) = kvs_store.wal.read_next::<Command>()? {
-            kvs_store.play(&cmd)?;
+        while let Some(p) = kvs_store.wal.pop()? {
+            kvs_store.data.insert(p.key.clone(), p);
         }
 
         Ok(kvs_store)
@@ -79,8 +67,8 @@ impl KvStore {
     /// ```
     pub fn set(&mut self, key: String, value: String) -> Result<()> {
         let cmd = Command::Set { key, value };
-        self.play(&cmd)?;
-        self.wal.append(&cmd)?;
+        let p = self.wal.append(&cmd)?;
+        self.data.insert(p.key.clone(), p);
         Ok(())
     }
 
@@ -101,8 +89,19 @@ impl KvStore {
     /// kvs.set(key.clone(), value.clone());
     /// assert_eq!(kvs.get(key).unwrap(), value);
     /// ```
-    pub fn get(&self, key: String) -> Result<Option<String>> {
-        Ok(self.data.get(&key).map(|val| val.to_owned()))
+    pub fn get(&mut self, key: String) -> Result<Option<String>> {
+        if let Some(p) = self.data.get(&key) {
+            if let Some(c) = self.wal.read_by_pointer::<Command>(p)? {
+                match c {
+                    Command::Set { value, .. } => Ok(Some(value)),
+                    Command::Remove { .. } => Ok(None),
+                }
+            } else {
+                Err(Error::DataNotFound(key))
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     /// remove a key-value from object of KvStore
@@ -118,28 +117,11 @@ impl KvStore {
     /// kvs.remove(key);
     /// ```
     pub fn remove(&mut self, key: String) -> Result<()> {
-        let cmd = Command::Remove { key };
-        self.play(&cmd)?;
+        let cmd = Command::Remove { key: key.clone() };
         self.wal.append(&cmd)?;
+        self.data
+            .remove(&key)
+            .ok_or(Error::KeyNotFound(key.clone()))?;
         Ok(())
-    }
-
-    fn play(&mut self, cmd: &Command) -> Result<()> {
-        match cmd {
-            Command::Set { key, value } => {
-                self.data.insert(key.to_owned(), value.to_owned());
-                Ok(())
-            }
-            Command::Remove { key } => {
-                let key = key.to_owned();
-                self.data
-                    .remove(&key)
-                    .ok_or(Error::KeyNotFound(key))
-                    .map(|_| ())
-            }
-        }
-        .map(|_| {
-            self.seq_id += 1;
-        })
     }
 }

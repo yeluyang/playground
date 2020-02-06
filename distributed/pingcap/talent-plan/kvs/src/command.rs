@@ -20,6 +20,12 @@ impl Record for Command {
             )
         })
     }
+    fn key(&self) -> String {
+        match self {
+            Command::Set { key, .. } => key.clone(),
+            Command::Remove { key } => key.clone(),
+        }
+    }
 }
 
 impl From<&[u8]> for Command {

@@ -1,5 +1,6 @@
 use std::{
     error,
+    ffi::OsString,
     fmt::{self, Display, Formatter},
     io,
 };
@@ -13,10 +14,14 @@ pub enum Error {
     Unknown,
     /// key not found in data-storage
     KeyNotFound(String),
+    /// data not found
+    DataNotFound(String),
     /// error from LogStructuredMergeTree
     LSMTError(lsmt::Error),
     /// IO error
     IO(io::Error),
+    /// XXX
+    InvalidPath(OsString),
 }
 
 impl Display for Error {
@@ -24,6 +29,8 @@ impl Display for Error {
         match *self {
             Error::Unknown => write!(f, "unknown or impossible error occurred"),
             Error::KeyNotFound(ref key) => write!(f, "`key = {}` not found in storage", key),
+            Error::DataNotFound(ref key) => write!(f, "data of key={} not found in storage", key),
+            Error::InvalidPath(ref path) => write!(f, "path={:?} invalid", path),
             Error::LSMTError(ref err) => err.fmt(f),
             Error::IO(ref err) => err.fmt(f),
         }
