@@ -47,10 +47,9 @@ impl LogStructuredMergeTree {
             )?)
         }
         fds.sort();
-        // TODO
-        // for fd in &mut fds {
-        //     fd.compact()?;
-        // }
+        for fd in fds.split_last_mut().unwrap().1 {
+            fd.compact()?;
+        }
         Ok(LogStructuredMergeTree {
             cfg,
             fds,
@@ -72,11 +71,13 @@ impl LogStructuredMergeTree {
 
     pub fn append<T: Record>(&mut self, r: &T) -> Result<LogEntryPointer> {
         if self.fds.last().unwrap().entry_count >= 2 * (self.cfg.file_size + 1) {
+            self.fds.last_mut().unwrap().compact()?;
+
             let next_id = *self.fds.last().unwrap().header.ids.end() + 1;
             self.fds.push(LogStructuredFile::create(
                 &self.cfg.lsmt_dir,
                 LogFileHeader::new(RangeInclusive::new(next_id, next_id), false),
-            )?)
+            )?);
         }
         self.fds.last_mut().unwrap().append(r)
     }

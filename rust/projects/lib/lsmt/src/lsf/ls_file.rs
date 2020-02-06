@@ -1,5 +1,6 @@
 use std::{
     cmp::Ordering,
+    fs,
     io::{Seek, SeekFrom, Write},
     path::Path,
 };
@@ -11,6 +12,7 @@ use crate::error::{self, Error, Result};
 
 use super::entry::{LogEntry, LogEntryIndex, LogEntryPointer, LogFileHeader, Record};
 
+#[derive(Debug)]
 pub struct LogStructuredFile {
     path: String,
     pub(crate) header: LogFileHeader,
@@ -66,7 +68,7 @@ impl LogStructuredFile {
         let path = dir.as_ref().join(format!("{}.wal", header.ids.end()));
         let mut ls_fd = LogStructuredFile::new(&path, SegmentFile::create(&path)?, header)?;
         ls_fd.write_end(LogEntry::FileHeader(ls_fd.header.clone()))?;
-        ls_fd.write_end(LogEntry::Index(ls_fd.entry_count + 1, ls_fd.index.clone()))?;
+        ls_fd.write_end(LogEntry::Index(ls_fd.entry_count, ls_fd.index.clone()))?;
         Ok(ls_fd)
     }
 
@@ -121,9 +123,9 @@ impl LogStructuredFile {
     }
 
     pub fn append<T: Record>(&mut self, r: &T) -> Result<LogEntryPointer> {
+        self.index.insert(r.key(), self.entry_count);
         self.write_end(LogEntry::from(r))?;
-        self.index.insert(r.key(), self.entry_count - 1);
-        self.write_end(LogEntry::Index(self.entry_count + 1, self.index.clone()))?;
+        self.write_end(LogEntry::Index(self.entry_count, self.index.clone()))?;
         Ok(LogEntryPointer::new(*self.header.ids.start(), r.key()))
     }
 
@@ -134,7 +136,53 @@ impl LogStructuredFile {
     }
 
     pub fn compact(&mut self) -> Result<()> {
-        unimplemented!()
+        if self.header.compacted {
+            return Ok(());
+        }
+        let dir = Path::new(&self.path).parent().unwrap();
+        let path = dir.join(format!("{}.compacted.wal", self.header.ids.end()));
+        let mut compacted = SegmentFile::create(&path)?;
+
+        let mut entry_count = 0usize;
+
+        let mut header = self.header.clone();
+        header.compacted = true;
+        compacted.append(LogEntry::FileHeader(header.clone()).to_bytes().as_slice())?;
+        compacted.flush()?;
+        entry_count += 1;
+
+        let mut entrys: Vec<(usize, String, LogEntry)> = Vec::new();
+        for (key, header_count) in &self.index {
+            self.fd.seek_segment(*header_count)?;
+            let l = self.fd.pop()?.map(LogEntry::from).unwrap();
+            entrys.push((*header_count, key.clone(), l));
+        }
+        entrys.sort_by(|l, r| l.0.cmp(&r.0));
+        let mut index = LogEntryIndex::new();
+        for e in entrys {
+            let (_, key, l) = e;
+            index.insert(key.clone(), entry_count);
+            compacted.append(l.to_bytes().as_slice())?;
+            compacted.flush()?;
+            entry_count += 1;
+        }
+
+        compacted.append(
+            LogEntry::Index(entry_count, index.clone())
+                .to_bytes()
+                .as_slice(),
+        )?;
+        compacted.flush()?;
+        entry_count += 1;
+
+        self.fd = compacted;
+        fs::remove_file(&self.path)?;
+        self.path = error::path_to_string(path)?;
+
+        self.header = header;
+        self.index = index;
+        self.entry_count = entry_count;
+        Ok(())
     }
 }
 

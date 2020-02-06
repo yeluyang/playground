@@ -63,8 +63,8 @@ fn test_segment_file_io() {
 
         let mut last_pos = 0u64;
         for rng in s_file.index.iter() {
-            assert_eq!(rng.start(), &last_pos);
-            last_pos = *rng.end();
+            assert_eq!(rng.start, last_pos);
+            last_pos = rng.end;
         }
     }
 
@@ -83,8 +83,8 @@ fn test_segment_file_io() {
 
     for (i, case) in cases.iter().enumerate() {
         assert_eq!(
-            &s_file.seek(SeekFrom::Start(i as u64)).unwrap(),
-            s_file.index[i].start()
+            s_file.seek(SeekFrom::Start(i as u64)).unwrap(),
+            s_file.index[i].start
         );
 
         let bs = serde_json::to_vec(case).unwrap();
@@ -98,8 +98,8 @@ fn test_segment_file_io() {
 
     for (i, case) in cases.iter().rev().enumerate() {
         assert_eq!(
-            &s_file.seek(SeekFrom::End(i as i64)).unwrap(),
-            s_file.index[s_file.index.len() - 1 - i].start()
+            s_file.seek(SeekFrom::End(i as i64)).unwrap(),
+            s_file.index[s_file.index.len() - 1 - i].start
         );
 
         let bs = serde_json::to_vec(case).unwrap();

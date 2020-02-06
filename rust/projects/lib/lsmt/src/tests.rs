@@ -63,24 +63,26 @@ fn test_lsmt() {
                 let p = lt.append(case).unwrap();
                 assert_eq!(&p.file_id, lt.fds.last().unwrap().header.ids.end());
                 assert_eq!(p.key, case.key());
+
+                let c = lt.read_by_pointer::<TestRecord>(&p).unwrap().unwrap();
+                assert_eq!(&c, case);
             }
+        }
+        for fd in &lt.fds {
+            assert_eq!(fd.index.len(), cases.len());
         }
     }
 
     let mut lt = LogStructuredMergeTree::open(cfg.clone()).unwrap();
     let mut index: HashMap<String, Vec<LogEntryPointer>> = HashMap::new();
-    for _ in 0..iterations {
-        for case in cases.iter() {
-            let p = lt.pop().unwrap().unwrap();
-            assert_eq!(&p.file_id, lt.fds[lt.fd_cursor].header.ids.end());
-            assert_eq!(p.key, case.key());
-            match index.get_mut(&p.key) {
-                Some(ps) => ps.push(p),
-                None => {
-                    index.insert(p.key.clone(), vec![p]);
-                }
-            };
-        }
+    while let Some(p) = lt.pop().unwrap() {
+        assert_eq!(&p.file_id, lt.fds[lt.fd_cursor].header.ids.end());
+        match index.get_mut(&p.key) {
+            Some(ps) => ps.push(p),
+            None => {
+                index.insert(p.key.clone(), vec![p]);
+            }
+        };
     }
     assert_eq!(index.len(), cases.len());
 
@@ -88,9 +90,10 @@ fn test_lsmt() {
     for c in &cases {
         cs.insert(c.key(), c.clone());
     }
-    for (_, pointers) in index.iter() {
+    for (key, pointers) in index.iter() {
         for p in pointers {
             let c = lt.read_by_pointer::<TestRecord>(p).unwrap().unwrap();
+            assert_eq!(&c.key(), key);
             assert_eq!(c, cs[&c.key()]);
         }
     }

@@ -13,7 +13,7 @@ pub trait Record: From<Vec<u8>> {
 pub type LogEntryKey = String;
 pub type LogEntryIndex = HashMap<LogEntryKey, usize>;
 
-#[derive(Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, Clone, Serialize, Deserialize)]
 pub struct LogFileHeader {
     pub version: usize,
     pub ids: RangeInclusive<usize>,
@@ -76,6 +76,7 @@ impl<T: Record> From<&T> for LogEntry {
     }
 }
 
+#[derive(Debug)]
 pub struct LogEntryPointer {
     pub file_id: usize,
     pub key: LogEntryKey,

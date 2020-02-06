@@ -2,7 +2,7 @@ use std::{
     fs::{File, OpenOptions},
     io::{self, Cursor, Read, Seek, SeekFrom, Write},
     mem,
-    ops::RangeInclusive,
+    ops::Range,
     path::Path,
 };
 
@@ -64,9 +64,10 @@ impl Header {
     }
 }
 
+#[derive(Debug)]
 pub struct SegmentFile {
     inner: File,
-    index: Vec<RangeInclusive<u64>>,
+    index: Vec<Range<u64>>,
 }
 
 impl SegmentFile {
@@ -90,7 +91,7 @@ impl SegmentFile {
             let start = seg.inner.seek(SeekFrom::Current(0))?;
             if let Some(h) = seg.read_header()? {
                 let end = seg.inner.seek(SeekFrom::Current(h.length as i64))?;
-                seg.index.push(RangeInclusive::new(start, end));
+                seg.index.push(Range { start, end });
             } else {
                 break;
             }
@@ -145,14 +146,14 @@ impl SegmentFile {
         let len = self.inner.write(buf)?;
         end += len as u64;
 
-        self.index.push(RangeInclusive::new(start, end));
+        self.index.push(Range { start, end });
         Ok(len)
     }
 
     pub fn seek_segment(&mut self, n: usize) -> io::Result<Option<u64>> {
         if n < self.index.len() {
             self.inner
-                .seek(SeekFrom::Start(*self.index[n].start()))
+                .seek(SeekFrom::Start(self.index[n].start))
                 .map(Some)
         } else {
             Ok(None)
