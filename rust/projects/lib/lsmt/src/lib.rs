@@ -4,8 +4,8 @@ mod error;
 pub use error::{Error, Result};
 
 mod lsf;
+use lsf::{LogEntry, LogEntryKey, LogFileHeader, LogStructuredFile};
 pub use lsf::{LogEntryPointer, Record};
-use lsf::{LogFileHeader, LogStructuredFile};
 
 #[cfg(test)]
 mod tests;
@@ -79,6 +79,9 @@ impl LogStructuredMergeTree {
                 LogFileHeader::new(RangeInclusive::new(next_id, next_id), false),
             )?);
         }
+        if self.fds.len() - 1 > self.cfg.merge_threshold {
+            self.merge()?;
+        }
         self.fds.last_mut().unwrap().append(r)
     }
 
@@ -91,7 +94,45 @@ impl LogStructuredMergeTree {
         Ok(None)
     }
 
-    fn merge() {
-        unimplemented!()
+    fn merge(&mut self) -> Result<()> {
+        self.fds.reverse();
+        let mut old_fds = self.fds.split_off(1);
+        old_fds.reverse();
+        // create new file with id [id .. id]
+        let mut fd = LogStructuredFile::create(
+            &self.cfg.lsmt_dir,
+            LogFileHeader::new(
+                RangeInclusive::new(
+                    *old_fds.first().unwrap().header.ids.start(),
+                    *old_fds.last().unwrap().header.ids.end(),
+                ),
+                false,
+            ),
+        )?;
+        // append entry into new file from other compacted files
+        while let Some(mut old) = old_fds.pop() {
+            //for old in old_fds.iter_mut() {
+            let mut entrys: Vec<(usize, LogEntryKey, LogEntry)> = Vec::new();
+            for (key, count) in &old.index.clone() {
+                let l = old
+                    .read_entry_by_pointer(&LogEntryPointer::new(
+                        *old.header.ids.start(),
+                        key.clone(),
+                    ))?
+                    .unwrap();
+                entrys.push((*count, key.clone(), l));
+            }
+            entrys.sort_by(|l, r| l.0.cmp(&r.0));
+            for e in entrys {
+                fd.write_entry_data(e.1, e.2)?;
+            }
+            // remove older fd with its local file
+            fs::remove_file(old.path())?;
+        }
+        // compact new file
+        fd.compact()?;
+        // push new file into self.fds front
+        self.fds.insert(0, fd);
+        Ok(())
     }
 }

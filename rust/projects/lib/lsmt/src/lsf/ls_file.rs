@@ -10,7 +10,7 @@ use segment_io::SegmentFile;
 
 use crate::error::{self, Error, Result};
 
-use super::entry::{LogEntry, LogEntryIndex, LogEntryPointer, LogFileHeader, Record};
+use super::entry::{LogEntry, LogEntryIndex, LogEntryKey, LogEntryPointer, LogFileHeader, Record};
 
 #[derive(Debug)]
 pub struct LogStructuredFile {
@@ -65,7 +65,12 @@ impl LogStructuredFile {
     }
 
     pub fn create<P: AsRef<Path>>(dir: P, header: LogFileHeader) -> Result<LogStructuredFile> {
-        let path = dir.as_ref().join(format!("{}.wal", header.ids.end()));
+        let path = if header.ids.start() == header.ids.end() {
+            dir.as_ref().join(format!("{}.wal", header.ids.end()))
+        } else {
+            dir.as_ref()
+                .join(format!("{}-{}.wal", header.ids.start(), header.ids.end()))
+        };
         let mut ls_fd = LogStructuredFile::new(&path, SegmentFile::create(&path)?, header)?;
         ls_fd.write_end(LogEntry::FileHeader(ls_fd.header.clone()))?;
         ls_fd.write_end(LogEntry::Index(ls_fd.entry_count, ls_fd.index.clone()))?;
@@ -115,18 +120,32 @@ impl LogStructuredFile {
         }
     }
 
-    fn write_end(&mut self, l: LogEntry) -> Result<()> {
+    pub(crate) fn write_end(&mut self, l: LogEntry) -> Result<()> {
         self.fd.append(l.to_bytes().as_slice())?;
         self.fd.flush()?;
         self.entry_count += 1;
         Ok(())
     }
 
-    pub fn append<T: Record>(&mut self, r: &T) -> Result<LogEntryPointer> {
-        self.index.insert(r.key(), self.entry_count);
-        self.write_end(LogEntry::from(r))?;
+    pub(crate) fn write_entry_data(&mut self, key: LogEntryKey, l: LogEntry) -> Result<()> {
+        self.index.insert(key, self.entry_count);
+        self.write_end(l)?;
         self.write_end(LogEntry::Index(self.entry_count, self.index.clone()))?;
+        Ok(())
+    }
+
+    pub fn append<T: Record>(&mut self, r: &T) -> Result<LogEntryPointer> {
+        self.write_entry_data(r.key(), LogEntry::from(r))?;
         Ok(LogEntryPointer::new(*self.header.ids.start(), r.key()))
+    }
+
+    pub(crate) fn read_entry_by_pointer(
+        &mut self,
+        p: &LogEntryPointer,
+    ) -> Result<Option<LogEntry>> {
+        let header_count = self.index[&p.key];
+        self.fd.seek_segment(header_count)?;
+        self.read_next_record()
     }
 
     pub fn read_by_pointer<T: Record>(&mut self, p: &LogEntryPointer) -> Result<Option<T>> {
@@ -140,7 +159,15 @@ impl LogStructuredFile {
             return Ok(());
         }
         let dir = Path::new(&self.path).parent().unwrap();
-        let path = dir.join(format!("{}.compacted.wal", self.header.ids.end()));
+        let path = if self.header.ids.start() == self.header.ids.end() {
+            dir.join(format!("{}.compacted.wal", self.header.ids.end()))
+        } else {
+            dir.join(format!(
+                "{}-{}.compacted.wal",
+                self.header.ids.start(),
+                self.header.ids.end()
+            ))
+        };
         let mut compacted = SegmentFile::create(&path)?;
 
         let mut entry_count = 0usize;
@@ -151,7 +178,7 @@ impl LogStructuredFile {
         compacted.flush()?;
         entry_count += 1;
 
-        let mut entrys: Vec<(usize, String, LogEntry)> = Vec::new();
+        let mut entrys: Vec<(usize, LogEntryKey, LogEntry)> = Vec::new();
         for (key, header_count) in &self.index {
             self.fd.seek_segment(*header_count)?;
             let l = self.fd.pop()?.map(LogEntry::from).unwrap();
@@ -202,7 +229,7 @@ impl PartialOrd for LogStructuredFile {
 
 impl Ord for LogStructuredFile {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.header.ids.end() < other.header.ids.end() {
+        if self.header.ids.end() < other.header.ids.start() {
             Ordering::Less
         } else if self.eq(other) {
             Ordering::Equal

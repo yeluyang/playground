@@ -27,9 +27,10 @@ fn test_lsf_io() {
     ];
 
     let tmp_dir = Path::new("tmp/test_lsf_io");
-    if !tmp_dir.exists() {
-        fs::create_dir(tmp_dir).unwrap();
+    if tmp_dir.exists() {
+        fs::remove_dir_all(tmp_dir).unwrap();
     }
+    fs::create_dir(tmp_dir).unwrap();
     let mut file_path = String::default();
     {
         let mut ls_fd = LogStructuredFile::create(

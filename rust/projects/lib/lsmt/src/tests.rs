@@ -76,7 +76,7 @@ fn test_lsmt() {
     let mut lt = LogStructuredMergeTree::open(cfg.clone()).unwrap();
     let mut index: HashMap<String, Vec<LogEntryPointer>> = HashMap::new();
     while let Some(p) = lt.pop().unwrap() {
-        assert_eq!(&p.file_id, lt.fds[lt.fd_cursor].header.ids.end());
+        assert!(lt.fds[lt.fd_cursor].header.ids.contains(&p.file_id));
         match index.get_mut(&p.key) {
             Some(ps) => ps.push(p),
             None => {
