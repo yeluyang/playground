@@ -18,7 +18,7 @@ pub struct LogStructuredFile {
     pub(crate) header: LogFileHeader,
     pub(crate) index: LogEntryIndex,
     pub(crate) entry_count: usize,
-    fd: SegmentFile,
+    pub(crate) fd: SegmentFile,
 }
 
 impl LogStructuredFile {
