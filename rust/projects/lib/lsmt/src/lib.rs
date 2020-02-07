@@ -14,7 +14,8 @@ mod tests;
 pub struct Config {
     pub lsmt_dir: String,
     pub file_size: usize,
-    pub merge_threshold: usize,
+    pub compact_enable: bool,
+    pub merge_threshold: Option<usize>,
 }
 
 pub struct LogStructuredMergeTree {
@@ -47,8 +48,10 @@ impl LogStructuredMergeTree {
             )?)
         }
         fds.sort();
-        for fd in fds.split_last_mut().unwrap().1 {
-            fd.compact()?;
+        if cfg.compact_enable {
+            for fd in fds.split_last_mut().unwrap().1 {
+                fd.compact()?;
+            }
         }
         Ok(LogStructuredMergeTree {
             cfg,
@@ -71,7 +74,9 @@ impl LogStructuredMergeTree {
 
     pub fn append<T: Record>(&mut self, r: &T) -> Result<LogEntryPointer> {
         if self.fds.last().unwrap().entry_count >= 2 * (self.cfg.file_size + 1) {
-            self.fds.last_mut().unwrap().compact()?;
+            if self.cfg.compact_enable {
+                self.fds.last_mut().unwrap().compact()?;
+            }
 
             let next_id = *self.fds.last().unwrap().header.ids.end() + 1;
             self.fds.push(LogStructuredFile::create(
@@ -79,8 +84,10 @@ impl LogStructuredMergeTree {
                 LogFileHeader::new(RangeInclusive::new(next_id, next_id), false),
             )?);
         }
+        if let Some(threshold) = self.cfg.merge_threshold {
         if self.fds.len() - 1 > self.cfg.merge_threshold {
-            self.merge()?;
+                self.merge()?;
+            }
         }
         self.fds.last_mut().unwrap().append(r)
     }
@@ -97,14 +104,13 @@ impl LogStructuredMergeTree {
     fn merge(&mut self) -> Result<()> {
         self.fds.reverse();
         let mut old_fds = self.fds.split_off(1);
-        old_fds.reverse();
         // create new file with id [id .. id]
         let mut fd = LogStructuredFile::create(
             &self.cfg.lsmt_dir,
             LogFileHeader::new(
                 RangeInclusive::new(
-                    *old_fds.first().unwrap().header.ids.start(),
-                    *old_fds.last().unwrap().header.ids.end(),
+                    *old_fds.last().unwrap().header.ids.start(),
+                    *old_fds.first().unwrap().header.ids.end(),
                 ),
                 false,
             ),
