@@ -85,7 +85,7 @@ impl LogStructuredMergeTree {
             )?);
         }
         if let Some(threshold) = self.cfg.merge_threshold {
-        if self.fds.len() - 1 > self.cfg.merge_threshold {
+            if self.fds.len() > threshold {
                 self.merge()?;
             }
         }
