@@ -38,8 +38,9 @@ impl KvStore {
                     .to_str()
                     .map(|s| s.to_owned())
                     .ok_or(Error::InvalidPath(dir.as_ref().as_os_str().to_os_string()))?,
-                file_size: 100,
-                merge_threshold: 4,
+                file_size: 1000,
+                compact_enable: true,
+                merge_threshold: Some(2),
             })?,
         };
 
@@ -55,16 +56,6 @@ impl KvStore {
     /// # Arguments
     /// - key: String type
     /// - value: String type
-    ///
-    /// # Example
-    /// ```rust
-    /// use kvs::KvStore;
-    /// let key = String::from("key");
-    /// let value = String::from("value");
-    /// let mut kvs = KvStore::new();
-    /// kvs.set(key.clone(), value.clone());
-    /// assert_eq!(kvs.get(key).unwrap(), value);
-    /// ```
     pub fn set(&mut self, key: String, value: String) -> Result<()> {
         let cmd = Command::Set { key, value };
         let p = self.wal.append(&cmd)?;
@@ -76,19 +67,6 @@ impl KvStore {
     ///
     /// # Arguments
     /// - key: String type
-    ///
-    /// # Example
-    /// ```rust
-    /// use kvs::KvStore;
-    /// let key = String::from("key");
-    /// let value = String::from("value");
-    ///
-    /// let mut kvs = KvStore::new();
-    /// assert_eq!(kvs.get(key.to_owned()), None);
-    ///
-    /// kvs.set(key.clone(), value.clone());
-    /// assert_eq!(kvs.get(key).unwrap(), value);
-    /// ```
     pub fn get(&mut self, key: String) -> Result<Option<String>> {
         if let Some(p) = self.data.get(&key) {
             if let Some(c) = self.wal.read_by_pointer::<Command>(p)? {
@@ -108,14 +86,6 @@ impl KvStore {
     ///
     /// # Arguments
     /// - key: String type
-    ///
-    /// # Example
-    /// ```rust
-    /// use kvs::KvStore;
-    /// let key = String::from("key");
-    /// let mut kvs = KvStore::new();
-    /// kvs.remove(key);
-    /// ```
     pub fn remove(&mut self, key: String) -> Result<()> {
         let cmd = Command::Remove { key: key.clone() };
         self.wal.append(&cmd)?;
