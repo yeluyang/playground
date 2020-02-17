@@ -4,6 +4,7 @@ members = [
     "projects/cmd/rgrep",
     "projects/cmd/server",
     "projects/cmd/city-pop",
+    "projects/cmd/ping-pong",
 
     "projects/lib/segment_io",
     "projects/lib/lsmt",
