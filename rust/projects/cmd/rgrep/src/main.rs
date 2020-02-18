@@ -8,9 +8,10 @@ extern crate log;
 use rgrep::*;
 
 fn main() {
-    let matches = clap::App::new(env!("CARGO_PKG_NAME"))
+    let matches = clap::App::new(clap::crate_name!())
         .version(clap::crate_version!())
         .author(clap::crate_authors!())
+        .settings(&[clap::AppSettings::ArgRequiredElseHelp])
         .args(&[
             clap::Arg::with_name("verbose")
                 .multiple(true)

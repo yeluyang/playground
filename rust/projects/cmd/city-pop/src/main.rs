@@ -1,6 +1,6 @@
 extern crate clap;
 
-use clap::{App, Arg};
+use clap::{App, AppSettings, Arg};
 
 use std::{
     io::{self, BufRead, Write},
@@ -13,6 +13,7 @@ fn main() {
     let matches = App::new(clap::crate_name!())
         .author(clap::crate_authors!())
         .version(clap::crate_version!())
+        .settings(&[AppSettings::ArgRequiredElseHelp])
         .args(&[Arg::with_name("verbose")
             .short("v")
             .long("verbose")
@@ -23,10 +24,6 @@ fn main() {
             .takes_value(true)])
         .args(&[Arg::with_name("DATA_PATH").required(true)])
         .get_matches();
-    if matches.args.is_empty() {
-        println!("{}", matches.usage());
-        process::exit(1);
-    }
 
     if matches.is_present("city_name") {
         match search(
