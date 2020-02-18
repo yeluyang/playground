@@ -2,10 +2,7 @@ extern crate clap;
 
 use clap::{App, AppSettings, Arg};
 
-use std::{
-    io::{self, BufRead, Write},
-    process,
-};
+use std::io::{self, BufRead, Write};
 
 use city_pop::*;
 
