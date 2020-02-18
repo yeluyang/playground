@@ -1,7 +1,6 @@
 use std::{
-    io::{Read, Write},
+    io::{BufRead, BufReader, BufWriter, Write},
     net::{TcpListener, TcpStream},
-    time::Duration,
 };
 
 extern crate env_logger;
@@ -30,17 +29,17 @@ fn main() {
     info!("server exit");
 }
 
-fn handle(mut stream: TcpStream) {
-    stream
-        .set_read_timeout(Some(Duration::from_secs(4)))
-        .unwrap();
-    let mut buf = Vec::with_capacity(10240);
-    let len = stream.read(buf.as_mut_slice()).unwrap();
-    debug!("read from request");
-    trace!("request={{ len={}, val={:?} }}", len, &buf[..len]);
+fn handle(stream: TcpStream) {
+    let mut reader = BufReader::new(stream.try_clone().unwrap());
+    let mut writer = BufWriter::new(stream);
 
-    let t = Protocol::from(buf);
-    stream.write_all(t.to_bytes().as_slice()).unwrap();
-    stream.flush().unwrap();
+    let mut buf = String::new();
+    let len = reader.read_line(&mut buf).unwrap();
+    debug!("read from request");
+    trace!("request={{ len={}, val={} }}", len, buf);
+
+    let t = Protocol::from(buf.as_str());
+    writer.write_all(t.to_bytes().as_slice()).unwrap();
+    writer.flush().unwrap();
     debug!("send response");
 }

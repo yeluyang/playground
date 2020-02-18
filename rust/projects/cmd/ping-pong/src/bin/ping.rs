@@ -47,16 +47,27 @@ fn main() {
     let args: Vec<&str> = matches.values_of("value").unwrap().collect();
     trace!("arguments={:?}", args);
 
-    let mut values: Vec<Protocol> = Vec::new();
-    for v in args {
-        values.push(Protocol::SimpleString(v.to_owned()));
-    }
-    let values = Protocol::Arrays(values);
+    let value = match args.len() {
+        1 => {
+            if args[0].parse::<i128>().is_ok() {
+                Protocol::Integers(args[0].parse::<i128>().unwrap())
+            } else {
+                Protocol::SimpleString(args[0].to_owned())
+            }
+        }
+        _ => {
+            let mut values: Vec<Protocol> = Vec::new();
+            for v in args {
+                values.push(Protocol::SimpleString(v.to_owned()));
+            }
+            Protocol::Arrays(values)
+        }
+    };
 
     let mut stream = TcpStream::connect("127.0.0.1:10086").unwrap();
     info!("listening");
 
-    stream.write_all(values.to_bytes().as_slice()).unwrap();
+    stream.write_all(value.to_bytes().as_slice()).unwrap();
     stream.flush().unwrap();
     info!("write request into tcp socket");
 
