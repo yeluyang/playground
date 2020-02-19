@@ -13,7 +13,6 @@ pub enum Protocol {
     SimpleString(String),
     Errors(Error),
     Integers(i128),
-    Arrays(Vec<Protocol>),
 }
 
 impl Display for Protocol {
@@ -22,14 +21,6 @@ impl Display for Protocol {
             Self::SimpleString(ref s) => write!(f, "+{}{}", s, CRLF),
             Self::Errors(ref err) => write!(f, "-{}{}", err, CRLF),
             Self::Integers(ref i) => write!(f, ":{}{}", i, CRLF),
-            Self::Arrays(ref array) => {
-                let number = format!("{}{}", array.len(), CRLF);
-                let mut content = String::new();
-                for a in array {
-                    content.push_str(a.to_string().as_str());
-                }
-                write!(f, "*{}{}{}", number, content, CRLF)
-            }
         }
     }
 }
@@ -61,7 +52,8 @@ impl<'a> From<&'a str> for Protocol {
         }
         let s = &s[..s.len() - CRLF.len()];
 
-        match s.chars().next().unwrap() {
+        let c = s.chars().next().unwrap();
+        match c {
             '+' => {
                 let content = &s[1..];
                 if content.contains(CRLF) {
@@ -76,35 +68,7 @@ impl<'a> From<&'a str> for Protocol {
             ':' => s[1..]
                 .parse::<i128>()
                 .map_or_else(|err| Self::Errors(Error::from(err)), Self::Integers),
-            '*' => {
-                let mut content = &s[1..];
-                if let Some(i) = content.find(CRLF) {
-                    match content[..i].parse::<i128>() {
-                        Ok(num) => {
-                            content = &content[i + CRLF.len()..];
-                            let mut array: Vec<Protocol> = Vec::new();
-                            while let Some(i) = content.find(CRLF) {
-                                // FIXME: bug occur when array nest in array
-                                array.push(Self::from(&content[..i + CRLF.len()]));
-                                content = &content[i + CRLF.len()..];
-                            }
-                            if array.len() != num as usize {
-                                Self::Errors(Error::MissElement(format!(
-                                    "expect {}, but get {}",
-                                    num,
-                                    array.len()
-                                )))
-                            } else {
-                                Self::Arrays(array)
-                            }
-                        }
-                        Err(err) => Self::Errors(Error::from(err)),
-                    }
-                } else {
-                    Self::Errors(Error::ParseError("missing numeric of element".to_owned()))
-                }
-            }
-            _ => unimplemented!(),
+            _ => Self::Errors(Error::Unknown(c)),
         }
     }
 }

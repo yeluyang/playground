@@ -20,16 +20,6 @@ fn test_proto() {
             b: ":10086\r\n".to_owned().into_bytes(),
             p: Protocol::Integers(10086),
         },
-        Case {
-            b: "*3\r\n+OK\r\n-PARSEERROR test\r\n:10086\r\n\r\n"
-                .to_owned()
-                .into_bytes(),
-            p: Protocol::Arrays(vec![
-                Protocol::SimpleString("OK".to_owned()),
-                Protocol::Errors(Error::ParseError("test".to_owned())),
-                Protocol::Integers(10086),
-            ]),
-        },
     ];
 
     for case in cases.iter() {

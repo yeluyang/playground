@@ -7,6 +7,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
+    Unknown(char),
     Internal(String),
     ParseError(String),
     MissElement(String),
@@ -17,6 +18,7 @@ impl std::error::Error for Error {}
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Unknown(ref c) => write!(f, "UNKNOWN unknown header: {}", c),
             Self::Internal(ref s) => write!(f, "INTERNAL {}", s),
             Self::ParseError(ref s) => write!(f, "PARSEERROR {}", s),
             Self::MissElement(ref s) => write!(f, "MISSELEMENT {}", s),

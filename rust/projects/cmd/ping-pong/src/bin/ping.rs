@@ -26,7 +26,7 @@ fn main() {
             .multiple(true)])
         .args(&[
             Arg::with_name("quiet").short("q").conflicts_with("verbose"),
-            Arg::with_name("value").required(true).multiple(true),
+            Arg::with_name("value").required(true),
         ])
         .get_matches();
 
@@ -44,24 +44,13 @@ fn main() {
 
     info!("client start");
 
-    let args: Vec<&str> = matches.values_of("value").unwrap().collect();
-    trace!("arguments={:?}", args);
+    let arg = matches.value_of("value").unwrap();
+    trace!("arguments={}", arg);
 
-    let value = match args.len() {
-        1 => {
-            if args[0].parse::<i128>().is_ok() {
-                Protocol::Integers(args[0].parse::<i128>().unwrap())
-            } else {
-                Protocol::SimpleString(args[0].to_owned())
-            }
-        }
-        _ => {
-            let mut values: Vec<Protocol> = Vec::new();
-            for v in args {
-                values.push(Protocol::SimpleString(v.to_owned()));
-            }
-            Protocol::Arrays(values)
-        }
+    let value = if arg.parse::<i128>().is_ok() {
+        Protocol::Integers(arg.parse::<i128>().unwrap())
+    } else {
+        Protocol::SimpleString(arg.to_owned())
     };
 
     let mut stream = TcpStream::connect("127.0.0.1:10086").unwrap();
