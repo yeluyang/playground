@@ -9,13 +9,23 @@ edition = "2018"
 [dependencies]
 
 clap = "2.33.0"
-lsmt = { path = "../../../../rust/projects/lib/lsmt" }
 serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.44"
+log = "0.4.6"
+env_logger = "0.6.1"
+sled = "0.22.1"
+
+lsmt = { path = "../../../../rust/projects/lib/lsmt" }
 
 [dev-dependencies]
 
-assert_cmd = "0.12.0"
-predicates = "1.0.2"
-tempfile = "3.1.0"
-walkdir = "2.2.9"
+assert_cmd = "0.11"
+criterion = "0.2.11"
+predicates = "1.0.0"
+rand = "0.6.5"
+tempfile = "3.0.7"
+walkdir = "2.2.7"
+
+[[bench]]
+name = "engine_bench"
+harness = false
