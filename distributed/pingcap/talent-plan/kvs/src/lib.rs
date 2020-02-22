@@ -88,10 +88,14 @@ impl KvStore {
     /// - key: String type
     pub fn remove(&mut self, key: String) -> Result<()> {
         let cmd = Command::Remove { key: key.clone() };
+        if self.data.remove(&key).is_some() {
         self.wal.append(&cmd)?;
         self.data
             .remove(&key)
             .ok_or(Error::KeyNotFound(key.clone()))?;
         Ok(())
+        } else {
+            Err(Error::KeyNotFound(key.clone()))
+        }
     }
 }
