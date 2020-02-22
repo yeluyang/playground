@@ -56,7 +56,6 @@ fn main() -> Result<()> {
     info!("client start");
 
     let mut kv_store = KvStore::open(std::env::current_dir()?)?;
-    info!("loaded data into KV store");
 
     match matches.subcommand() {
         ("set", Some(m)) => {

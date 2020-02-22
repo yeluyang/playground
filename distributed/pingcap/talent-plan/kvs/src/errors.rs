@@ -7,6 +7,8 @@ use std::{
 
 extern crate lsmt;
 
+// XXX: should add enum named `InternalError`, and nested in `Error`?
+
 /// Error
 #[derive(Debug)]
 pub enum Error {
