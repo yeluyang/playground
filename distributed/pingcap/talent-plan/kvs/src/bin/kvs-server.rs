@@ -55,8 +55,8 @@ fn main() -> Result<()> {
     info!("server start");
 
     let mut server = Server::on(
-        matches.value_of("IP:PORT").unwrap().to_owned(),
         &std::env::current_dir()?.as_path(),
+        matches.value_of("IP:PORT").unwrap().to_owned(),
     )?;
 
     server.run()
