@@ -1,6 +1,7 @@
 use std::{
     io::{BufReader, BufWriter, Read, Write},
     net::TcpStream,
+    path::Path,
 };
 
 extern crate serde;
@@ -9,6 +10,7 @@ use serde::{Deserialize, Serialize};
 pub extern crate serde_json as protocol_serde;
 
 use crate::errors::{Error, Result};
+use crate::KvStore;
 
 /// Protocol
 #[derive(Debug, Deserialize, Serialize)]
@@ -53,7 +55,7 @@ pub struct Client {
 impl Client {
     pub fn connect(addr: &str) -> Result<Self> {
         let stream = TcpStream::connect(addr)?;
-        Ok(Client {
+        Ok(Self {
             net_reader: BufReader::new(stream.try_clone()?),
             net_writer: BufWriter::new(stream),
         })
@@ -98,6 +100,80 @@ impl Client {
             Protocol::RemoveResponse(_) => Ok(()),
             Protocol::Error(err) => Err(Error::Simple(err)),
             _ => unreachable!(),
+        }
+    }
+}
+
+pub struct Server {
+    kv_store: KvStore,
+    net_reader: BufReader<TcpStream>,
+    net_writer: BufWriter<TcpStream>,
+}
+
+impl Server {
+    pub fn on<P: AsRef<Path>>(addr: String, local_dir: P) -> Result<Self> {
+        let stream = TcpStream::connect(addr)?;
+        Ok(Self {
+            kv_store: KvStore::open(local_dir)?,
+            net_reader: BufReader::new(stream.try_clone()?),
+            net_writer: BufWriter::new(stream),
+        })
+    }
+
+    pub fn run(&mut self) -> Result<()> {
+        let mut buf: Vec<u8> = Vec::new();
+        loop {
+            self.net_reader.read_to_end(&mut buf)?;
+            let p = Protocol::from(buf.as_slice());
+            match p {
+                Protocol::GetRequest(key) => {
+                    info!("getting value by key");
+                    match self.kv_store.get(key) {
+                        Err(err) => protocol_serde::to_writer(
+                            &mut self.net_writer,
+                            &Protocol::Error(err.to_string()),
+                        )
+                        .unwrap_or_else(|err| eprintln!("{}", err)),
+                        Ok(opt) => protocol_serde::to_writer(
+                            &mut self.net_writer,
+                            &Protocol::GetResponse(opt),
+                        )
+                        .unwrap_or_else(|err| eprintln!("{}", err)),
+                    };
+                }
+                Protocol::SetRequest { key, value } => {
+                    info!("setting key-value");
+                    match self.kv_store.set(key, value) {
+                        Err(err) => protocol_serde::to_writer(
+                            &mut self.net_writer,
+                            &Protocol::Error(err.to_string()),
+                        )
+                        .unwrap_or_else(|err| eprintln!("{}", err)),
+                        Ok(_) => protocol_serde::to_writer(
+                            &mut self.net_writer,
+                            &Protocol::SetResponse(()),
+                        )
+                        .unwrap_or_else(|err| eprintln!("{}", err)),
+                    };
+                }
+                Protocol::RemoveRequest(key) => {
+                    info!("removing key-value");
+                    match self.kv_store.remove(key) {
+                        Err(err) => protocol_serde::to_writer(
+                            &mut self.net_writer,
+                            &Protocol::Error(err.to_string()),
+                        )
+                        .unwrap_or_else(|err| eprintln!("{}", err)),
+                        Ok(_) => protocol_serde::to_writer(
+                            &mut self.net_writer,
+                            &Protocol::RemoveResponse(()),
+                        )
+                        .unwrap_or_else(|err| eprintln!("{}", err)),
+                    };
+                }
+                Protocol::Error(err) => eprintln!("{}", err),
+                _ => unreachable!(),
+            };
         }
     }
 }
