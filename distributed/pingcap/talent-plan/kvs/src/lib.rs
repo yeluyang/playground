@@ -1,4 +1,4 @@
-#![deny(missing_docs)]
+// #![deny(missing_docs)]
 
 //! kvs
 
@@ -15,6 +15,8 @@ pub use errors::{Error, Result};
 
 mod command;
 use command::Command;
+
+pub mod network;
 
 /// KvStore
 pub struct KvStore {
