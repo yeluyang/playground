@@ -7,7 +7,7 @@ use log::LevelFilter;
 
 extern crate env_logger;
 use env_logger::Env;
-use kvs::{self, KvStore, Result};
+use kvs::{self, network::Client, Result};
 
 fn main() -> Result<()> {
     let matches = App::new("kvs-client")
@@ -29,6 +29,11 @@ fn main() -> Result<()> {
                 .takes_value(false)
                 .conflicts_with("verbose"),
         ])
+        .args(&[Arg::with_name("IP:PORT")
+            .long("addr")
+            .short("a")
+            .takes_value(true)
+            .default_value("127.0.0.1:4000")])
         .subcommands(vec![
             SubCommand::with_name("set").args(&[
                 Arg::with_name("KEY").required(true).takes_value(true),
@@ -55,32 +60,27 @@ fn main() -> Result<()> {
 
     info!("client start");
 
-    let mut kv_store = KvStore::open(std::env::current_dir()?)?;
+    let mut client = Client::connect(matches.value_of("IP:PORT").unwrap())?;
 
     match matches.subcommand() {
         ("set", Some(m)) => {
             info!("setting key-value");
-            kv_store.set(
+            client.set(
                 m.value_of("KEY").unwrap().to_owned(),
                 m.value_of("VALUE").unwrap().to_owned(),
             )
         }
         ("get", Some(m)) => {
             info!("getting value by key");
-            kv_store
-                .get(m.value_of("KEY").unwrap().to_owned())
-                .map_err(|err| {
-                    eprintln!("{}", err);
-                    err
-                })
-                .map(|opt| match opt {
-                    Some(val) => println!("{}", val),
-                    None => println!("Key not found"),
-                })
+            match client.get(m.value_of("KEY").unwrap().to_owned())? {
+                Some(val) => println!("{}", val),
+                None => println!("Key not found"),
+            };
+            Ok(())
         }
         ("rm", Some(m)) => {
             info!("removing key-value");
-            kv_store.remove(m.value_of("KEY").unwrap().to_owned())
+            client.remove(m.value_of("KEY").unwrap().to_owned())
         }
         _ => unreachable!(),
     }

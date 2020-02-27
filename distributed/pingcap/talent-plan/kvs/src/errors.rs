@@ -5,15 +5,15 @@ use std::{
     io,
 };
 
-extern crate lsmt;
+extern crate serde_json;
 
-// XXX: should add enum named `InternalError`, and nested in `Error`?
+extern crate lsmt;
 
 /// Error
 #[derive(Debug)]
 pub enum Error {
     /// unknown error occur
-    Unknown,
+    Simple(String),
     /// key not found in data-storage
     KeyNotFound(String),
     /// data not found
@@ -22,19 +22,22 @@ pub enum Error {
     LSMTError(lsmt::Error),
     /// IO error
     IO(io::Error),
-    /// XXX
+    /// TODO
     InvalidPath(OsString),
+    /// TODO
+    SerdeJSON(serde_json::Error),
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match *self {
-            Error::Unknown => write!(f, "unknown or impossible error occurred"),
-            Error::KeyNotFound(ref key) => write!(f, "`key = {}` not found in storage", key),
-            Error::DataNotFound(ref key) => write!(f, "data of key={} not found in storage", key),
-            Error::InvalidPath(ref path) => write!(f, "path={:?} invalid", path),
-            Error::LSMTError(ref err) => err.fmt(f),
-            Error::IO(ref err) => err.fmt(f),
+        match self {
+            Error::Simple(s) => write!(f, "{}", s),
+            Error::KeyNotFound(key) => write!(f, "`key = {}` not found in storage", key),
+            Error::DataNotFound(key) => write!(f, "data of key={} not found in storage", key),
+            Error::InvalidPath(path) => write!(f, "path={:?} invalid", path),
+            Error::LSMTError(err) => err.fmt(f),
+            Error::IO(err) => err.fmt(f),
+            Error::SerdeJSON(err) => err.fmt(f),
         }
     }
 }
@@ -50,6 +53,12 @@ impl From<lsmt::Error> for Error {
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
         Error::IO(err)
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Self {
+        Self::SerdeJSON(err)
     }
 }
 
