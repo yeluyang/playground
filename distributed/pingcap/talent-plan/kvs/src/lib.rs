@@ -31,9 +31,8 @@ impl KvStore {
     ///
     /// - dir: path to persistent dir
     pub fn open<P: AsRef<Path>>(dir: P) -> Result<KvStore> {
-        debug!("open kv storage on directory");
+        debug!("open kv storage on directory={:?}", dir.as_ref());
 
-        trace!("reading local storage directory on path={:?}", dir.as_ref());
         if !dir.as_ref().exists() {
             fs::create_dir(&dir)?;
         }
@@ -67,9 +66,8 @@ impl KvStore {
     /// - key: String type
     /// - value: String type
     pub fn set(&mut self, key: String, value: String) -> Result<()> {
-        debug!("setting data");
+        debug!("setting data={{key={}, val={}}}", key, value);
 
-        trace!("setting data={{key={}, val={}}}", key, value);
         let cmd = Command::Set { key, value };
 
         trace!("writting data in wal");
@@ -86,9 +84,8 @@ impl KvStore {
     /// # Arguments
     /// - key: String type
     pub fn get(&mut self, key: String) -> Result<Option<String>> {
-        debug!("getting data by key");
+        debug!("getting data by key={}", key);
 
-        trace!("getting data by key={}", key);
         if let Some(p) = self.data.get(&key) {
             trace!("get pointer from wal: pointer={:?}", p);
             if let Some(c) = self.wal.read_by_pointer::<Command>(p)? {
@@ -112,9 +109,8 @@ impl KvStore {
     /// # Arguments
     /// - key: String type
     pub fn remove(&mut self, key: String) -> Result<()> {
-        debug!("removing data by key");
+        debug!("removing data by key={}", key);
 
-        trace!("removing data: key={}", key);
         let cmd = Command::Remove { key: key.clone() };
 
         trace!("removing data from memory table");

@@ -6,7 +6,7 @@ extern crate log;
 use log::LevelFilter;
 
 extern crate env_logger;
-use env_logger::Env;
+use env_logger::{Builder, Env};
 
 use kvs::{network::Server, Result};
 
@@ -50,7 +50,8 @@ fn main() -> Result<()> {
             _ => LevelFilter::Trace,
         }
     };
-    env_logger::init_from_env(Env::default().default_filter_or(log_level.to_string()));
+
+    Builder::from_env(Env::default().default_filter_or(log_level.to_string())).init();
 
     info!("server start");
 
