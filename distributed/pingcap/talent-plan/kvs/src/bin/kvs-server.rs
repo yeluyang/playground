@@ -8,7 +8,7 @@ use log::LevelFilter;
 extern crate env_logger;
 use env_logger::{Builder, Env};
 
-use kvs::{network::Server, Result};
+use kvs::{engines::KvStore, network::Server, Result};
 
 fn main() -> Result<()> {
     let matches = App::new("kvs-server")
@@ -56,8 +56,8 @@ fn main() -> Result<()> {
     info!("server start");
 
     let mut server = Server::on(
-        &std::env::current_dir()?.as_path(),
         matches.value_of("IP:PORT").unwrap().to_owned(),
+        KvStore::open(&std::env::current_dir()?.as_path())?,
     )?;
 
     server.run()

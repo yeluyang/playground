@@ -1,7 +1,6 @@
 use std::{
     io::{BufRead, BufReader, BufWriter, Read, Write},
     net::{TcpListener, TcpStream},
-    path::Path,
 };
 
 extern crate log;
@@ -11,8 +10,8 @@ use serde::{Deserialize, Serialize};
 
 pub extern crate serde_json as protocol_serde;
 
+use crate::engines::KvsEngine;
 use crate::errors::{Error, Result};
-use crate::KvStore;
 
 /// Protocol
 #[derive(Debug, Deserialize, Serialize)]
@@ -129,16 +128,16 @@ impl Client {
     }
 }
 
-pub struct Server {
-    kv_store: KvStore,
+pub struct Server<KV: KvsEngine> {
+    kv_store: KV,
     listener: TcpListener,
 }
 
-impl Server {
-    pub fn on<P: AsRef<Path>>(local_dir: P, addr: String) -> Result<Self> {
+impl<KV: KvsEngine> Server<KV> {
+    pub fn on(addr: String, kv: KV) -> Result<Self> {
         debug!("server listening address={}", addr);
         Ok(Self {
-            kv_store: KvStore::open(local_dir)?,
+            kv_store: kv,
             listener: TcpListener::bind(addr)?,
         })
     }
