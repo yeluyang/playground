@@ -2,10 +2,12 @@ use std::{
     error,
     ffi::OsString,
     fmt::{self, Display, Formatter},
-    io,
+    io, string,
 };
 
 extern crate serde_json;
+
+extern crate sled;
 
 extern crate lsmt;
 
@@ -26,6 +28,10 @@ pub enum Error {
     InvalidPath(OsString),
     /// TODO
     SerdeJSON(serde_json::Error),
+    /// TODO
+    SledError(sled::Error),
+    /// TODO
+    ParseUTF8Error(string::FromUtf8Error),
 }
 
 impl Display for Error {
@@ -38,6 +44,8 @@ impl Display for Error {
             Error::LSMTError(err) => err.fmt(f),
             Error::IO(err) => err.fmt(f),
             Error::SerdeJSON(err) => err.fmt(f),
+            Self::SledError(err) => err.fmt(f),
+            Self::ParseUTF8Error(err) => err.fmt(f),
         }
     }
 }
@@ -59,6 +67,18 @@ impl From<io::Error> for Error {
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
         Self::SerdeJSON(err)
+    }
+}
+
+impl From<sled::Error> for Error {
+    fn from(err: sled::Error) -> Self {
+        Self::SledError(err)
+    }
+}
+
+impl From<string::FromUtf8Error> for Error {
+    fn from(err: string::FromUtf8Error) -> Self {
+        Self::ParseUTF8Error(err)
     }
 }
 

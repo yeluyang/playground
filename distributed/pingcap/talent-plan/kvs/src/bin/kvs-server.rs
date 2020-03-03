@@ -8,7 +8,11 @@ use log::LevelFilter;
 extern crate env_logger;
 use env_logger::{Builder, Env};
 
-use kvs::{engines::KvStore, network::Server, Result};
+use kvs::{
+    engines::{KvStore, SledDB},
+    network::Server,
+    Result,
+};
 
 fn main() -> Result<()> {
     let matches = App::new("kvs-server")
@@ -36,7 +40,8 @@ fn main() -> Result<()> {
             Arg::with_name("ENGINE-NAME")
                 .long("engine")
                 .short("e")
-                .takes_value(true),
+                .takes_value(true)
+                .possible_values(&["kvs", "sled"]),
         ])
         .get_matches();
 
@@ -55,10 +60,17 @@ fn main() -> Result<()> {
 
     info!("server start");
 
-    let mut server = Server::on(
-        matches.value_of("IP:PORT").unwrap().to_owned(),
-        KvStore::open(&std::env::current_dir()?.as_path())?,
-    )?;
+    let mut server = match matches.value_of("ENGINE-NAME").unwrap() {
+        "kvs" => Server::on(
+            matches.value_of("IP:PORT").unwrap().to_owned(),
+            Box::new(KvStore::open(&std::env::current_dir()?.as_path())?),
+        )?,
+        "sled" => Server::on(
+            matches.value_of("IP:PORT").unwrap().to_owned(),
+            Box::new(SledDB::open(&std::env::current_dir()?.as_path())?),
+        )?,
+        _ => unreachable!(),
+    };
 
     server.run()
 }
