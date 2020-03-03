@@ -5,21 +5,25 @@ use sled::Db;
 
 use crate::errors::Result;
 
-pub struct SledDB {
+pub struct SledKvsEngine {
     inner: Db,
 }
 
-impl SledDB {
-    /// open an object of KvStore on an exist log file and return it
-    pub fn open<P: AsRef<Path>>(dir: P) -> Result<SledDB> {
+impl SledKvsEngine {
+    /// new
+    pub fn new(db: sled::Db) -> Self {
+        Self { inner: db }
+    }
+    /// open
+    pub fn open<P: AsRef<Path>>(dir: P) -> Result<Self> {
         debug!("open sled storage on directory={:?}", dir.as_ref());
-        Ok(SledDB {
+        Ok(Self {
             inner: sled::Db::start_default(dir)?,
         })
     }
 }
 
-impl super::KvsEngine for SledDB {
+impl super::KvsEngine for SledKvsEngine {
     fn set(&mut self, key: String, value: String) -> Result<()> {
         debug!("setting data={{key={}, value={}}}", key, value);
 

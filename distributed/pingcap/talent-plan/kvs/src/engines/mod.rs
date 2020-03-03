@@ -1,7 +1,7 @@
 use crate::errors::Result;
 
 mod sled_db;
-pub use sled_db::SledDB;
+pub use sled_db::SledKvsEngine;
 
 mod kvs;
 pub use kvs::KvStore;

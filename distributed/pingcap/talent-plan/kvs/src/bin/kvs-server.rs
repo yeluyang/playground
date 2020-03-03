@@ -8,11 +8,7 @@ use log::LevelFilter;
 extern crate env_logger;
 use env_logger::{Builder, Env};
 
-use kvs::{
-    engines::{KvStore, SledDB},
-    network::Server,
-    Result,
-};
+use kvs::{network::Server, KvStore, Result, SledKvsEngine};
 
 fn main() -> Result<()> {
     let matches = App::new("kvs-server")
@@ -67,7 +63,7 @@ fn main() -> Result<()> {
         )?,
         "sled" => Server::on(
             matches.value_of("IP:PORT").unwrap().to_owned(),
-            Box::new(SledDB::open(&std::env::current_dir()?.as_path())?),
+            Box::new(SledKvsEngine::open(&std::env::current_dir()?.as_path())?),
         )?,
         _ => unreachable!(),
     };
