@@ -8,6 +8,7 @@ members = [
 
     "projects/lib/segment_io",
     "projects/lib/lsmt",
+    "projects/lib/thread_pool",
 
     "examples/serde_examples",
     "examples/env_examples",
