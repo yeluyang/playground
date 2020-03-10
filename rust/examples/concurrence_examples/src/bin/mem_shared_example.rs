@@ -38,6 +38,7 @@ fn main() {
         thread::sleep(Duration::from_secs(1));
         let counts = counts.lock().unwrap();
         assert!(counts.is_sorted());
+        assert_eq!(counts.len(), counter.load(Ordering::SeqCst));
         println!("count={{sorted={}, val={:?}}}", counts.is_sorted(), counts);
     }
 }
