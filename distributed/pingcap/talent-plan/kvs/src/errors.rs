@@ -32,6 +32,8 @@ pub enum Error {
     SledError(sled::Error),
     /// TODO
     ParseUTF8Error(string::FromUtf8Error),
+    /// TODO
+    EngineMismatch { exist: String, got: String },
 }
 
 impl Display for Error {
@@ -46,6 +48,9 @@ impl Display for Error {
             Error::SerdeJSON(err) => err.fmt(f),
             Self::SledError(err) => err.fmt(f),
             Self::ParseUTF8Error(err) => err.fmt(f),
+            Self::EngineMismatch { exist, got } => {
+                write!(f, "engine={} already exist, but got {}", exist, got)
+            }
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::fs;
+
 extern crate clap;
 use clap::{App, AppSettings, Arg};
 
@@ -8,7 +10,7 @@ use log::LevelFilter;
 extern crate env_logger;
 use env_logger::{Builder, Env};
 
-use kvs::{network::Server, KvStore, Result, SledKvsEngine};
+use kvs::{network::Server, Error, KvStore, Result, SledKvsEngine};
 
 fn main() -> Result<()> {
     let matches = App::new("kvs-server")
@@ -20,11 +22,13 @@ fn main() -> Result<()> {
                 .short("v")
                 .takes_value(false)
                 .multiple(true)
+                .global(true)
                 .conflicts_with("quiet"),
             Arg::with_name("quiet")
                 .long("quiet")
                 .short("q")
                 .takes_value(false)
+                .global(true)
                 .conflicts_with("verbose"),
         ])
         .args(&[
@@ -32,11 +36,13 @@ fn main() -> Result<()> {
                 .long("addr")
                 .short("a")
                 .takes_value(true)
+                .global(true)
                 .default_value("127.0.0.1:4000"),
             Arg::with_name("ENGINE-NAME")
                 .long("engine")
                 .short("e")
                 .takes_value(true)
+                .global(true)
                 .possible_values(&["kvs", "sled"]),
         ])
         .get_matches();
@@ -54,17 +60,43 @@ fn main() -> Result<()> {
 
     Builder::from_env(Env::default().default_filter_or(log_level.to_string())).init();
 
-    info!("server start");
+    info!("kvs-server.{} start", clap::crate_version!(),);
 
-    let mut server = match matches.value_of("ENGINE-NAME").unwrap() {
-        "kvs" => Server::on(
-            matches.value_of("IP:PORT").unwrap().to_owned(),
-            Box::new(KvStore::open(&std::env::current_dir()?.as_path())?),
-        )?,
-        "sled" => Server::on(
-            matches.value_of("IP:PORT").unwrap().to_owned(),
-            Box::new(SledKvsEngine::open(&std::env::current_dir()?.as_path())?),
-        )?,
+    let working_dir = std::env::current_dir()?.into_boxed_path();
+    let engine_name = matches.value_of("ENGINE-NAME").unwrap();
+    let mut server = match engine_name {
+        "kvs" => {
+            for entry in fs::read_dir(&working_dir)? {
+                if let Some(f_name) = entry?.path().file_name() {
+                    if f_name == "conf" || f_name == "db" {
+                        return Err(Error::EngineMismatch {
+                            exist: "sled".to_owned(),
+                            got: engine_name.to_owned(),
+                        });
+                    }
+                }
+            }
+            Server::on(
+                matches.value_of("IP:PORT").unwrap().to_owned(),
+                Box::new(KvStore::open(&working_dir)?),
+            )?
+        }
+        "sled" => {
+            for entry in fs::read_dir(&working_dir)? {
+                if let Some(ext) = entry?.path().extension() {
+                    if ext == "wal" {
+                        return Err(Error::EngineMismatch {
+                            exist: "kvs".to_owned(),
+                            got: engine_name.to_owned(),
+                        });
+                    }
+                }
+            }
+            Server::on(
+                matches.value_of("IP:PORT").unwrap().to_owned(),
+                Box::new(SledKvsEngine::open(&working_dir)?),
+            )?
+        }
         _ => unreachable!(),
     };
 
