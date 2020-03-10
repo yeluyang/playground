@@ -157,7 +157,7 @@ fn cli_log_configuration() {
     let stderr_path = temp_dir.path().join("stderr");
     let mut cmd = Command::cargo_bin("kvs-server").unwrap();
     let mut child = cmd
-        .args(&["--engine", "kvs", "--addr", "127.0.0.1:4001"])
+        .args(&["-vvv", "--engine", "kvs", "--addr", "127.0.0.1:4001"])
         .current_dir(&temp_dir)
         .stderr(File::create(&stderr_path).unwrap())
         .spawn()
@@ -217,7 +217,7 @@ fn cli_access_server(engine: &str, addr: &str) {
     let temp_dir = TempDir::new().unwrap();
     let mut server = Command::cargo_bin("kvs-server").unwrap();
     let mut child = server
-        .args(&["--engine", engine, "--addr", addr])
+        .args(&["-vvv", "--engine", engine, "--addr", addr])
         .current_dir(&temp_dir)
         .spawn()
         .unwrap();
@@ -298,7 +298,7 @@ fn cli_access_server(engine: &str, addr: &str) {
     let (sender, receiver) = mpsc::sync_channel(0);
     let mut server = Command::cargo_bin("kvs-server").unwrap();
     let mut child = server
-        .args(&["--engine", engine, "--addr", addr])
+        .args(&["-vvv", "--engine", engine, "--addr", addr])
         .current_dir(&temp_dir)
         .spawn()
         .unwrap();

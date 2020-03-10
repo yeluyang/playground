@@ -40,8 +40,8 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Error::Simple(s) => write!(f, "{}", s),
-            Error::KeyNotFound(key) => write!(f, "`key = {}` not found in storage", key),
-            Error::DataNotFound(key) => write!(f, "data of key={} not found in storage", key),
+            Error::KeyNotFound(key) => write!(f, "Key not found in storage: key={}", key),
+            Error::DataNotFound(key) => write!(f, "Data not found in storage: key={}", key),
             Error::InvalidPath(path) => write!(f, "path={:?} invalid", path),
             Error::LSMTError(err) => err.fmt(f),
             Error::IO(err) => err.fmt(f),

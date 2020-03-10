@@ -22,17 +22,20 @@ fn main() -> Result<()> {
                 .short("v")
                 .takes_value(false)
                 .multiple(true)
+                .global(true)
                 .conflicts_with("quiet"),
             Arg::with_name("quiet")
                 .long("quiet")
                 .short("q")
                 .takes_value(false)
+                .global(true)
                 .conflicts_with("verbose"),
         ])
         .args(&[Arg::with_name("IP:PORT")
             .long("addr")
             .short("a")
             .takes_value(true)
+            .global(true)
             .default_value("127.0.0.1:4000")])
         .subcommands(vec![
             SubCommand::with_name("set").args(&[

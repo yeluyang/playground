@@ -3,7 +3,7 @@ use std::path::Path;
 extern crate sled;
 use sled::Db;
 
-use crate::errors::Result;
+use crate::errors::{Error, Result};
 
 pub struct SledKvsEngine {
     inner: Db,
@@ -34,9 +34,12 @@ impl super::KvsEngine for SledKvsEngine {
     fn get(&mut self, key: String) -> Result<Option<String>> {
         debug!("getting data by key={}", key);
 
-        if let Some(val) = self.inner.get(key)? {
-            Ok(Some(String::from_utf8(val.to_vec())?))
+        if let Some(val) = self.inner.get(&key)? {
+            let val = String::from_utf8(val.to_vec())?;
+            trace!("found data={{key={}, val={}}}", key, val);
+            Ok(Some(val))
         } else {
+            trace!("data not found for key={}", key);
             Ok(None)
         }
     }
@@ -44,7 +47,12 @@ impl super::KvsEngine for SledKvsEngine {
     fn remove(&mut self, key: String) -> Result<()> {
         debug!("removing data by key={}", key);
 
-        self.inner.del(key)?;
-        Ok(())
+        if self.inner.del(key.as_bytes())?.is_some() {
+            trace!("removed success: key={}", key);
+            Ok(())
+        } else {
+            trace!("removing non-exist data: key={}", key);
+            Err(Error::KeyNotFound(key))
+        }
     }
 }
