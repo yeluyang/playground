@@ -14,6 +14,7 @@ members = [
     "examples/env_examples",
     "examples/fs_examples",
     "examples/concurrence_examples",
+    "examples/references_examples",
 ]
 
 exclude = [
