@@ -10,6 +10,8 @@ use std::{
 };
 
 fn main() {
+    // TODO add example of RwLock
+
     let counter = Arc::new(AtomicUsize::new(0usize));
     let counter_a = counter.clone();
     let counter_b = counter.clone();
