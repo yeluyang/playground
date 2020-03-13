@@ -4,7 +4,7 @@ mod sled_db;
 pub use sled_db::SledKvsEngine;
 
 mod kvs;
-pub use kvs::KvStore;
+pub use self::kvs::KvStore;
 
 pub trait KvsEngine {
     fn set(&mut self, key: String, value: String) -> Result<()>;
