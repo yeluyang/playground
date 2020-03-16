@@ -44,6 +44,12 @@ fn main() -> Result<()> {
                 .global(true)
                 .takes_value(true)
                 .possible_values(&["kvs", "sled"]),
+            Arg::with_name("THREADS-NUMBER")
+                .long("threads-number")
+                .short("t")
+                .global(true)
+                .takes_value(true)
+                .default_value("1"),
         ])
         .get_matches();
 
@@ -80,6 +86,11 @@ fn main() -> Result<()> {
             Server::on(
                 matches.value_of("IP:PORT").unwrap().to_owned(),
                 KvStore::open(&working_dir)?,
+                matches
+                    .value_of("THREADS-NUMBER")
+                    .unwrap()
+                    .parse::<usize>()
+                    .unwrap(),
             )?
             .run()
         }
@@ -97,6 +108,11 @@ fn main() -> Result<()> {
             Server::on(
                 matches.value_of("IP:PORT").unwrap().to_owned(),
                 SledKvsEngine::open(&working_dir)?,
+                matches
+                    .value_of("THREADS-NUMBER")
+                    .unwrap()
+                    .parse::<usize>()
+                    .unwrap(),
             )?
             .run()
         }

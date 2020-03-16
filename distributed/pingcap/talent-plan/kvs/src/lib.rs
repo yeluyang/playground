@@ -5,6 +5,8 @@
 #[macro_use]
 extern crate log;
 
+pub extern crate thread_pool;
+
 mod errors;
 pub use errors::{Error, Result};
 
