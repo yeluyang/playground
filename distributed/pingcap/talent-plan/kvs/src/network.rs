@@ -128,13 +128,13 @@ impl Client {
     }
 }
 
-pub struct Server {
-    kv_store: Box<dyn KvsEngine>,
+pub struct Server<KV: KvsEngine> {
+    kv_store: KV,
     listener: TcpListener,
 }
 
-impl Server {
-    pub fn on(addr: String, kv: Box<dyn KvsEngine>) -> Result<Self> {
+impl<KV: KvsEngine> Server<KV> {
+    pub fn on(addr: String, kv: KV) -> Result<Self> {
         debug!("server listening address={}", addr);
         Ok(Self {
             kv_store: kv,

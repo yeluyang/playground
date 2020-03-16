@@ -1,40 +1,44 @@
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 extern crate sled;
 use sled::Db;
 
 use crate::errors::{Error, Result};
 
+#[derive(Clone)]
 pub struct SledKvsEngine {
-    inner: Db,
+    inner: Arc<Mutex<Db>>,
 }
 
 impl SledKvsEngine {
     /// new
     pub fn new(db: sled::Db) -> Self {
-        Self { inner: db }
+        Self {
+            inner: Arc::new(Mutex::new(db)),
+        }
     }
     /// open
     pub fn open<P: AsRef<Path>>(dir: P) -> Result<Self> {
         debug!("open sled storage on directory={:?}", dir.as_ref());
-        Ok(Self {
-            inner: sled::Db::start_default(dir)?,
-        })
+        Ok(Self::new(sled::Db::start_default(dir)?))
     }
 }
 
 impl super::KvsEngine for SledKvsEngine {
-    fn set(&mut self, key: String, value: String) -> Result<()> {
+    fn set(&self, key: String, value: String) -> Result<()> {
         debug!("setting data={{key={}, value={}}}", key, value);
 
-        self.inner.set(key, value.as_str())?;
+        self.inner.lock().unwrap().set(key, value.as_str())?;
         Ok(())
     }
 
-    fn get(&mut self, key: String) -> Result<Option<String>> {
+    fn get(&self, key: String) -> Result<Option<String>> {
         debug!("getting data by key={}", key);
 
-        if let Some(val) = self.inner.get(&key)? {
+        if let Some(val) = self.inner.lock().unwrap().get(&key)? {
             let val = String::from_utf8(val.to_vec())?;
             trace!("found data={{key={}, val={}}}", key, val);
             Ok(Some(val))
@@ -44,10 +48,10 @@ impl super::KvsEngine for SledKvsEngine {
         }
     }
 
-    fn remove(&mut self, key: String) -> Result<()> {
+    fn remove(&self, key: String) -> Result<()> {
         debug!("removing data by key={}", key);
 
-        if self.inner.del(key.as_bytes())?.is_some() {
+        if self.inner.lock().unwrap().del(key.as_bytes())?.is_some() {
             trace!("removed success: key={}", key);
             Ok(())
         } else {

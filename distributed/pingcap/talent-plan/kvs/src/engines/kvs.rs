@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::HashMap,
+    fs,
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 extern crate lsmt;
 use lsmt::{LogEntryPointer, LogStructuredMergeTree};
@@ -6,19 +11,18 @@ use lsmt::{LogEntryPointer, LogStructuredMergeTree};
 use crate::command::Command;
 use crate::errors::{Error, Result};
 
-/// KvStore
-pub struct KvStore {
+struct KvStoreInner {
     data: HashMap<String, LogEntryPointer>,
     wal: LogStructuredMergeTree,
 }
 
-impl KvStore {
-    /// open an object of KvStore on an exist log file and return it
+impl KvStoreInner {
+    /// open an object of KvStoreInner on an exist log file and return it
     ///
     /// # Arguments
     ///
     /// - dir: path to persistent dir
-    pub fn open<P: AsRef<Path>>(dir: P) -> Result<KvStore> {
+    pub fn open<P: AsRef<Path>>(dir: P) -> Result<Self> {
         debug!("open kv storage on directory={:?}", dir.as_ref());
 
         if !dir.as_ref().exists() {
@@ -26,7 +30,7 @@ impl KvStore {
         }
 
         trace!("constructing kv storage");
-        let mut kvs_store = KvStore {
+        let mut kvs_store = Self {
             data: HashMap::default(),
             wal: LogStructuredMergeTree::open(lsmt::Config {
                 lsmt_dir: dir
@@ -47,10 +51,8 @@ impl KvStore {
 
         Ok(kvs_store)
     }
-}
 
-impl super::KvsEngine for KvStore {
-    /// insert a key-value into KvStore
+    /// insert a key-value into KvStoreInner
     ///
     /// # Arguments
     /// - key: String type
@@ -94,7 +96,7 @@ impl super::KvsEngine for KvStore {
         }
     }
 
-    /// remove a key-value from object of KvStore
+    /// remove a key-value from object of KvStoreInner
     ///
     /// # Arguments
     /// - key: String type
@@ -112,5 +114,33 @@ impl super::KvsEngine for KvStore {
         } else {
             Err(Error::KeyNotFound(key.clone()))
         }
+    }
+}
+
+/// KvStore
+#[derive(Clone)]
+pub struct KvStore {
+    inner: Arc<Mutex<KvStoreInner>>,
+}
+
+impl KvStore {
+    pub fn open<P: AsRef<Path>>(dir: P) -> Result<Self> {
+        Ok(Self {
+            inner: Arc::new(Mutex::new(KvStoreInner::open(dir)?)),
+        })
+    }
+}
+
+impl super::KvsEngine for KvStore {
+    fn set(&self, key: String, value: String) -> Result<()> {
+        self.inner.lock().unwrap().set(key, value)
+    }
+
+    fn get(&self, key: String) -> Result<Option<String>> {
+        self.inner.lock().unwrap().get(key)
+    }
+
+    fn remove(&self, key: String) -> Result<()> {
+        self.inner.lock().unwrap().remove(key)
     }
 }

@@ -21,28 +21,28 @@ fn main() -> Result<()> {
             Arg::with_name("verbose")
                 .short("v")
                 .takes_value(false)
-                .multiple(true)
                 .global(true)
+                .multiple(true)
                 .conflicts_with("quiet"),
             Arg::with_name("quiet")
                 .long("quiet")
                 .short("q")
-                .takes_value(false)
                 .global(true)
+                .takes_value(false)
                 .conflicts_with("verbose"),
         ])
         .args(&[
             Arg::with_name("IP:PORT")
                 .long("addr")
                 .short("a")
-                .takes_value(true)
                 .global(true)
+                .takes_value(true)
                 .default_value("127.0.0.1:4000"),
             Arg::with_name("ENGINE-NAME")
                 .long("engine")
                 .short("e")
-                .takes_value(true)
                 .global(true)
+                .takes_value(true)
                 .possible_values(&["kvs", "sled"]),
         ])
         .get_matches();
@@ -64,7 +64,8 @@ fn main() -> Result<()> {
 
     let working_dir = std::env::current_dir()?.into_boxed_path();
     let engine_name = matches.value_of("ENGINE-NAME").unwrap();
-    let mut server = match engine_name {
+
+    match engine_name {
         "kvs" => {
             for entry in fs::read_dir(&working_dir)? {
                 if let Some(f_name) = entry?.path().file_name() {
@@ -78,8 +79,9 @@ fn main() -> Result<()> {
             }
             Server::on(
                 matches.value_of("IP:PORT").unwrap().to_owned(),
-                Box::new(KvStore::open(&working_dir)?),
+                KvStore::open(&working_dir)?,
             )?
+            .run()
         }
         "sled" => {
             for entry in fs::read_dir(&working_dir)? {
@@ -94,11 +96,10 @@ fn main() -> Result<()> {
             }
             Server::on(
                 matches.value_of("IP:PORT").unwrap().to_owned(),
-                Box::new(SledKvsEngine::open(&working_dir)?),
+                SledKvsEngine::open(&working_dir)?,
             )?
+            .run()
         }
         _ => unreachable!(),
-    };
-
-    server.run()
+    }
 }

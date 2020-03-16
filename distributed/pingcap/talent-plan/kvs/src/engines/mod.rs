@@ -6,8 +6,8 @@ pub use sled_db::SledKvsEngine;
 mod kvs;
 pub use self::kvs::KvStore;
 
-pub trait KvsEngine {
-    fn set(&mut self, key: String, value: String) -> Result<()>;
-    fn get(&mut self, key: String) -> Result<Option<String>>;
-    fn remove(&mut self, key: String) -> Result<()>;
+pub trait KvsEngine: Clone + Send + 'static {
+    fn set(&self, key: String, value: String) -> Result<()>;
+    fn get(&self, key: String) -> Result<Option<String>>;
+    fn remove(&self, key: String) -> Result<()>;
 }
