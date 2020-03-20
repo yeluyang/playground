@@ -2,6 +2,7 @@ use std::{
     fs::{File, OpenOptions},
     io::{self, BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
     mem,
+    ops::Range,
     path::Path,
 };
 
@@ -134,7 +135,7 @@ impl SegmentFile {
             seg.segment_seq = 0;
         } else {
             assert_eq!(segments_bytes % seg.segment_bytes, 0);
-            seg.segment_seq = (segments_bytes / seg.segment_bytes) - 1;
+            seg.segment_seq = segments_bytes / seg.segment_bytes;
         }
 
         trace!("inited: SegmentFile={:?}", seg);
@@ -161,6 +162,8 @@ impl SegmentFile {
             Ok(Some(segment))
         }
     }
+
+    // TODO add `next_n_segments(n)->Result<Option<Vec<Segment>>>`
 
     pub fn seek_segment(&mut self, n: usize) -> io::Result<Option<u64>> {
         debug!("seeking segment: segment_seq={}", n);
@@ -197,6 +200,7 @@ impl SegmentFile {
         } else {
             return Ok(None);
         };
+        // TODO use `next_n_segments`
         while let Some(seg) = self.next_segment()? {
             let is_last = seg.is_last();
             bytes.extend(seg.payload());
@@ -208,7 +212,7 @@ impl SegmentFile {
         panic!("incomplete write")
     }
 
-    pub fn append(&mut self, buf: &[u8]) -> io::Result<usize> {
+    pub fn append(&mut self, buf: &[u8]) -> io::Result<Range<usize>> {
         debug!(
             "writting data into segment_file: data={{len={}, val={:?}}}",
             buf.len(),
@@ -231,7 +235,10 @@ impl SegmentFile {
             segment_seq,
             self.segment_seq
         );
-        Ok(segment_seq)
+        Ok(Range {
+            start: segment_seq,
+            end: self.segment_seq,
+        })
     }
 
     // TODO add `replace`
@@ -311,7 +318,7 @@ mod tests {
                 data: vec![4; TEST_PAYLOAD_BYTES * 4],
             },
         ];
-        let mut index: HashMap<usize, usize> = HashMap::new();
+        let mut index: HashMap<usize, Range<usize>> = HashMap::new();
 
         let tmp_dir = Path::new("tmp");
         if tmp_dir.exists() {
@@ -335,13 +342,14 @@ mod tests {
 
             for (i, case) in cases.iter().enumerate() {
                 let bytes = serde_json::to_vec(case).unwrap();
-                let pos = s_file.append(bytes.as_slice()).unwrap();
-                index.insert(i, pos);
+                let seq_rng = s_file.append(bytes.as_slice()).unwrap();
+                index.insert(i, seq_rng);
             }
             assert_eq!(index.len(), cases.len());
         }
 
         let mut s_file = SegmentFile::open("tmp/tmp.segment").unwrap();
+        assert_eq!(s_file.segment_seq, index[&(cases.len() - 1)].end);
         assert_eq!(
             s_file.segment_bytes,
             segment::SEGMENT_HEADER_SIZE + TEST_PAYLOAD_BYTES
@@ -362,10 +370,10 @@ mod tests {
         }
 
         for (i, case) in cases.iter().enumerate() {
-            let seek_bytes = s_file.seek_segment(index[&i]).unwrap().unwrap();
+            let seek_bytes = s_file.seek_segment(index[&i].start).unwrap().unwrap();
             assert_eq!(
                 seek_bytes,
-                (FILE_HEADER_SIZE + s_file.segment_bytes * index[&i]) as u64
+                (FILE_HEADER_SIZE + s_file.segment_bytes * index[&i].start) as u64
             );
 
             let js_bytes = serde_json::to_vec(case).unwrap();
@@ -378,12 +386,13 @@ mod tests {
 
         for (i, case) in cases.iter().rev().enumerate() {
             let seek_bytes = s_file
-                .seek_segment(index[&(cases.len() - i - 1)])
+                .seek_segment(index[&(cases.len() - i - 1)].start)
                 .unwrap()
                 .unwrap();
             assert_eq!(
                 seek_bytes,
-                (FILE_HEADER_SIZE + s_file.segment_bytes * index[&(cases.len() - i - 1)]) as u64
+                (FILE_HEADER_SIZE + s_file.segment_bytes * index[&(cases.len() - i - 1)].start)
+                    as u64
             );
             let js_bytes = serde_json::to_vec(case).unwrap();
             let seg_bytes = s_file.pop().unwrap().unwrap();

@@ -96,6 +96,7 @@ impl Segment {
         Ok(bytes)
     }
 
+    // XXX: return reference instead clone
     pub(crate) fn payload(&self) -> Vec<u8> {
         (&self.payload[..self.header.length as usize]).to_owned()
     }
