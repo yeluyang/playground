@@ -1,9 +1,11 @@
 use std::{
+    convert::{TryFrom, TryInto},
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
     mem,
     ops::Range,
     path::Path,
+    result,
 };
 
 extern crate byteorder;
@@ -29,20 +31,8 @@ impl FileHeader {
             payload_bytes,
         }
     }
-    fn from(bs: &[u8]) -> io::Result<Self> {
-        assert_eq!(bs.len(), FILE_HEADER_SIZE);
 
-        let mut rdr = Cursor::new(Vec::from(bs));
-        let header_bytes = rdr.read_u128::<Endian>()?;
-        let payload_bytes = rdr.read_u128::<Endian>()?;
-
-        Ok(Self {
-            header_bytes,
-            payload_bytes,
-        })
-    }
-
-    fn to_bytes(&self) -> io::Result<Vec<u8>> {
+    fn to_vec_u8(&self) -> Result<Vec<u8>> {
         let mut wtr = Vec::new();
         wtr.write_u128::<Endian>(self.header_bytes)?;
         wtr.write_u128::<Endian>(self.payload_bytes)?;
@@ -56,6 +46,36 @@ impl FileHeader {
         }
 
         Ok(wtr)
+    }
+}
+
+impl TryFrom<&[u8]> for FileHeader {
+    type Error = Error;
+    fn try_from(bs: &[u8]) -> result::Result<Self, Self::Error> {
+        assert_eq!(bs.len(), FILE_HEADER_SIZE);
+
+        let mut rdr = Cursor::new(Vec::from(bs));
+        let header_bytes = rdr.read_u128::<Endian>()?;
+        let payload_bytes = rdr.read_u128::<Endian>()?;
+
+        Ok(Self {
+            header_bytes,
+            payload_bytes,
+        })
+    }
+}
+
+impl TryFrom<Vec<u8>> for FileHeader {
+    type Error = Error;
+    fn try_from(bs: Vec<u8>) -> result::Result<Self, Self::Error> {
+        Self::try_from(bs.as_slice())
+    }
+}
+
+impl TryInto<Vec<u8>> for FileHeader {
+    type Error = Error;
+    fn try_into(self) -> result::Result<Vec<u8>, Self::Error> {
+        self.to_vec_u8()
     }
 }
 
@@ -96,7 +116,7 @@ impl SegmentFile {
         trace!("header of new segment file, header={:?}", seg.header);
 
         seg.writer.seek(SeekFrom::Start(0))?;
-        seg.writer.write_all(seg.header.to_bytes()?.as_slice())?;
+        seg.writer.write_all(seg.header.to_vec_u8()?.as_slice())?;
         seg.reader.seek(SeekFrom::Start(FILE_HEADER_SIZE as u64))?;
 
         trace!("inited: SegmentFile={:?}", seg);
@@ -119,7 +139,7 @@ impl SegmentFile {
             panic!("missing header of segment file");
         };
 
-        let header = FileHeader::from(&buf)?;
+        let header = FileHeader::try_from(&buf[..])?;
         trace!("file-header={:?}", header);
         let segment_bytes = (header.header_bytes + header.payload_bytes) as usize;
 
@@ -163,7 +183,7 @@ impl SegmentFile {
                 self.segment_bytes
             );
         } else {
-            let segment = Segment::from(buf.as_slice())?;
+            let segment = Segment::try_from(buf.as_slice())?;
             trace!("read next segment success: segment={:?}", segment);
             Ok(Some(segment))
         }
@@ -232,7 +252,7 @@ impl SegmentFile {
         );
         let segment_seq = self.segment_seq;
         for seg in segs {
-            self.writer.write_all(seg.to_bytes()?.as_slice())?;
+            self.writer.write_all(seg.to_vec_u8()?.as_slice())?;
             self.segment_seq += 1;
         }
 
@@ -284,11 +304,11 @@ mod tests {
         }];
 
         for c in cases.iter() {
-            let bytes = c.header.to_bytes().unwrap();
+            let bytes = c.header.to_vec_u8().unwrap();
             assert_eq!(bytes.len(), FILE_HEADER_SIZE);
-            let header = FileHeader::from(bytes.as_slice()).unwrap();
+            let header = FileHeader::try_from(bytes.as_slice()).unwrap();
             assert_eq!(header, c.header);
-            assert_eq!(header.to_bytes().unwrap(), bytes);
+            assert_eq!(header.to_vec_u8().unwrap(), bytes);
         }
     }
 

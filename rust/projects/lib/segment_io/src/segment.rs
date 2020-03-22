@@ -1,9 +1,16 @@
-use std::{io::Cursor, mem};
+use std::{
+    convert::{TryFrom, TryInto},
+    io::Cursor,
+    mem, result,
+};
 
 extern crate byteorder;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 
-use crate::{error::Result, Endian};
+use crate::{
+    error::{Error, Result},
+    Endian,
+};
 
 #[derive(Default, Debug, PartialEq)]
 struct SegmentHeader {
@@ -13,7 +20,6 @@ struct SegmentHeader {
     partial_seq: u128,
     total: u128,
 }
-
 pub(crate) const SEGMENT_HEADER_SIZE: usize = mem::size_of::<SegmentHeader>();
 
 impl SegmentHeader {
@@ -26,22 +32,7 @@ impl SegmentHeader {
         }
     }
 
-    fn from(bs: &[u8]) -> Result<Self> {
-        assert_eq!(bs.len(), SEGMENT_HEADER_SIZE);
-
-        let mut h = Self::default();
-
-        let mut rdr = Cursor::new(Vec::from(bs));
-
-        h.length = rdr.read_u128::<Endian>()?;
-        h.size = rdr.read_u128::<Endian>()?;
-        h.partial_seq = rdr.read_u128::<Endian>()?;
-        h.total = rdr.read_u128::<Endian>()?;
-
-        Ok(h)
-    }
-
-    fn to_bytes(&self) -> Result<Vec<u8>> {
+    fn to_vec_u8(&self) -> Result<Vec<u8>> {
         let mut wtr = Vec::new();
 
         wtr.write_u128::<Endian>(self.length)?;
@@ -58,6 +49,41 @@ impl SegmentHeader {
         }
 
         Ok(wtr)
+    }
+}
+
+impl TryFrom<&[u8]> for SegmentHeader {
+    type Error = Error;
+
+    fn try_from(bs: &[u8]) -> result::Result<Self, Self::Error> {
+        assert_eq!(bs.len(), SEGMENT_HEADER_SIZE);
+
+        let mut h = Self::default();
+
+        let mut rdr = Cursor::new(Vec::from(bs));
+
+        h.length = rdr.read_u128::<Endian>()?;
+        h.size = rdr.read_u128::<Endian>()?;
+        h.partial_seq = rdr.read_u128::<Endian>()?;
+        h.total = rdr.read_u128::<Endian>()?;
+
+        Ok(h)
+    }
+}
+
+impl TryFrom<Vec<u8>> for SegmentHeader {
+    type Error = Error;
+
+    fn try_from(bs: Vec<u8>) -> result::Result<Self, Self::Error> {
+        Self::try_from(bs.as_slice())
+    }
+}
+
+impl TryInto<Vec<u8>> for SegmentHeader {
+    type Error = Error;
+
+    fn try_into(self) -> result::Result<Vec<u8>, Self::Error> {
+        self.to_vec_u8()
     }
 }
 
@@ -79,17 +105,8 @@ impl Segment {
         Self { header, payload }
     }
 
-    pub(crate) fn from(bs: &[u8]) -> Result<Self> {
-        assert!(bs.len() >= SEGMENT_HEADER_SIZE);
-
-        let header = SegmentHeader::from(&bs[..SEGMENT_HEADER_SIZE])?;
-        let payload = Vec::from(&bs[SEGMENT_HEADER_SIZE..]);
-
-        Ok(Self { header, payload })
-    }
-
-    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>> {
-        let mut bytes = self.header.to_bytes()?;
+    pub(crate) fn to_vec_u8(&self) -> Result<Vec<u8>> {
+        let mut bytes = self.header.to_vec_u8()?;
 
         bytes.extend(self.payload.clone());
 
@@ -107,6 +124,35 @@ impl Segment {
 
     pub(crate) fn is_last(&self) -> bool {
         self.header.partial_seq == self.header.total - 1
+    }
+}
+
+impl TryFrom<&[u8]> for Segment {
+    type Error = Error;
+
+    fn try_from(bs: &[u8]) -> result::Result<Self, Self::Error> {
+        assert!(bs.len() >= SEGMENT_HEADER_SIZE);
+
+        let header = SegmentHeader::try_from(&bs[..SEGMENT_HEADER_SIZE])?;
+        let payload = Vec::from(&bs[SEGMENT_HEADER_SIZE..]);
+
+        Ok(Self { header, payload })
+    }
+}
+
+impl TryFrom<Vec<u8>> for Segment {
+    type Error = Error;
+
+    fn try_from(bs: Vec<u8>) -> result::Result<Self, Self::Error> {
+        Self::try_from(bs.as_slice())
+    }
+}
+
+impl TryInto<Vec<u8>> for Segment {
+    type Error = Error;
+
+    fn try_into(self) -> result::Result<Vec<u8>, Self::Error> {
+        self.to_vec_u8()
     }
 }
 
@@ -229,11 +275,11 @@ mod tests {
         }];
 
         for c in cases.iter() {
-            let bytes = c.header.to_bytes().unwrap();
+            let bytes = c.header.to_vec_u8().unwrap();
             assert_eq!(bytes.len(), SEGMENT_HEADER_SIZE);
-            let header = SegmentHeader::from(bytes.as_slice()).unwrap();
+            let header = SegmentHeader::try_from(bytes.as_slice()).unwrap();
             assert_eq!(header, c.header);
-            assert_eq!(header.to_bytes().unwrap(), bytes);
+            assert_eq!(header.to_vec_u8().unwrap(), bytes);
         }
     }
 
@@ -273,11 +319,11 @@ mod tests {
                 &c.segment.payload[..c.segment.header.length as usize]
             );
 
-            let bytes = c.segment.to_bytes().unwrap();
+            let bytes = c.segment.to_vec_u8().unwrap();
             assert_eq!(bytes.len(), SEGMENT_HEADER_SIZE + c.segment.payload.len());
-            let segment = Segment::from(bytes.as_slice()).unwrap();
+            let segment = Segment::try_from(bytes.as_slice()).unwrap();
             assert_eq!(segment, c.segment);
-            assert_eq!(segment.to_bytes().unwrap(), bytes);
+            assert_eq!(segment.to_vec_u8().unwrap(), bytes);
             assert_eq!(segment.payload(), c.segment.payload());
         }
     }
