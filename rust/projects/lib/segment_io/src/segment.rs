@@ -1,9 +1,9 @@
-use std::{
-    io::{self, Cursor},
-    mem,
-};
+use std::{io::Cursor, mem};
 
-use crate::{Endian, ReadBytesExt, WriteBytesExt};
+extern crate byteorder;
+use byteorder::{ReadBytesExt, WriteBytesExt};
+
+use crate::{error::Result, Endian};
 
 #[derive(Default, Debug, PartialEq)]
 struct SegmentHeader {
@@ -26,7 +26,7 @@ impl SegmentHeader {
         }
     }
 
-    fn from(bs: &[u8]) -> io::Result<Self> {
+    fn from(bs: &[u8]) -> Result<Self> {
         assert_eq!(bs.len(), SEGMENT_HEADER_SIZE);
 
         let mut h = Self::default();
@@ -41,7 +41,7 @@ impl SegmentHeader {
         Ok(h)
     }
 
-    fn to_bytes(&self) -> io::Result<Vec<u8>> {
+    fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut wtr = Vec::new();
 
         wtr.write_u128::<Endian>(self.length)?;
@@ -79,7 +79,7 @@ impl Segment {
         Self { header, payload }
     }
 
-    pub(crate) fn from(bs: &[u8]) -> io::Result<Self> {
+    pub(crate) fn from(bs: &[u8]) -> Result<Self> {
         assert!(bs.len() >= SEGMENT_HEADER_SIZE);
 
         let header = SegmentHeader::from(&bs[..SEGMENT_HEADER_SIZE])?;
@@ -88,7 +88,7 @@ impl Segment {
         Ok(Self { header, payload })
     }
 
-    pub(crate) fn to_bytes(&self) -> io::Result<Vec<u8>> {
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut bytes = self.header.to_bytes()?;
 
         bytes.extend(self.payload.clone());

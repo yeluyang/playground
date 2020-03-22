@@ -1,15 +1,21 @@
 use std::{
     fs::{File, OpenOptions},
-    io::{self, BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
+    io::{BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
     mem,
     ops::Range,
     path::Path,
 };
 
-use crate::segment::{self, Segment};
-use crate::{Endian, ReadBytesExt, WriteBytesExt};
+extern crate byteorder;
+use byteorder::{ReadBytesExt, WriteBytesExt};
 
-#[derive(Debug, Default, PartialEq)]
+use crate::{
+    error::{Error, Result},
+    segment::{self, Segment},
+    Endian,
+};
+
+#[derive(Debug, Clone, Default, PartialEq)]
 struct FileHeader {
     header_bytes: u128,
     payload_bytes: u128,
@@ -64,7 +70,7 @@ pub struct SegmentFile {
 }
 
 impl SegmentFile {
-    pub fn create<P: AsRef<Path>>(path: P, payload_bytes: u128) -> io::Result<Self> {
+    pub fn create<P: AsRef<Path>>(path: P, payload_bytes: u128) -> Result<Self> {
         debug!("create segment file: {:?}", path.as_ref());
 
         if path.as_ref().exists() {
@@ -97,7 +103,7 @@ impl SegmentFile {
         Ok(seg)
     }
 
-    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         debug!("open segment file: {:?}", path.as_ref());
 
         let writer = OpenOptions::new()
@@ -142,7 +148,7 @@ impl SegmentFile {
         Ok(seg)
     }
 
-    fn next_segment(&mut self) -> io::Result<Option<Segment>> {
+    fn next_segment(&mut self) -> Result<Option<Segment>> {
         debug!("reading next segment");
         let mut buf: Vec<u8> = vec![0u8; self.segment_bytes];
         self.reader.read_exact(buf.as_mut_slice())?;
@@ -165,7 +171,7 @@ impl SegmentFile {
 
     // TODO add `next_n_segments(n)->Result<Option<Vec<Segment>>>`
 
-    pub fn seek_segment(&mut self, n: usize) -> io::Result<Option<u64>> {
+    pub fn seek_segment(&mut self, n: usize) -> Result<Option<u64>> {
         debug!("seeking segment: segment_seq={}", n);
 
         let bytes = FILE_HEADER_SIZE + self.segment_bytes * n;
@@ -178,7 +184,7 @@ impl SegmentFile {
         }
     }
 
-    pub fn pop(&mut self) -> io::Result<Option<Vec<u8>>> {
+    pub fn pop(&mut self) -> Result<Option<Vec<u8>>> {
         debug!("reading full content");
 
         let mut bytes: Vec<u8> = Vec::new();
@@ -212,7 +218,7 @@ impl SegmentFile {
         panic!("incomplete write")
     }
 
-    pub fn append(&mut self, buf: &[u8]) -> io::Result<Range<usize>> {
+    pub fn append(&mut self, buf: &[u8]) -> Result<Range<usize>> {
         debug!(
             "writting data into segment_file: data={{len={}, val={:?}}}",
             buf.len(),
