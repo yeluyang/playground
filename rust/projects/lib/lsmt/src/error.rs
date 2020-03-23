@@ -5,6 +5,10 @@ use std::{
     path::Path,
 };
 
+extern crate segment_io;
+
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[derive(Debug)]
 pub enum Error {
     IO(io::Error),
@@ -12,32 +16,34 @@ pub enum Error {
     EmptyFile(String),
     InvalidPath(OsString),
     IncompleteWrite(String),
+    SegmentFile(segment_io::Error),
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match *self {
-            Self::IO(ref err) => err.fmt(f),
-            Self::HeaderMissing(ref path) => write!(
+        match self {
+            Self::IO(err) => err.fmt(f),
+            Self::HeaderMissing(path) => write!(
                 f,
                 "failed to open log structed file: miss header, path={}",
                 path,
             ),
-            Self::EmptyFile(ref path) => write!(
+            Self::EmptyFile(path) => write!(
                 f,
-                "failed to open log structed file: empty file, path={}",
+                "failed to open log structed file: empty file even header, path={}",
                 path,
             ),
-            Self::InvalidPath(ref path) => write!(
+            Self::InvalidPath(path) => write!(
                 f,
                 "failed to open log structed file: invalid path, path={:?}",
                 path,
             ),
-            Self::IncompleteWrite(ref path) => write!(
+            Self::IncompleteWrite(path) => write!(
                 f,
                 "failed to open log structed file: incomplete write, path={}",
                 path,
             ),
+            Self::SegmentFile(err) => err.fmt(f),
         }
     }
 }
@@ -50,11 +56,15 @@ impl From<io::Error> for Error {
     }
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+impl From<segment_io::Error> for Error {
+    fn from(err: segment_io::Error) -> Self {
+        Error::SegmentFile(err)
+    }
+}
 
 pub fn path_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
     path.as_ref()
         .to_str()
         .map(|s| s.to_owned())
-        .ok_or(Error::InvalidPath(path.as_ref().as_os_str().to_os_string()))
+        .ok_or_else(|| Error::InvalidPath(path.as_ref().as_os_str().to_os_string()))
 }

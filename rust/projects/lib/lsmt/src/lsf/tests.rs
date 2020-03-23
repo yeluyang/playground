@@ -1,9 +1,4 @@
-use std::{
-    fs,
-    io::{Seek, SeekFrom},
-    ops::RangeInclusive,
-    path::Path,
-};
+use std::{fs, ops::RangeInclusive, path::Path};
 
 extern crate serde_json;
 
@@ -77,7 +72,7 @@ fn test_lsf() {
     }
 
     ls_fd.compact().unwrap();
-    ls_fd.fd.seek(SeekFrom::Start(0)).unwrap();
+    ls_fd.fd.seek_segment(0).unwrap();
 
     for k in 0..keys_num {
         let c = ls_fd.pop::<TestRecord>().unwrap().unwrap();

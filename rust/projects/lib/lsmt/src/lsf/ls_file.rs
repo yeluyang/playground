@@ -1,9 +1,4 @@
-use std::{
-    cmp::Ordering,
-    fs,
-    io::{Seek, SeekFrom, Write},
-    path::Path,
-};
+use std::{cmp::Ordering, fs, path::Path};
 
 extern crate segment_io;
 use segment_io::SegmentFile;
@@ -36,6 +31,19 @@ impl LogStructuredFile {
         })
     }
 
+    pub fn create<P: AsRef<Path>>(dir: P, header: LogFileHeader) -> Result<LogStructuredFile> {
+        let path = if header.ids.start() == header.ids.end() {
+            dir.as_ref().join(format!("{}.wal", header.ids.end()))
+        } else {
+            dir.as_ref()
+                .join(format!("{}-{}.wal", header.ids.start(), header.ids.end()))
+        };
+        let mut ls_fd = LogStructuredFile::new(&path, SegmentFile::create(&path, 1024)?, header)?;
+        ls_fd.write_end(LogEntry::FileHeader(ls_fd.header.clone()))?;
+        ls_fd.write_end(LogEntry::Index(ls_fd.entry_count, ls_fd.index.clone()))?;
+        Ok(ls_fd)
+    }
+
     pub fn open<P: AsRef<Path>>(path: P) -> Result<LogStructuredFile> {
         let mut ls_fd =
             LogStructuredFile::new(&path, SegmentFile::open(&path)?, LogFileHeader::default())?;
@@ -51,7 +59,9 @@ impl LogStructuredFile {
             return Err(Error::EmptyFile(error::path_to_string(path)?));
         };
 
-        ls_fd.fd.seek(SeekFrom::End(0))?;
+        ls_fd
+            .fd
+            .seek_segment(ls_fd.fd.last_segment_seq().unwrap())?;
         match ls_fd.read_next()?.unwrap() {
             LogEntry::Index(entry_count, index) => {
                 ls_fd.index = index;
@@ -60,20 +70,7 @@ impl LogStructuredFile {
             _ => return Err(Error::IncompleteWrite(error::path_to_string(path)?)),
         };
 
-        ls_fd.fd.seek(SeekFrom::Start(0))?;
-        Ok(ls_fd)
-    }
-
-    pub fn create<P: AsRef<Path>>(dir: P, header: LogFileHeader) -> Result<LogStructuredFile> {
-        let path = if header.ids.start() == header.ids.end() {
-            dir.as_ref().join(format!("{}.wal", header.ids.end()))
-        } else {
-            dir.as_ref()
-                .join(format!("{}-{}.wal", header.ids.start(), header.ids.end()))
-        };
-        let mut ls_fd = LogStructuredFile::new(&path, SegmentFile::create(&path)?, header)?;
-        ls_fd.write_end(LogEntry::FileHeader(ls_fd.header.clone()))?;
-        ls_fd.write_end(LogEntry::Index(ls_fd.entry_count, ls_fd.index.clone()))?;
+        ls_fd.fd.seek_segment(0)?;
         Ok(ls_fd)
     }
 
@@ -82,7 +79,7 @@ impl LogStructuredFile {
     }
 
     fn read_next(&mut self) -> Result<Option<LogEntry>> {
-        Ok(self.fd.pop()?.map(LogEntry::from))
+        Ok(self.fd.get_payload()?.map(LogEntry::from))
     }
 
     fn read_next_record(&mut self) -> Result<Option<LogEntry>> {
@@ -122,7 +119,6 @@ impl LogStructuredFile {
 
     pub(crate) fn write_end(&mut self, l: LogEntry) -> Result<()> {
         self.fd.append(l.to_bytes().as_slice())?;
-        self.fd.flush()?;
         self.entry_count += 1;
         Ok(())
     }
@@ -168,20 +164,19 @@ impl LogStructuredFile {
                 self.header.ids.end()
             ))
         };
-        let mut compacted = SegmentFile::create(&path)?;
+        let mut compacted = SegmentFile::create(&path, 1024)?;
 
         let mut entry_count = 0usize;
 
         let mut header = self.header.clone();
         header.compacted = true;
         compacted.append(LogEntry::FileHeader(header.clone()).to_bytes().as_slice())?;
-        compacted.flush()?;
         entry_count += 1;
 
         let mut entrys: Vec<(usize, LogEntryKey, LogEntry)> = Vec::new();
         for (key, header_count) in &self.index {
             self.fd.seek_segment(*header_count)?;
-            let l = self.fd.pop()?.map(LogEntry::from).unwrap();
+            let l = self.fd.get_payload()?.map(LogEntry::from).unwrap();
             entrys.push((*header_count, key.clone(), l));
         }
         entrys.sort_by(|l, r| l.0.cmp(&r.0));
@@ -190,7 +185,6 @@ impl LogStructuredFile {
             let (_, key, l) = e;
             index.insert(key.clone(), entry_count);
             compacted.append(l.to_bytes().as_slice())?;
-            compacted.flush()?;
             entry_count += 1;
         }
 
@@ -199,7 +193,6 @@ impl LogStructuredFile {
                 .to_bytes()
                 .as_slice(),
         )?;
-        compacted.flush()?;
         entry_count += 1;
 
         self.fd = compacted;

@@ -198,6 +198,23 @@ impl SegmentFile {
 
     // TODO add `next_n_segments(n)->Result<Option<Vec<Segment>>>`
 
+    pub fn last_segment_seq(&self) -> Option<usize> {
+        if self.segment_seq == 0 {
+            None
+        } else {
+            Some(self.segment_seq - 1)
+        }
+    }
+
+    fn write_segments(&mut self, segments: Vec<Segment>) -> Result<()> {
+        for seg in segments {
+            self.writer.write_all(seg.to_vec_u8()?.as_slice())?;
+            self.writer.flush()?;
+            self.segment_seq += 1;
+        }
+        Ok(())
+    }
+
     pub fn seek_segment(&mut self, n: usize) -> Result<Option<u64>> {
         debug!("seeking segment: segment_seq={}", n);
 
@@ -267,10 +284,7 @@ impl SegmentFile {
         let segs = segment::create(payload.to_owned(), self.header.payload_bytes as usize);
         trace!("create {} segments from payload", segs.len());
         let segment_seq = self.segment_seq;
-        for seg in segs {
-            self.writer.write_all(seg.to_vec_u8()?.as_slice())?;
-            self.segment_seq += 1;
-        }
+        self.write_segments(segs)?;
 
         trace!(
             "write all success: segment_file.segment_seq={{before={}, now={}}}",
