@@ -1,7 +1,7 @@
 use std::{
     convert::{TryFrom, TryInto},
     fs::{File, OpenOptions},
-    io::{BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
+    io::{self, BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
     mem,
     ops::Range,
     path::Path,
@@ -37,13 +37,7 @@ impl FileHeader {
         wtr.write_u128::<Endian>(self.header_bytes)?;
         wtr.write_u128::<Endian>(self.payload_bytes)?;
 
-        if wtr.len() != FILE_HEADER_SIZE {
-            panic!(
-                "length of Version's bytes={}, expected={}",
-                wtr.len(),
-                FILE_HEADER_SIZE,
-            );
-        }
+        assert_eq!(wtr.len(), FILE_HEADER_SIZE);
 
         Ok(wtr)
     }
@@ -51,10 +45,10 @@ impl FileHeader {
 
 impl TryFrom<&[u8]> for FileHeader {
     type Error = Error;
-    fn try_from(bs: &[u8]) -> result::Result<Self, Self::Error> {
-        assert_eq!(bs.len(), FILE_HEADER_SIZE);
+    fn try_from(bytes: &[u8]) -> result::Result<Self, Self::Error> {
+        assert_eq!(bytes.len(), FILE_HEADER_SIZE);
 
-        let mut rdr = Cursor::new(Vec::from(bs));
+        let mut rdr = Cursor::new(Vec::from(bytes));
         let header_bytes = rdr.read_u128::<Endian>()?;
         let payload_bytes = rdr.read_u128::<Endian>()?;
 
@@ -67,8 +61,8 @@ impl TryFrom<&[u8]> for FileHeader {
 
 impl TryFrom<Vec<u8>> for FileHeader {
     type Error = Error;
-    fn try_from(bs: Vec<u8>) -> result::Result<Self, Self::Error> {
-        Self::try_from(bs.as_slice())
+    fn try_from(bytes: Vec<u8>) -> result::Result<Self, Self::Error> {
+        Self::try_from(bytes.as_slice())
     }
 }
 
@@ -91,11 +85,10 @@ pub struct SegmentFile {
 
 impl SegmentFile {
     pub fn create<P: AsRef<Path>>(path: P, payload_bytes: u128) -> Result<Self> {
-        debug!("create segment file: {:?}", path.as_ref());
+        debug!("creating segment file: {:?}", path.as_ref());
 
         if path.as_ref().exists() {
-            // TODO: add error
-            panic!("already exists: {:?}", path.as_ref());
+            return Err(Error::FileExisted(path.as_ref().to_path_buf()));
         }
 
         let writer = OpenOptions::new()
@@ -105,7 +98,7 @@ impl SegmentFile {
             .open(path.as_ref())?;
         let reader = OpenOptions::new().read(true).open(path)?;
 
-        let mut seg = Self {
+        let mut seg_file = Self {
             segment_seq: 0,
 
             header: FileHeader::new(payload_bytes),
@@ -113,14 +106,18 @@ impl SegmentFile {
             writer: BufWriter::new(writer),
             segment_bytes: payload_bytes as usize + segment::SEGMENT_HEADER_SIZE,
         };
-        trace!("header of new segment file, header={:?}", seg.header);
+        trace!("header of new segment file, header={:?}", seg_file.header);
 
-        seg.writer.seek(SeekFrom::Start(0))?;
-        seg.writer.write_all(seg.header.to_vec_u8()?.as_slice())?;
-        seg.reader.seek(SeekFrom::Start(FILE_HEADER_SIZE as u64))?;
+        seg_file.writer.seek(SeekFrom::Start(0))?;
+        seg_file
+            .writer
+            .write_all(seg_file.header.to_vec_u8()?.as_slice())?;
+        seg_file
+            .reader
+            .seek(SeekFrom::Start(FILE_HEADER_SIZE as u64))?;
 
-        trace!("inited: SegmentFile={:?}", seg);
-        Ok(seg)
+        trace!("inited: SegmentFile={:?}", seg_file);
+        Ok(seg_file)
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
@@ -130,20 +127,25 @@ impl SegmentFile {
             .append(true)
             .create(true)
             .open(path.as_ref())?;
-        let mut reader = OpenOptions::new().read(true).open(path)?;
+        let mut reader = OpenOptions::new().read(true).open(path.as_ref())?;
 
-        let mut buf: [u8; FILE_HEADER_SIZE] = [0u8; FILE_HEADER_SIZE];
-        let bytes = reader.read(&mut buf)?;
-        if bytes == 0 {
-            // TODO add error
-            panic!("missing header of segment file");
+        let mut buf = [0u8; FILE_HEADER_SIZE];
+        if let Err(err) = reader.read_exact(&mut buf) {
+            match err.kind() {
+                io::ErrorKind::UnexpectedEof => {
+                    return Err(Error::FileHeaderMissing(path.as_ref().to_path_buf()));
+                }
+                _ => {
+                    return Err(Error::IO(err));
+                }
+            };
         };
 
         let header = FileHeader::try_from(&buf[..])?;
         trace!("file-header={:?}", header);
         let segment_bytes = (header.header_bytes + header.payload_bytes) as usize;
 
-        let mut seg = Self {
+        let mut seg_file = Self {
             segment_seq: 0,
 
             header,
@@ -152,39 +154,44 @@ impl SegmentFile {
             writer: BufWriter::new(writer),
         };
 
-        seg.reader.seek(SeekFrom::Start(FILE_HEADER_SIZE as u64))?;
-        seg.writer.seek(SeekFrom::End(0))?;
+        seg_file
+            .reader
+            .seek(SeekFrom::Start(FILE_HEADER_SIZE as u64))?;
+        seg_file.writer.seek(SeekFrom::End(0))?;
 
-        let segments_bytes = seg.writer.seek(SeekFrom::Current(0))? as usize - FILE_HEADER_SIZE;
+        let segments_bytes =
+            seg_file.writer.seek(SeekFrom::Current(0))? as usize - FILE_HEADER_SIZE;
         trace!("bytes of segments of file: bytes={}", segments_bytes);
         if segments_bytes == 0 {
-            seg.segment_seq = 0;
+            seg_file.segment_seq = 0;
         } else {
-            assert_eq!(segments_bytes % seg.segment_bytes, 0);
-            seg.segment_seq = segments_bytes / seg.segment_bytes;
+            assert_eq!(segments_bytes % seg_file.segment_bytes, 0);
+            seg_file.segment_seq = segments_bytes / seg_file.segment_bytes;
         }
 
-        trace!("inited: SegmentFile={:?}", seg);
-        Ok(seg)
+        trace!("inited: SegmentFile={:?}", seg_file);
+        Ok(seg_file)
     }
 
     fn next_segment(&mut self) -> Result<Option<Segment>> {
         debug!("reading next segment");
         let mut buf: Vec<u8> = vec![0u8; self.segment_bytes];
-        self.reader.read_exact(buf.as_mut_slice())?;
-
-        if buf.is_empty() {
-            trace!("read EOF");
-            Ok(None)
-        } else if buf.len() != self.segment_bytes {
-            panic!(
-                "length of bytes from file mismatch header size: {} vs {}",
-                buf.len(),
-                self.segment_bytes
-            );
+        if let Err(err) = self.reader.read_exact(buf.as_mut_slice()) {
+            match err.kind() {
+                io::ErrorKind::UnexpectedEof => {
+                    trace!("read EOF");
+                    Ok(None)
+                }
+                _ => Err(Error::IO(err)),
+            }
         } else {
+            assert_eq!(buf.len(), self.segment_bytes);
             let segment = Segment::try_from(buf.as_slice())?;
-            trace!("read next segment success: segment={:?}", segment);
+            trace!(
+                "read next segment success: segment={{header={:?}, payload.len={}}}",
+                segment.header,
+                segment.payload.len(),
+            );
             Ok(Some(segment))
         }
     }
@@ -197,59 +204,68 @@ impl SegmentFile {
         let bytes = FILE_HEADER_SIZE + self.segment_bytes * n;
         trace!("seek bytes from start: bytes={}", bytes);
         if self.reader.seek(SeekFrom::Start(bytes as u64))? as usize == bytes {
+            trace!("segment found");
             Ok(Some(bytes as u64))
         } else {
-            error!("encounter EOF when seeking");
+            trace!("segment not found: encounter EOF");
             Ok(None)
         }
     }
 
-    pub fn pop(&mut self) -> Result<Option<Vec<u8>>> {
-        debug!("reading full content");
+    pub fn get_payload(&mut self) -> Result<Option<Vec<u8>>> {
+        debug!("reading payload from segments");
 
-        let mut bytes: Vec<u8> = Vec::new();
+        let mut bytes: Vec<u8> = Vec::with_capacity(self.header.payload_bytes as usize);
         if let Some(seg) = self.next_segment()? {
             if seg.is_first() {
                 if seg.is_last() {
+                    bytes.extend(seg.payload());
                     trace!(
-                        "read all content success, first is all: content={:?}",
-                        seg.payload()
+                        "read success, first contains all: payload.len={}",
+                        bytes.len()
                     );
-                    return Ok(Some(seg.payload()));
+                    return Ok(Some(bytes));
                 } else {
+                    trace!(
+                        "read segments: {}/{}",
+                        seg.header.partial_seq + 1,
+                        seg.header.total
+                    );
                     bytes.extend(seg.payload());
                 }
             } else {
-                // TODO return error
-                unimplemented!();
+                return Err(Error::ReadFromMiddle(
+                    seg.header.partial_seq,
+                    seg.header.total,
+                ));
             }
         } else {
             return Ok(None);
         };
         // TODO use `next_n_segments`
         while let Some(seg) = self.next_segment()? {
-            let is_last = seg.is_last();
+            trace!(
+                "read segments: {}/{}",
+                seg.header.partial_seq + 1,
+                seg.header.total
+            );
+            // TODO: use `take_payload`
             bytes.extend(seg.payload());
-            if is_last {
-                trace!("read all content success: content={:?}", bytes);
+            if seg.is_last() {
+                trace!("read success: payload.len={}", bytes.len());
                 return Ok(Some(bytes));
             }
         }
         panic!("incomplete write")
     }
 
-    pub fn append(&mut self, buf: &[u8]) -> Result<Range<usize>> {
+    pub fn append(&mut self, payload: &[u8]) -> Result<Range<usize>> {
         debug!(
-            "writting data into segment_file: data={{len={}, val={:?}}}",
-            buf.len(),
-            buf
+            "appending payload into segment_file: payload.len={}",
+            payload.len(),
         );
-        let segs = segment::create(buf.to_owned(), self.header.payload_bytes as usize);
-        trace!(
-            "create a segments with data: segments={{len={}, val={:?}}}",
-            segs.len(),
-            segs
-        );
+        let segs = segment::create(payload.to_owned(), self.header.payload_bytes as usize);
+        trace!("create {} segments from payload", segs.len());
         let segment_seq = self.segment_seq;
         for seg in segs {
             self.writer.write_all(seg.to_vec_u8()?.as_slice())?;
@@ -373,6 +389,7 @@ mod tests {
             }
             assert_eq!(index.len(), cases.len());
         }
+        assert!(SegmentFile::create("tmp/tmp.segment", TEST_PAYLOAD_BYTES as u128).is_err());
 
         let mut s_file = SegmentFile::open("tmp/tmp.segment").unwrap();
         assert_eq!(s_file.segment_seq, index[&(cases.len() - 1)].end);
@@ -388,12 +405,13 @@ mod tests {
 
         for case in &cases {
             let bytes_json = serde_json::to_vec(case).unwrap();
-            let bytes_seg = s_file.pop().unwrap().unwrap();
+            let bytes_seg = s_file.get_payload().unwrap().unwrap();
             assert_eq!(bytes_seg, bytes_json);
 
             let c: Case = serde_json::from_slice(bytes_seg.as_slice()).unwrap();
             assert_eq!(&c, case);
         }
+        assert!(s_file.get_payload().unwrap().is_none());
 
         for (i, case) in cases.iter().enumerate() {
             let seek_bytes = s_file.seek_segment(index[&i].start).unwrap().unwrap();
@@ -403,12 +421,13 @@ mod tests {
             );
 
             let js_bytes = serde_json::to_vec(case).unwrap();
-            let seg_bytes = s_file.pop().unwrap().unwrap();
+            let seg_bytes = s_file.get_payload().unwrap().unwrap();
             assert_eq!(seg_bytes, js_bytes);
 
             let c: Case = serde_json::from_slice(seg_bytes.as_slice()).unwrap();
             assert_eq!(&c, case);
         }
+        assert!(s_file.get_payload().unwrap().is_none());
 
         for (i, case) in cases.iter().rev().enumerate() {
             let seek_bytes = s_file
@@ -421,11 +440,12 @@ mod tests {
                     as u64
             );
             let js_bytes = serde_json::to_vec(case).unwrap();
-            let seg_bytes = s_file.pop().unwrap().unwrap();
+            let seg_bytes = s_file.get_payload().unwrap().unwrap();
             assert_eq!(seg_bytes, js_bytes);
 
             let c: Case = serde_json::from_slice(seg_bytes.as_slice()).unwrap();
             assert_eq!(&c, case);
         }
+        assert!(s_file.get_payload().unwrap().is_some());
     }
 }

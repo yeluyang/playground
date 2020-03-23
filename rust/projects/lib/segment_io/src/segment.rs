@@ -13,12 +13,12 @@ use crate::{
 };
 
 #[derive(Default, Debug, PartialEq)]
-struct SegmentHeader {
+pub(crate) struct SegmentHeader {
     // TODO add `segment_uuid`
     length: u128,
     size: u128,
-    partial_seq: u128,
-    total: u128,
+    pub(crate) partial_seq: u128,
+    pub(crate) total: u128,
 }
 pub(crate) const SEGMENT_HEADER_SIZE: usize = mem::size_of::<SegmentHeader>();
 
@@ -40,13 +40,7 @@ impl SegmentHeader {
         wtr.write_u128::<Endian>(self.partial_seq)?;
         wtr.write_u128::<Endian>(self.total)?;
 
-        if wtr.len() != SEGMENT_HEADER_SIZE {
-            panic!(
-                "length of SegmentHeader's bytes={}, expected={}",
-                wtr.len(),
-                SEGMENT_HEADER_SIZE,
-            );
-        }
+        assert_eq!(wtr.len(), SEGMENT_HEADER_SIZE);
 
         Ok(wtr)
     }
@@ -55,13 +49,12 @@ impl SegmentHeader {
 impl TryFrom<&[u8]> for SegmentHeader {
     type Error = Error;
 
-    fn try_from(bs: &[u8]) -> result::Result<Self, Self::Error> {
-        assert_eq!(bs.len(), SEGMENT_HEADER_SIZE);
+    fn try_from(bytes: &[u8]) -> result::Result<Self, Self::Error> {
+        assert_eq!(bytes.len(), SEGMENT_HEADER_SIZE);
 
         let mut h = Self::default();
 
-        let mut rdr = Cursor::new(Vec::from(bs));
-
+        let mut rdr = Cursor::new(Vec::from(bytes));
         h.length = rdr.read_u128::<Endian>()?;
         h.size = rdr.read_u128::<Endian>()?;
         h.partial_seq = rdr.read_u128::<Endian>()?;
@@ -74,8 +67,8 @@ impl TryFrom<&[u8]> for SegmentHeader {
 impl TryFrom<Vec<u8>> for SegmentHeader {
     type Error = Error;
 
-    fn try_from(bs: Vec<u8>) -> result::Result<Self, Self::Error> {
-        Self::try_from(bs.as_slice())
+    fn try_from(bytes: Vec<u8>) -> result::Result<Self, Self::Error> {
+        Self::try_from(bytes.as_slice())
     }
 }
 
@@ -89,8 +82,8 @@ impl TryInto<Vec<u8>> for SegmentHeader {
 
 #[derive(Default, Debug, PartialEq)]
 pub(crate) struct Segment {
-    header: SegmentHeader,
-    payload: Vec<u8>,
+    pub(crate) header: SegmentHeader,
+    pub(crate) payload: Vec<u8>,
 }
 
 impl Segment {
@@ -101,21 +94,22 @@ impl Segment {
         if payload.len() < header.size as usize {
             payload.resize_with(header.size as usize, Default::default);
         };
+        assert!(payload.len() == header.size as usize);
 
         Self { header, payload }
     }
 
     pub(crate) fn to_vec_u8(&self) -> Result<Vec<u8>> {
         let mut bytes = self.header.to_vec_u8()?;
-
         bytes.extend(self.payload.clone());
+        assert_eq!(bytes.len(), SEGMENT_HEADER_SIZE + self.payload.len());
 
         Ok(bytes)
     }
 
-    // XXX: return reference instead clone
-    pub(crate) fn payload(&self) -> Vec<u8> {
-        (&self.payload[..self.header.length as usize]).to_owned()
+    // TODO: add `take_payload`
+    pub(crate) fn payload(&self) -> &[u8] {
+        &self.payload[..self.header.length as usize]
     }
 
     pub(crate) fn is_first(&self) -> bool {
@@ -130,11 +124,11 @@ impl Segment {
 impl TryFrom<&[u8]> for Segment {
     type Error = Error;
 
-    fn try_from(bs: &[u8]) -> result::Result<Self, Self::Error> {
-        assert!(bs.len() >= SEGMENT_HEADER_SIZE);
+    fn try_from(bytes: &[u8]) -> result::Result<Self, Self::Error> {
+        assert!(bytes.len() >= SEGMENT_HEADER_SIZE);
 
-        let header = SegmentHeader::try_from(&bs[..SEGMENT_HEADER_SIZE])?;
-        let payload = Vec::from(&bs[SEGMENT_HEADER_SIZE..]);
+        let header = SegmentHeader::try_from(&bytes[..SEGMENT_HEADER_SIZE])?;
+        let payload = Vec::from(&bytes[SEGMENT_HEADER_SIZE..]);
 
         Ok(Self { header, payload })
     }
@@ -143,8 +137,8 @@ impl TryFrom<&[u8]> for Segment {
 impl TryFrom<Vec<u8>> for Segment {
     type Error = Error;
 
-    fn try_from(bs: Vec<u8>) -> result::Result<Self, Self::Error> {
-        Self::try_from(bs.as_slice())
+    fn try_from(bytes: Vec<u8>) -> result::Result<Self, Self::Error> {
+        Self::try_from(bytes.as_slice())
     }
 }
 
@@ -162,6 +156,14 @@ pub(crate) fn create(mut payload: Vec<u8>, partial_limits: usize) -> Vec<Segment
     } else {
         payload.len() / partial_limits as usize
     };
+
+    debug!(
+        "creating {} segments: data.len={}, partial.size={}",
+        n,
+        payload.len(),
+        partial_limits
+    );
+
     let mut segments: Vec<Segment> = Vec::with_capacity(n);
 
     for i in 0..n {
@@ -170,6 +172,8 @@ pub(crate) fn create(mut payload: Vec<u8>, partial_limits: usize) -> Vec<Segment
         } else {
             vec![]
         };
+        assert!(!payload.is_empty());
+        assert!(payload.len() <= partial_limits);
 
         segments.push(Segment::new(
             SegmentHeader::new(
@@ -183,6 +187,7 @@ pub(crate) fn create(mut payload: Vec<u8>, partial_limits: usize) -> Vec<Segment
 
         payload = next;
     }
+    assert_eq!(segments.len(), n);
 
     segments
 }
@@ -213,6 +218,11 @@ mod tests {
                 payload: vec![3; 1025],
                 partial_limits: 128,
                 expected_segments: 9,
+            },
+            Case {
+                payload: vec![3; 125],
+                partial_limits: 128,
+                expected_segments: 1,
             },
         ];
 
@@ -292,6 +302,17 @@ mod tests {
             Case {
                 segment: Segment {
                     header: SegmentHeader {
+                        length: 0,
+                        size: 128,
+                        partial_seq: 4,
+                        total: 16,
+                    },
+                    payload: vec![0; 0],
+                },
+            },
+            Case {
+                segment: Segment {
+                    header: SegmentHeader {
                         length: 128,
                         size: 128,
                         partial_seq: 8,
@@ -305,7 +326,7 @@ mod tests {
                     header: SegmentHeader {
                         length: 64,
                         size: 128,
-                        partial_seq: 8,
+                        partial_seq: 15,
                         total: 16,
                     },
                     payload: vec![0; 64],
@@ -315,7 +336,7 @@ mod tests {
 
         for c in cases.iter() {
             assert_eq!(
-                c.segment.payload().as_slice(),
+                c.segment.payload(),
                 &c.segment.payload[..c.segment.header.length as usize]
             );
 

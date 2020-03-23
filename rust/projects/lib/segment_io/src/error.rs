@@ -1,19 +1,29 @@
 use std::{
     error,
     fmt::{self, Formatter},
-    io, result,
+    io,
+    path::PathBuf,
+    result,
 };
 
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    FileHeaderMissing(PathBuf),
+    FileExisted(PathBuf),
+    ReadFromMiddle(u128, u128),
     IO(io::Error),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::FileHeaderMissing(path) => write!(f, "header of file missing: {:?}", path),
+            Self::FileExisted(path) => write!(f, "file already existed: {:?}", path),
+            Self::ReadFromMiddle(seq, total) => {
+                write!(f, "read from middle segment: {}/{}", seq, total)
+            }
             Self::IO(err) => err.fmt(f),
         }
     }
