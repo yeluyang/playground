@@ -13,6 +13,7 @@ pub enum Error {
     FileHeaderMissing(PathBuf),
     FileExisted(PathBuf),
     ReadFromMiddle(u128, u128),
+    PayloadLimitZero,
     IO(io::Error),
 }
 
@@ -24,6 +25,7 @@ impl fmt::Display for Error {
             Self::ReadFromMiddle(seq, total) => {
                 write!(f, "read from middle segment: {}/{}", seq, total)
             }
+            Self::PayloadLimitZero => write!(f, "limit of bytes of payload must greater than zero"),
             Self::IO(err) => err.fmt(f),
         }
     }

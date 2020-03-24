@@ -74,7 +74,7 @@ impl TryInto<Vec<u8>> for FileHeader {
 }
 
 #[derive(Debug)]
-pub struct SegmentFile {
+pub struct SegmentsFile {
     header: FileHeader,
     reader: BufReader<File>,
     writer: BufWriter<File>,
@@ -83,12 +83,16 @@ pub struct SegmentFile {
     segment_seq: usize,
 }
 
-impl SegmentFile {
+impl SegmentsFile {
     pub fn create<P: AsRef<Path>>(path: P, payload_bytes: u128) -> Result<Self> {
         debug!("creating segment file: {:?}", path.as_ref());
 
         if path.as_ref().exists() {
             return Err(Error::FileExisted(path.as_ref().to_path_buf()));
+        }
+
+        if payload_bytes == 0 {
+            return Err(Error::PayloadLimitZero);
         }
 
         let writer = OpenOptions::new()
@@ -116,17 +120,14 @@ impl SegmentFile {
             .reader
             .seek(SeekFrom::Start(FILE_HEADER_SIZE as u64))?;
 
-        trace!("inited: SegmentFile={:?}", seg_file);
+        trace!("inited: SegmentsFile={:?}", seg_file);
         Ok(seg_file)
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         debug!("open segment file: {:?}", path.as_ref());
 
-        let writer = OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(path.as_ref())?;
+        let writer = OpenOptions::new().append(true).open(path.as_ref())?;
         let mut reader = OpenOptions::new().read(true).open(path.as_ref())?;
 
         let mut buf = [0u8; FILE_HEADER_SIZE];
@@ -169,7 +170,7 @@ impl SegmentFile {
             seg_file.segment_seq = segments_bytes / seg_file.segment_bytes;
         }
 
-        trace!("inited: SegmentFile={:?}", seg_file);
+        trace!("inited: SegmentsFile={:?}", seg_file);
         Ok(seg_file)
     }
 
@@ -276,6 +277,19 @@ impl SegmentFile {
         panic!("incomplete write")
     }
 
+    pub fn get_payload_by(&mut self, n: usize) -> Result<Option<Vec<u8>>> {
+        match self.get_payload() {
+            Ok(opt) => Ok(opt),
+            Err(err) => match err {
+                Error::ReadFromMiddle(seq, _) => {
+                    self.seek_segment(n - seq as usize)?;
+                    self.get_payload()
+                }
+                _ => Err(err),
+            },
+        }
+    }
+
     pub fn append(&mut self, payload: &[u8]) -> Result<Range<usize>> {
         debug!(
             "appending payload into segment_file: payload.len={}",
@@ -302,164 +316,323 @@ impl SegmentFile {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, fs};
-
     use super::*;
+    use crate::tests::*;
 
-    extern crate serde;
-    use serde::{Deserialize, Serialize};
+    mod file_header {
+        use super::*;
 
-    extern crate serde_json;
+        #[test]
+        fn test_file_header() {
+            init();
+            struct Case {
+                header: FileHeader,
+            }
+            let cases = [Case {
+                header: FileHeader::new(128),
+            }];
 
-    extern crate env_logger;
-    use env_logger::{Builder, Env};
-
-    static INIT: std::sync::Once = std::sync::Once::new();
-    fn init() {
-        INIT.call_once(|| {
-            Builder::from_env(Env::default().default_filter_or("trace"))
-                .is_test(true)
-                .init();
-        })
-    }
-
-    #[test]
-    fn test_file_header() {
-        init();
-        struct Case {
-            header: FileHeader,
-        }
-        let cases = [Case {
-            header: FileHeader::new(128),
-        }];
-
-        for c in cases.iter() {
-            let bytes = c.header.to_vec_u8().unwrap();
-            assert_eq!(bytes.len(), FILE_HEADER_SIZE);
-            let header = FileHeader::try_from(bytes.as_slice()).unwrap();
-            assert_eq!(header, c.header);
-            assert_eq!(header.to_vec_u8().unwrap(), bytes);
+            for c in cases.iter() {
+                let bytes = c.header.to_vec_u8().unwrap();
+                assert_eq!(bytes.len(), FILE_HEADER_SIZE);
+                let header = FileHeader::try_from(bytes.as_slice()).unwrap();
+                assert_eq!(header, c.header);
+                assert_eq!(header.to_vec_u8().unwrap(), bytes);
+            }
         }
     }
 
-    #[test]
-    fn test_segment_file() {
-        init();
-        const TEST_PAYLOAD_BYTES: usize = 64;
+    mod segments_file {
+        use std::{collections::HashMap, fs};
+
+        use super::*;
+
+        extern crate serde;
+        use serde::{Deserialize, Serialize};
+        extern crate serde_json;
 
         #[derive(Debug, PartialEq, Serialize, Deserialize)]
-        struct Case {
+        struct CaseData {
             id: usize,
-            data: Vec<usize>,
+            data: Vec<u8>,
         }
-        let cases = [
-            Case {
-                id: 0,
-                data: vec![0; TEST_PAYLOAD_BYTES / 4],
-            },
-            Case {
-                id: 1,
-                data: vec![1; TEST_PAYLOAD_BYTES / 2],
-            },
-            Case {
-                id: 2,
-                data: vec![2; TEST_PAYLOAD_BYTES],
-            },
-            Case {
-                id: 3,
-                data: vec![3; TEST_PAYLOAD_BYTES * 2],
-            },
-            Case {
-                id: 4,
-                data: vec![4; TEST_PAYLOAD_BYTES * 4],
-            },
-        ];
-        let mut index: HashMap<usize, Range<usize>> = HashMap::new();
 
-        let tmp_dir = Path::new("tmp");
-        if tmp_dir.exists() {
-            fs::remove_dir_all(tmp_dir).unwrap();
-        }
-        fs::create_dir(tmp_dir).unwrap();
-
+        fn setup<T, P>(
+            dataset: &[T],
+            path: P,
+            payload_limits: usize,
+        ) -> (SegmentsFile, HashMap<usize, Range<usize>>)
+        where
+            T: Serialize,
+            P: AsRef<Path>,
         {
-            let mut s_file =
-                SegmentFile::create("tmp/tmp.segment", TEST_PAYLOAD_BYTES as u128).unwrap();
-            assert_eq!(s_file.segment_seq, 0);
-            assert_eq!(
-                s_file.segment_bytes,
-                segment::SEGMENT_HEADER_SIZE + TEST_PAYLOAD_BYTES
-            );
-            assert_eq!(
-                s_file.header.header_bytes as usize,
-                segment::SEGMENT_HEADER_SIZE
-            );
-            assert_eq!(s_file.header.payload_bytes as usize, TEST_PAYLOAD_BYTES);
+            let mut index: HashMap<usize, Range<usize>> = HashMap::new();
+            let mut s_file = SegmentsFile::create(path, payload_limits as u128).unwrap();
 
-            for (i, case) in cases.iter().enumerate() {
-                let bytes = serde_json::to_vec(case).unwrap();
+            for (i, data) in dataset.iter().enumerate() {
+                let bytes = serde_json::to_vec(data).unwrap();
                 let seq_rng = s_file.append(bytes.as_slice()).unwrap();
                 index.insert(i, seq_rng);
             }
-            assert_eq!(index.len(), cases.len());
+            assert_eq!(index.len(), dataset.len());
+            (s_file, index)
         }
-        assert!(SegmentFile::create("tmp/tmp.segment", TEST_PAYLOAD_BYTES as u128).is_err());
 
-        let mut s_file = SegmentFile::open("tmp/tmp.segment").unwrap();
-        assert_eq!(s_file.segment_seq, index[&(cases.len() - 1)].end);
-        assert_eq!(
-            s_file.segment_bytes,
-            segment::SEGMENT_HEADER_SIZE + TEST_PAYLOAD_BYTES
-        );
-        assert_eq!(
-            s_file.header.header_bytes as usize,
-            segment::SEGMENT_HEADER_SIZE
-        );
-        assert_eq!(s_file.header.payload_bytes as usize, TEST_PAYLOAD_BYTES);
+        #[test]
+        fn test_create() {
+            init();
+            let case_dir = case_dir(module_path!(), "test_create");
+            if case_dir.exists() {
+                fs::remove_dir_all(&case_dir).unwrap();
+            }
+            fs::create_dir_all(&case_dir).unwrap();
 
-        for case in &cases {
-            let bytes_json = serde_json::to_vec(case).unwrap();
-            let bytes_seg = s_file.get_payload().unwrap().unwrap();
-            assert_eq!(bytes_seg, bytes_json);
+            struct Case {
+                path: String,
+                payload_limits: u128,
+                result: Result<()>,
+            }
+            let cases = &[
+                Case {
+                    path: "normal.segment".to_owned(),
+                    payload_limits: 128,
+                    result: Ok(()),
+                },
+                Case {
+                    path: "non-existed-dir/non-existed.segment".to_owned(),
+                    payload_limits: 128,
+                    result: Err(Error::IO(io::Error::from_raw_os_error(2))),
+                },
+                Case {
+                    path: "payload-limits-zero.segment".to_owned(),
+                    payload_limits: 0,
+                    result: Err(Error::PayloadLimitZero),
+                },
+            ];
 
-            let c: Case = serde_json::from_slice(bytes_seg.as_slice()).unwrap();
-            assert_eq!(&c, case);
+            for case in cases {
+                let path = case_dir.join(&case.path);
+                match SegmentsFile::create(&path, case.payload_limits) {
+                    Ok(s_file) => {
+                        assert_eq!(s_file.segment_seq, 0);
+                        assert_eq!(
+                            s_file.segment_bytes,
+                            segment::SEGMENT_HEADER_SIZE + case.payload_limits as usize
+                        );
+                        assert_eq!(
+                            s_file.header.header_bytes as usize,
+                            segment::SEGMENT_HEADER_SIZE
+                        );
+                        assert_eq!(s_file.header.payload_bytes, case.payload_limits);
+                        assert!(SegmentsFile::create(&path, case.payload_limits).is_err());
+                    }
+                    Err(err) => assert_eq!(
+                        err.to_string(),
+                        case.result.as_ref().unwrap_err().to_string()
+                    ),
+                };
+            }
         }
-        assert!(s_file.get_payload().unwrap().is_none());
 
-        for (i, case) in cases.iter().enumerate() {
-            let seek_bytes = s_file.seek_segment(index[&i].start).unwrap().unwrap();
-            assert_eq!(
-                seek_bytes,
-                (FILE_HEADER_SIZE + s_file.segment_bytes * index[&i].start) as u64
-            );
+        #[test]
+        fn test_open() {
+            init();
+            let case_dir = case_dir(module_path!(), "test_open");
+            if case_dir.exists() {
+                fs::remove_dir_all(&case_dir).unwrap();
+            }
+            fs::create_dir_all(&case_dir).unwrap();
 
-            let js_bytes = serde_json::to_vec(case).unwrap();
-            let seg_bytes = s_file.get_payload().unwrap().unwrap();
-            assert_eq!(seg_bytes, js_bytes);
+            struct Case {
+                path: String,
+                payload_limits: usize,
+                dataset: Vec<CaseData>,
+                result: Result<()>,
+            }
+            let cases = &[
+                Case {
+                    path: "normal.segment".to_owned(),
+                    payload_limits: 128,
+                    dataset: vec![
+                        CaseData {
+                            id: 0,
+                            data: vec![0; 64],
+                        },
+                        CaseData {
+                            id: 1,
+                            data: vec![1; 256],
+                        },
+                    ],
+                    result: Ok(()),
+                },
+                Case {
+                    path: "no-header.segment".to_owned(),
+                    payload_limits: 128,
+                    dataset: vec![],
+                    result: Err(Error::FileHeaderMissing(case_dir.join("no-header.segment"))),
+                },
+            ];
 
-            let c: Case = serde_json::from_slice(seg_bytes.as_slice()).unwrap();
-            assert_eq!(&c, case);
+            for case in cases {
+                let path = case_dir.join(&case.path);
+                let err = SegmentsFile::open(&path).unwrap_err();
+                assert_eq!(
+                    err.to_string(),
+                    Error::IO(io::Error::from_raw_os_error(2)).to_string()
+                );
+
+                let (open_result, index) = match case.result.as_ref() {
+                    Ok(_) => {
+                        let (_, index) = setup(case.dataset.as_slice(), &path, case.payload_limits);
+
+                        (SegmentsFile::open(&path), index)
+                    }
+                    Err(err) => match err {
+                        Error::FileHeaderMissing(_) => {
+                            OpenOptions::new()
+                                .create(true)
+                                .write(true)
+                                .open(&path)
+                                .unwrap();
+                            (SegmentsFile::open(&path), HashMap::new())
+                        }
+                        _ => unimplemented!(),
+                    },
+                };
+
+                match open_result {
+                    Ok(s_file) => {
+                        assert_eq!(s_file.segment_seq, index[&(case.dataset.len() - 1)].end);
+                        assert_eq!(
+                            s_file.segment_bytes,
+                            segment::SEGMENT_HEADER_SIZE + case.payload_limits
+                        );
+                        assert_eq!(
+                            s_file.header.header_bytes as usize,
+                            segment::SEGMENT_HEADER_SIZE
+                        );
+                        assert_eq!(s_file.header.payload_bytes as usize, case.payload_limits);
+                    }
+                    Err(err) => {
+                        assert_eq!(
+                            err.to_string(),
+                            case.result.as_ref().unwrap_err().to_string(),
+                        );
+                    }
+                }
+            }
         }
-        assert!(s_file.get_payload().unwrap().is_none());
 
-        for (i, case) in cases.iter().rev().enumerate() {
-            let seek_bytes = s_file
-                .seek_segment(index[&(cases.len() - i - 1)].start)
-                .unwrap()
-                .unwrap();
-            assert_eq!(
-                seek_bytes,
-                (FILE_HEADER_SIZE + s_file.segment_bytes * index[&(cases.len() - i - 1)].start)
-                    as u64
-            );
-            let js_bytes = serde_json::to_vec(case).unwrap();
-            let seg_bytes = s_file.get_payload().unwrap().unwrap();
-            assert_eq!(seg_bytes, js_bytes);
+        #[test]
+        fn test_read() {
+            init();
+            let case_dir = case_dir(module_path!(), "test_read");
+            if case_dir.exists() {
+                fs::remove_dir_all(&case_dir).unwrap();
+            }
+            fs::create_dir_all(&case_dir).unwrap();
 
-            let c: Case = serde_json::from_slice(seg_bytes.as_slice()).unwrap();
-            assert_eq!(&c, case);
+            struct Case {
+                path: String,
+                payload_limits: usize,
+                dataset: Vec<CaseData>,
+            }
+            let cases = &[Case {
+                path: "normal.segment".to_owned(),
+                payload_limits: 128,
+                dataset: vec![
+                    CaseData {
+                        id: 0,
+                        data: vec![0; 64],
+                    },
+                    CaseData {
+                        id: 1,
+                        data: vec![1; 256],
+                    },
+                ],
+            }];
+
+            for case in cases {
+                let path = case_dir.join(&case.path);
+                let (mut s_file, _) = setup(case.dataset.as_slice(), &path, case.payload_limits);
+                for i in 0..2 {
+                    for data in &case.dataset {
+                        let js_bytes = serde_json::to_vec(data).unwrap();
+                        let seg_bytes = s_file.get_payload().unwrap().unwrap();
+                        assert_eq!(seg_bytes, js_bytes);
+
+                        let d: CaseData = serde_json::from_slice(seg_bytes.as_slice()).unwrap();
+                        assert_eq!(&d, data);
+                    }
+                    assert!(s_file.get_payload().unwrap().is_none());
+
+                    if i == 0 {
+                        // open then read
+                        s_file = SegmentsFile::open(&path).unwrap();
+                    }
+                }
+            }
         }
-        assert!(s_file.get_payload().unwrap().is_some());
+
+        #[test]
+        fn test_seek() {
+            init();
+            let case_dir = case_dir(module_path!(), "test_seek");
+            if case_dir.exists() {
+                fs::remove_dir_all(&case_dir).unwrap();
+            }
+            fs::create_dir_all(&case_dir).unwrap();
+
+            struct Case {
+                path: String,
+                payload_limits: usize,
+                dataset: Vec<CaseData>,
+            }
+            let cases = &[Case {
+                path: "normal.segment".to_owned(),
+                payload_limits: 128,
+                dataset: vec![
+                    CaseData {
+                        id: 0,
+                        data: vec![0; 64],
+                    },
+                    CaseData {
+                        id: 1,
+                        data: vec![1; 256],
+                    },
+                ],
+            }];
+
+            for case in cases {
+                let path = case_dir.join(&case.path);
+                let (mut s_file, index) =
+                    setup(case.dataset.as_slice(), &path, case.payload_limits);
+                for i in 0..2 {
+                    for (i, data) in case.dataset.iter().rev().enumerate() {
+                        let seek_bytes = s_file
+                            .seek_segment(index[&(case.dataset.len() - i - 1)].start)
+                            .unwrap()
+                            .unwrap();
+                        assert_eq!(
+                            seek_bytes,
+                            (FILE_HEADER_SIZE
+                                + s_file.segment_bytes * index[&(case.dataset.len() - i - 1)].start)
+                                as u64
+                        );
+                        let js_bytes = serde_json::to_vec(data).unwrap();
+                        let seg_bytes = s_file.get_payload().unwrap().unwrap();
+                        assert_eq!(seg_bytes, js_bytes);
+                        let d: CaseData = serde_json::from_slice(seg_bytes.as_slice()).unwrap();
+                        assert_eq!(&d, data);
+                    }
+                    assert!(s_file.get_payload().unwrap().is_some());
+
+                    if i == 0 {
+                        // open then seek
+                        s_file = SegmentsFile::open(&path).unwrap();
+                    }
+                }
+            }
+        }
     }
 }
