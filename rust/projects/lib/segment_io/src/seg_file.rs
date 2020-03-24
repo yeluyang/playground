@@ -230,7 +230,7 @@ impl SegmentsFile {
         }
     }
 
-    pub fn get_payload(&mut self) -> Result<Option<Vec<u8>>> {
+    pub fn next_payload(&mut self) -> Result<Option<Vec<u8>>> {
         debug!("reading payload from segments");
 
         let mut bytes: Vec<u8> = Vec::with_capacity(self.header.payload_bytes as usize);
@@ -277,13 +277,13 @@ impl SegmentsFile {
         panic!("incomplete write")
     }
 
-    pub fn get_payload_by(&mut self, n: usize) -> Result<Option<Vec<u8>>> {
-        match self.get_payload() {
+    pub fn read_payload_by(&mut self, n: usize) -> Result<Option<Vec<u8>>> {
+        match self.next_payload() {
             Ok(opt) => Ok(opt),
             Err(err) => match err {
                 Error::ReadFromMiddle(seq, _) => {
                     self.seek_segment(n - seq as usize)?;
-                    self.get_payload()
+                    self.next_payload()
                 }
                 _ => Err(err),
             },
@@ -558,13 +558,13 @@ mod tests {
                 for i in 0..2 {
                     for data in &case.dataset {
                         let js_bytes = serde_json::to_vec(data).unwrap();
-                        let seg_bytes = s_file.get_payload().unwrap().unwrap();
+                        let seg_bytes = s_file.next_payload().unwrap().unwrap();
                         assert_eq!(seg_bytes, js_bytes);
 
                         let d: CaseData = serde_json::from_slice(seg_bytes.as_slice()).unwrap();
                         assert_eq!(&d, data);
                     }
-                    assert!(s_file.get_payload().unwrap().is_none());
+                    assert!(s_file.next_payload().unwrap().is_none());
 
                     if i == 0 {
                         // open then read
@@ -620,12 +620,12 @@ mod tests {
                                 as u64
                         );
                         let js_bytes = serde_json::to_vec(data).unwrap();
-                        let seg_bytes = s_file.get_payload().unwrap().unwrap();
+                        let seg_bytes = s_file.next_payload().unwrap().unwrap();
                         assert_eq!(seg_bytes, js_bytes);
                         let d: CaseData = serde_json::from_slice(seg_bytes.as_slice()).unwrap();
                         assert_eq!(&d, data);
                     }
-                    assert!(s_file.get_payload().unwrap().is_some());
+                    assert!(s_file.next_payload().unwrap().is_some());
 
                     if i == 0 {
                         // open then seek

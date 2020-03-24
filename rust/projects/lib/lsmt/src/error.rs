@@ -16,7 +16,7 @@ pub enum Error {
     EmptyFile(String),
     InvalidPath(OsString),
     IncompleteWrite(String),
-    SegmentFile(segment_io::Error),
+    SegmentsFile(segment_io::Error),
 }
 
 impl Display for Error {
@@ -43,7 +43,7 @@ impl Display for Error {
                 "failed to open log structed file: incomplete write, path={}",
                 path,
             ),
-            Self::SegmentFile(err) => err.fmt(f),
+            Self::SegmentsFile(err) => err.fmt(f),
         }
     }
 }
@@ -58,7 +58,7 @@ impl From<io::Error> for Error {
 
 impl From<segment_io::Error> for Error {
     fn from(err: segment_io::Error) -> Self {
-        Error::SegmentFile(err)
+        Error::SegmentsFile(err)
     }
 }
 

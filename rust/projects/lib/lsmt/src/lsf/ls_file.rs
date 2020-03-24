@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, fs, path::Path};
 
 extern crate segment_io;
-use segment_io::SegmentFile;
+use segment_io::SegmentsFile;
 
 use crate::error::{self, Error, Result};
 
@@ -13,13 +13,13 @@ pub struct LogStructuredFile {
     pub(crate) header: LogFileHeader,
     pub(crate) index: LogEntryIndex,
     pub(crate) entry_count: usize,
-    pub(crate) fd: SegmentFile,
+    pub(crate) fd: SegmentsFile,
 }
 
 impl LogStructuredFile {
     pub fn new<P: AsRef<Path>>(
         path: P,
-        fd: SegmentFile,
+        fd: SegmentsFile,
         file_header: LogFileHeader,
     ) -> Result<LogStructuredFile> {
         Ok(LogStructuredFile {
@@ -38,7 +38,7 @@ impl LogStructuredFile {
             dir.as_ref()
                 .join(format!("{}-{}.wal", header.ids.start(), header.ids.end()))
         };
-        let mut ls_fd = LogStructuredFile::new(&path, SegmentFile::create(&path, 1024)?, header)?;
+        let mut ls_fd = LogStructuredFile::new(&path, SegmentsFile::create(&path, 1024)?, header)?;
         ls_fd.write_end(LogEntry::FileHeader(ls_fd.header.clone()))?;
         ls_fd.write_end(LogEntry::Index(ls_fd.entry_count, ls_fd.index.clone()))?;
         Ok(ls_fd)
@@ -46,7 +46,7 @@ impl LogStructuredFile {
 
     pub fn open<P: AsRef<Path>>(path: P) -> Result<LogStructuredFile> {
         let mut ls_fd =
-            LogStructuredFile::new(&path, SegmentFile::open(&path)?, LogFileHeader::default())?;
+            LogStructuredFile::new(&path, SegmentsFile::open(&path)?, LogFileHeader::default())?;
 
         if let Some(l) = ls_fd.read_next()? {
             match l {
@@ -79,7 +79,7 @@ impl LogStructuredFile {
     }
 
     fn read_next(&mut self) -> Result<Option<LogEntry>> {
-        Ok(self.fd.get_payload()?.map(LogEntry::from))
+        Ok(self.fd.next_payload()?.map(LogEntry::from))
     }
 
     fn read_next_record(&mut self) -> Result<Option<LogEntry>> {
@@ -164,7 +164,7 @@ impl LogStructuredFile {
                 self.header.ids.end()
             ))
         };
-        let mut compacted = SegmentFile::create(&path, 1024)?;
+        let mut compacted = SegmentsFile::create(&path, 1024)?;
 
         let mut entry_count = 0usize;
 
@@ -176,7 +176,7 @@ impl LogStructuredFile {
         let mut entrys: Vec<(usize, LogEntryKey, LogEntry)> = Vec::new();
         for (key, header_count) in &self.index {
             self.fd.seek_segment(*header_count)?;
-            let l = self.fd.get_payload()?.map(LogEntry::from).unwrap();
+            let l = self.fd.next_payload()?.map(LogEntry::from).unwrap();
             entrys.push((*header_count, key.clone(), l));
         }
         entrys.sort_by(|l, r| l.0.cmp(&r.0));
