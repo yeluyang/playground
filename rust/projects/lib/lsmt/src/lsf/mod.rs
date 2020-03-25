@@ -4,5 +4,6 @@ mod ls_file;
 #[cfg(test)]
 mod tests;
 
-pub use entry::{LogEntry, LogEntryKey, LogEntryPointer, LogFileHeader, Record};
-pub use ls_file::LogStructuredFile;
+pub(crate) use entry::{LogEntry, LogEntryKey, LogFileHeader};
+pub use entry::{LogEntryPointer, Record};
+pub(crate) use ls_file::LogStructuredFile;

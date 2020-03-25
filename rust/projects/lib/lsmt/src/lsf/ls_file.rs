@@ -8,7 +8,7 @@ use crate::error::{self, Error, Result};
 use super::entry::{LogEntry, LogEntryIndex, LogEntryKey, LogEntryPointer, LogFileHeader, Record};
 
 #[derive(Debug)]
-pub struct LogStructuredFile {
+pub(crate) struct LogStructuredFile {
     path: String,
     pub(crate) header: LogFileHeader,
     pub(crate) index: LogEntryIndex,
@@ -48,7 +48,7 @@ impl LogStructuredFile {
         let mut ls_fd =
             LogStructuredFile::new(&path, SegmentsFile::open(&path)?, LogFileHeader::default())?;
 
-        if let Some(l) = ls_fd.read_next()? {
+        if let Some(l) = ls_fd.next_entry()? {
             match l {
                 LogEntry::FileHeader(h) => {
                     ls_fd.header = h;
@@ -62,7 +62,7 @@ impl LogStructuredFile {
         ls_fd
             .fd
             .seek_segment(ls_fd.fd.last_segment_seq().unwrap())?;
-        match ls_fd.read_next()?.unwrap() {
+        match ls_fd.next_entry()?.unwrap() {
             LogEntry::Index(entry_count, index) => {
                 ls_fd.index = index;
                 ls_fd.entry_count = entry_count;
@@ -78,12 +78,12 @@ impl LogStructuredFile {
         self.path.clone()
     }
 
-    fn read_next(&mut self) -> Result<Option<LogEntry>> {
+    fn next_entry(&mut self) -> Result<Option<LogEntry>> {
         Ok(self.fd.next_payload()?.map(LogEntry::from))
     }
 
-    fn read_next_record(&mut self) -> Result<Option<LogEntry>> {
-        while let Some(l) = self.read_next()? {
+    fn next_record(&mut self) -> Result<Option<LogEntry>> {
+        while let Some(l) = self.next_entry()? {
             match l {
                 LogEntry::Data(_) => return Ok(Some(l)),
                 _ => continue, // skip log file header and log index
@@ -93,7 +93,7 @@ impl LogStructuredFile {
     }
 
     pub fn pop<T: Record>(&mut self) -> Result<Option<T>> {
-        if let Some(l) = self.read_next_record()? {
+        if let Some(l) = self.next_record()? {
             match l {
                 LogEntry::Data(data) => Ok(Some(T::from(data.data))),
                 _ => unreachable!(),
@@ -104,7 +104,7 @@ impl LogStructuredFile {
     }
 
     pub fn pop_pointer(&mut self) -> Result<Option<LogEntryPointer>> {
-        if let Some(l) = self.read_next_record()? {
+        if let Some(l) = self.next_record()? {
             match l {
                 LogEntry::Data(data) => Ok(Some(LogEntryPointer::new(
                     *self.header.ids.start(),
@@ -141,7 +141,7 @@ impl LogStructuredFile {
     ) -> Result<Option<LogEntry>> {
         let header_count = self.index[&p.key];
         self.fd.seek_segment(header_count)?;
-        self.read_next_record()
+        self.next_record()
     }
 
     pub fn read_by_pointer<T: Record>(&mut self, p: &LogEntryPointer) -> Result<Option<T>> {

@@ -10,11 +10,11 @@ pub trait Record: From<Vec<u8>> {
     fn key(&self) -> String;
 }
 
-pub type LogEntryKey = String;
-pub type LogEntryIndex = HashMap<LogEntryKey, usize>;
+pub(crate) type LogEntryKey = String;
+pub(crate) type LogEntryIndex = HashMap<LogEntryKey, usize>;
 
 #[derive(Debug, Eq, Clone, Serialize, Deserialize)]
-pub struct LogFileHeader {
+pub(crate) struct LogFileHeader {
     pub version: usize,
     pub ids: RangeInclusive<usize>,
     pub compacted: bool,
@@ -43,13 +43,13 @@ impl LogFileHeader {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct LogEntryData {
+pub(crate) struct LogEntryData {
     pub key: LogEntryKey,
     pub data: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum LogEntry {
+pub(crate) enum LogEntry {
     FileHeader(LogFileHeader),
     Index(usize, LogEntryIndex),
     Data(LogEntryData),
