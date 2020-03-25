@@ -17,6 +17,8 @@ type Master struct {
 //
 // an example RPC handler.
 //
+// the RPC argument and reply types are defined in rpc.go.
+//
 func (m *Master) Example(args *ExampleArgs, reply *ExampleReply) error {
 	reply.Y = args.X + 1
 	return nil
@@ -30,8 +32,9 @@ func (m *Master) server() {
 	rpc.Register(m)
 	rpc.HandleHTTP()
 	//l, e := net.Listen("tcp", ":1234")
-	os.Remove("mr-socket")
-	l, e := net.Listen("unix", "mr-socket")
+	sockname := masterSock()
+	os.Remove(sockname)
+	l, e := net.Listen("unix", sockname)
 	if e != nil {
 		log.Fatal("listen error:", e)
 	}
@@ -53,6 +56,8 @@ func (m *Master) Done() bool {
 
 //
 // create a Master.
+// main/mrmaster.go calls this function.
+// nReduce is the number of reduce tasks to use.
 //
 func MakeMaster(files []string, nReduce int) *Master {
 	m := Master{}
@@ -60,5 +65,6 @@ func MakeMaster(files []string, nReduce int) *Master {
 	// Your code here.
 
 
+	m.server()
 	return &m
 }
