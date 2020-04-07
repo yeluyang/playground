@@ -45,8 +45,11 @@ impl LogStructuredFile {
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Result<LogStructuredFile> {
-        let mut ls_fd =
-            LogStructuredFile::new(&path, SegmentsFile::open(&path)?, LogFileHeader::default())?;
+        let mut ls_fd = LogStructuredFile::new(
+            &path,
+            SegmentsFile::open(&path, true)?,
+            LogFileHeader::default(),
+        )?;
 
         if let Some(l) = ls_fd.next_entry()? {
             match l {

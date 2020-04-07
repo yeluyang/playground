@@ -13,6 +13,7 @@ pub enum Error {
     FileHeaderMissing(PathBuf),
     FileExisted(PathBuf),
     ReadFromMiddle(u128, u128),
+    WriteOnReadOnlyFile(PathBuf),
     PayloadLimitZero,
     IO(io::Error),
 }
@@ -24,6 +25,9 @@ impl fmt::Display for Error {
             Self::FileExisted(path) => write!(f, "file already existed: {:?}", path),
             Self::ReadFromMiddle(seq, total) => {
                 write!(f, "read from middle segment: {}/{}", seq, total)
+            }
+            Self::WriteOnReadOnlyFile(path) => {
+                write!(f, "write segments on read-only file: {:?}", path)
             }
             Self::PayloadLimitZero => write!(f, "limit of bytes of payload must greater than zero"),
             Self::IO(err) => err.fmt(f),

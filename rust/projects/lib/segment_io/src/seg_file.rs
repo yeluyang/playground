@@ -4,8 +4,12 @@ use std::{
     io::{self, BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
     mem,
     ops::Range,
-    path::Path,
+    path::{Path, PathBuf},
     result,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
 };
 
 extern crate byteorder;
@@ -73,49 +77,106 @@ impl TryInto<Vec<u8>> for FileHeader {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub path: PathBuf,
+    pub write_enable: bool,
+}
+
+impl Config {
+    fn new<P: AsRef<Path>>(path: P, write_enable: bool) -> Self {
+        Self {
+            write_enable,
+            path: PathBuf::from(path.as_ref()),
+        }
+    }
+}
+
+// TODO ReadOnly and WriteOnly
 #[derive(Debug)]
 pub struct SegmentsFile {
-    header: FileHeader,
-    reader: BufReader<File>,
-    writer: BufWriter<File>,
+    pub config: Config,
 
+    header: FileHeader,
     segment_bytes: usize,
-    segment_seq: usize,
+    segment_seq: Arc<AtomicUsize>,
+
+    reader: BufReader<File>,
+    writer: Option<Arc<Mutex<BufWriter<File>>>>,
+}
+
+impl Clone for SegmentsFile {
+    fn clone(&self) -> Self {
+        let mut reader = BufReader::new(
+            OpenOptions::new()
+                .read(true)
+                .open(self.config.path.as_path())
+                .unwrap(),
+        );
+        reader
+            .seek(SeekFrom::Start(FILE_HEADER_SIZE as u64))
+            .unwrap();
+        Self {
+            config: self.config.clone(),
+
+            header: self.header.clone(),
+            segment_bytes: self.segment_bytes,
+            segment_seq: self.segment_seq.clone(),
+
+            reader,
+            writer: self.writer.clone(),
+        }
+    }
 }
 
 impl SegmentsFile {
+    fn new(config: Config, header: FileHeader, segment_bytes: usize) -> Result<Self> {
+        let reader = BufReader::new(OpenOptions::new().read(true).open(config.path.as_path())?);
+        let writer = if config.write_enable {
+            Some(Arc::new(Mutex::new(BufWriter::new(
+                OpenOptions::new().write(true).open(config.path.as_path())?,
+            ))))
+        } else {
+            None
+        };
+
+        Ok(Self {
+            config,
+            header,
+            segment_bytes,
+            segment_seq: Arc::new(AtomicUsize::new(0)),
+
+            reader,
+            writer,
+        })
+    }
+
     pub fn create<P: AsRef<Path>>(path: P, payload_bytes: u128) -> Result<Self> {
         debug!("creating segment file: {:?}", path.as_ref());
 
         if path.as_ref().exists() {
             return Err(Error::FileExisted(path.as_ref().to_path_buf()));
+        } else {
+            File::create(path.as_ref())?;
         }
 
         if payload_bytes == 0 {
             return Err(Error::PayloadLimitZero);
         }
 
-        let writer = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path.as_ref())?;
-        let reader = OpenOptions::new().read(true).open(path)?;
+        let mut seg_file = Self::new(
+            Config::new(path, true),
+            FileHeader::new(payload_bytes),
+            payload_bytes as usize + segment::SEGMENT_HEADER_SIZE,
+        )?;
+        trace!("header of new segment file, config={:?}", seg_file.config);
 
-        let mut seg_file = Self {
-            segment_seq: 0,
+        {
+            let mut seg_writer = seg_file.writer.as_ref().unwrap().lock().unwrap();
+            seg_writer.seek(SeekFrom::Start(0))?;
+            seg_writer.write_all(seg_file.header.to_vec_u8()?.as_slice())?;
+        }
 
-            header: FileHeader::new(payload_bytes),
-            reader: BufReader::new(reader),
-            writer: BufWriter::new(writer),
-            segment_bytes: payload_bytes as usize + segment::SEGMENT_HEADER_SIZE,
-        };
-        trace!("header of new segment file, header={:?}", seg_file.header);
-
-        seg_file.writer.seek(SeekFrom::Start(0))?;
-        seg_file
-            .writer
-            .write_all(seg_file.header.to_vec_u8()?.as_slice())?;
         seg_file
             .reader
             .seek(SeekFrom::Start(FILE_HEADER_SIZE as u64))?;
@@ -124,12 +185,10 @@ impl SegmentsFile {
         Ok(seg_file)
     }
 
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open<P: AsRef<Path>>(path: P, write_enable: bool) -> Result<Self> {
         debug!("open segment file: {:?}", path.as_ref());
 
-        let writer = OpenOptions::new().append(true).open(path.as_ref())?;
         let mut reader = OpenOptions::new().read(true).open(path.as_ref())?;
-
         let mut buf = [0u8; FILE_HEADER_SIZE];
         if let Err(err) = reader.read_exact(&mut buf) {
             match err.kind() {
@@ -141,33 +200,30 @@ impl SegmentsFile {
                 }
             };
         };
-
         let header = FileHeader::try_from(&buf[..])?;
         trace!("file-header={:?}", header);
         let segment_bytes = (header.header_bytes + header.payload_bytes) as usize;
+        drop(reader);
 
-        let mut seg_file = Self {
-            segment_seq: 0,
-
+        let mut seg_file = Self::new(
+            Config::new(path.as_ref(), write_enable),
             header,
             segment_bytes,
-            reader: BufReader::new(reader),
-            writer: BufWriter::new(writer),
-        };
+        )?;
 
+        let segments_bytes = seg_file.reader.seek(SeekFrom::End(0))? as usize - FILE_HEADER_SIZE;
         seg_file
             .reader
             .seek(SeekFrom::Start(FILE_HEADER_SIZE as u64))?;
-        seg_file.writer.seek(SeekFrom::End(0))?;
 
-        let segments_bytes =
-            seg_file.writer.seek(SeekFrom::Current(0))? as usize - FILE_HEADER_SIZE;
         trace!("bytes of segments of file: bytes={}", segments_bytes);
         if segments_bytes == 0 {
-            seg_file.segment_seq = 0;
+            seg_file.segment_seq.store(0, Ordering::SeqCst);
         } else {
             assert_eq!(segments_bytes % seg_file.segment_bytes, 0);
-            seg_file.segment_seq = segments_bytes / seg_file.segment_bytes;
+            seg_file
+                .segment_seq
+                .store(segments_bytes / seg_file.segment_bytes, Ordering::SeqCst);
         }
 
         trace!("inited: SegmentsFile={:?}", seg_file);
@@ -200,20 +256,26 @@ impl SegmentsFile {
     // TODO add `next_n_segments(n)->Result<Option<Vec<Segment>>>`
 
     pub fn last_segment_seq(&self) -> Option<usize> {
-        if self.segment_seq == 0 {
+        if self.segment_seq.load(Ordering::SeqCst) == 0 {
             None
         } else {
-            Some(self.segment_seq - 1)
+            Some(self.segment_seq.load(Ordering::SeqCst) - 1)
         }
     }
 
     fn write_segments(&mut self, segments: Vec<Segment>) -> Result<()> {
-        for seg in segments {
-            self.writer.write_all(seg.to_vec_u8()?.as_slice())?;
-            self.writer.flush()?;
-            self.segment_seq += 1;
+        match &self.writer {
+            None => Err(Error::WriteOnReadOnlyFile(self.config.path.clone())),
+            Some(writer) => {
+                let mut writer = writer.lock().unwrap();
+                for seg in segments {
+                    writer.write_all(seg.to_vec_u8()?.as_slice())?;
+                    writer.flush()?;
+                    self.segment_seq.fetch_add(1, Ordering::SeqCst);
+                }
+                Ok(())
+            }
         }
-        Ok(())
     }
 
     pub fn seek_segment(&mut self, n: usize) -> Result<Option<u64>> {
@@ -297,17 +359,17 @@ impl SegmentsFile {
         );
         let segs = segment::create(payload.to_owned(), self.header.payload_bytes as usize);
         trace!("create {} segments from payload", segs.len());
-        let segment_seq = self.segment_seq;
+        let segment_seq = self.segment_seq.load(Ordering::SeqCst);
         self.write_segments(segs)?;
 
         trace!(
             "write all success: segment_file.segment_seq={{before={}, now={}}}",
             segment_seq,
-            self.segment_seq
+            self.segment_seq.load(Ordering::SeqCst)
         );
         Ok(Range {
             start: segment_seq,
-            end: self.segment_seq,
+            end: self.segment_seq.load(Ordering::SeqCst),
         })
     }
 
@@ -414,7 +476,7 @@ mod tests {
                 let path = case_dir.join(&case.path);
                 match SegmentsFile::create(&path, case.payload_limits) {
                     Ok(s_file) => {
-                        assert_eq!(s_file.segment_seq, 0);
+                        assert_eq!(s_file.segment_seq.load(Ordering::SeqCst), 0);
                         assert_eq!(
                             s_file.segment_bytes,
                             segment::SEGMENT_HEADER_SIZE + case.payload_limits as usize
@@ -475,7 +537,7 @@ mod tests {
 
             for case in cases {
                 let path = case_dir.join(&case.path);
-                let err = SegmentsFile::open(&path).unwrap_err();
+                let err = SegmentsFile::open(&path, false).unwrap_err();
                 assert_eq!(
                     err.to_string(),
                     Error::IO(io::Error::from_raw_os_error(2)).to_string()
@@ -485,7 +547,7 @@ mod tests {
                     Ok(_) => {
                         let (_, index) = setup(case.dataset.as_slice(), &path, case.payload_limits);
 
-                        (SegmentsFile::open(&path), index)
+                        (SegmentsFile::open(&path, false), index)
                     }
                     Err(err) => match err {
                         Error::FileHeaderMissing(_) => {
@@ -494,15 +556,18 @@ mod tests {
                                 .write(true)
                                 .open(&path)
                                 .unwrap();
-                            (SegmentsFile::open(&path), HashMap::new())
+                            (SegmentsFile::open(&path, false), HashMap::new())
                         }
-                        _ => unimplemented!(),
+                        _ => unreachable!(),
                     },
                 };
 
                 match open_result {
                     Ok(s_file) => {
-                        assert_eq!(s_file.segment_seq, index[&(case.dataset.len() - 1)].end);
+                        assert_eq!(
+                            s_file.segment_seq.load(Ordering::SeqCst),
+                            index[&(case.dataset.len() - 1)].end
+                        );
                         assert_eq!(
                             s_file.segment_bytes,
                             segment::SEGMENT_HEADER_SIZE + case.payload_limits
@@ -568,7 +633,7 @@ mod tests {
 
                     if i == 0 {
                         // open then read
-                        s_file = SegmentsFile::open(&path).unwrap();
+                        s_file = SegmentsFile::open(&path, false).unwrap();
                     }
                 }
             }
@@ -629,10 +694,15 @@ mod tests {
 
                     if i == 0 {
                         // open then seek
-                        s_file = SegmentsFile::open(&path).unwrap();
+                        s_file = SegmentsFile::open(&path, false).unwrap();
                     }
                 }
             }
+        }
+
+        #[test]
+        fn test_concurrence() {
+            // TODO add concurrence test
         }
     }
 }
