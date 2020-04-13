@@ -1,1 +1,2 @@
+mod master;
 mod rpc;
