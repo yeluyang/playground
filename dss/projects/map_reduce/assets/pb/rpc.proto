@@ -4,6 +4,15 @@ message PingRequest {}
 
 message PingResponse {}
 
-service Node {
+message TaskGetRequest {
+    string host = 1;
+}
+
+message TaskGetResponse {
+    string input_path = 1;
+}
+
+service MasterRPC {
     rpc Ping(PingRequest) returns (PingResponse) {}
+    rpc TaskGet(TaskGetRequest) returns (TaskGetResponse) {}
 }
