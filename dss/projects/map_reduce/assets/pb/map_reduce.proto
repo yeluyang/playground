@@ -12,7 +12,7 @@ message TaskGetResponse {
     string input_path = 1;
 }
 
-service MasterRPC {
+service MasterGRPC {
     rpc Ping(PingRequest) returns (PingResponse) {}
     rpc TaskGet(TaskGetRequest) returns (TaskGetResponse) {}
 }
