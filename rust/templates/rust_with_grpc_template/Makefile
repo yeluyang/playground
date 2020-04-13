@@ -7,7 +7,7 @@ ENV_GOPATH = /go
 ENV_WD = $(ENV_GOPATH)/src/$(AUTHOR)/$(PROJECT)
 
 GRPC_PROTO_FILES = assets/pb/rpc.proto
-GRPC_OUTPUT_DIR = src/rpc
+GRPC_OUTPUT_DIR = src/rpc/grpc
 GRPC_OUTPUT_FILES = $(GRPC_OUTPUT_DIR)/rpc.rs $(GRPC_OUTPUT_DIR)/rpc_grpc.rs
 
 .PHONY: all

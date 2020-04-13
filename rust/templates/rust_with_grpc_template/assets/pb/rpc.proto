@@ -6,6 +6,6 @@ message PingRequest {
 message PingResponse {
 }
 
-service Node {
+service NodeGRPC {
     rpc Ping(PingRequest) returns (PingResponse) {}
 }

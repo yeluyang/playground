@@ -1,2 +1,10 @@
-mod rpc;
-mod rpc_grpc;
+mod grpc;
+use grpc::{NodeGrpcClient, NodeGrpcServer};
+
+struct NodeServer {
+    server: NodeGrpcServer,
+}
+
+struct NodeClient {
+    client: NodeGrpcClient,
+}
