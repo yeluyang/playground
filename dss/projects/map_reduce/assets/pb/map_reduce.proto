@@ -1,18 +1,26 @@
 syntax = "proto3";
 
-message PingRequest {}
+enum TaskType {
+    ANY = 0;
+    MAP = 1;
+    REDUCE = 2;
+}
 
-message PingResponse {}
+message FileLocation {
+    string host = 1;
+    string path = 2;
+}
 
 message TaskGetRequest {
-    string host = 1;
+    TaskType task_type = 1;
+    string host = 2;
 }
 
 message TaskGetResponse {
-    string input_path = 1;
+    TaskType task_type = 1;
+    FileLocation file_location = 2;
 }
 
 service MasterGRPC {
-    rpc Ping(PingRequest) returns (PingResponse) {}
     rpc TaskGet(TaskGetRequest) returns (TaskGetResponse) {}
 }

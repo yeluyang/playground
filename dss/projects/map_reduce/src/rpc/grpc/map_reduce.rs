@@ -27,25 +27,80 @@ use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 // const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_2_14_0;
 
 #[derive(PartialEq,Clone,Default)]
-pub struct PingRequest {
+pub struct FileLocation {
+    // message fields
+    pub host: ::std::string::String,
+    pub path: ::std::string::String,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
 }
 
-impl<'a> ::std::default::Default for &'a PingRequest {
-    fn default() -> &'a PingRequest {
-        <PingRequest as ::protobuf::Message>::default_instance()
+impl<'a> ::std::default::Default for &'a FileLocation {
+    fn default() -> &'a FileLocation {
+        <FileLocation as ::protobuf::Message>::default_instance()
     }
 }
 
-impl PingRequest {
-    pub fn new() -> PingRequest {
+impl FileLocation {
+    pub fn new() -> FileLocation {
         ::std::default::Default::default()
     }
+
+    // string host = 1;
+
+
+    pub fn get_host(&self) -> &str {
+        &self.host
+    }
+    pub fn clear_host(&mut self) {
+        self.host.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_host(&mut self, v: ::std::string::String) {
+        self.host = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_host(&mut self) -> &mut ::std::string::String {
+        &mut self.host
+    }
+
+    // Take field
+    pub fn take_host(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.host, ::std::string::String::new())
+    }
+
+    // string path = 2;
+
+
+    pub fn get_path(&self) -> &str {
+        &self.path
+    }
+    pub fn clear_path(&mut self) {
+        self.path.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_path(&mut self, v: ::std::string::String) {
+        self.path = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_path(&mut self) -> &mut ::std::string::String {
+        &mut self.path
+    }
+
+    // Take field
+    pub fn take_path(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.path, ::std::string::String::new())
+    }
 }
 
-impl ::protobuf::Message for PingRequest {
+impl ::protobuf::Message for FileLocation {
     fn is_initialized(&self) -> bool {
         true
     }
@@ -54,6 +109,12 @@ impl ::protobuf::Message for PingRequest {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.host)?;
+                },
+                2 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.path)?;
+                },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
@@ -66,12 +127,24 @@ impl ::protobuf::Message for PingRequest {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
+        if !self.host.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.host);
+        }
+        if !self.path.is_empty() {
+            my_size += ::protobuf::rt::string_size(2, &self.path);
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if !self.host.is_empty() {
+            os.write_string(1, &self.host)?;
+        }
+        if !self.path.is_empty() {
+            os.write_string(2, &self.path)?;
+        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -102,17 +175,27 @@ impl ::protobuf::Message for PingRequest {
         Self::descriptor_static()
     }
 
-    fn new() -> PingRequest {
-        PingRequest::new()
+    fn new() -> FileLocation {
+        FileLocation::new()
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
         static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
         unsafe {
             descriptor.get(|| {
-                let fields = ::std::vec::Vec::new();
-                ::protobuf::reflect::MessageDescriptor::new_pb_name::<PingRequest>(
-                    "PingRequest",
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "host",
+                    |m: &FileLocation| { &m.host },
+                    |m: &mut FileLocation| { &mut m.host },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "path",
+                    |m: &FileLocation| { &m.path },
+                    |m: &mut FileLocation| { &mut m.path },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new_pb_name::<FileLocation>(
+                    "FileLocation",
                     fields,
                     file_descriptor_proto()
                 )
@@ -120,147 +203,29 @@ impl ::protobuf::Message for PingRequest {
         }
     }
 
-    fn default_instance() -> &'static PingRequest {
-        static mut instance: ::protobuf::lazy::Lazy<PingRequest> = ::protobuf::lazy::Lazy::INIT;
+    fn default_instance() -> &'static FileLocation {
+        static mut instance: ::protobuf::lazy::Lazy<FileLocation> = ::protobuf::lazy::Lazy::INIT;
         unsafe {
-            instance.get(PingRequest::new)
+            instance.get(FileLocation::new)
         }
     }
 }
 
-impl ::protobuf::Clear for PingRequest {
+impl ::protobuf::Clear for FileLocation {
     fn clear(&mut self) {
+        self.host.clear();
+        self.path.clear();
         self.unknown_fields.clear();
     }
 }
 
-impl ::std::fmt::Debug for PingRequest {
+impl ::std::fmt::Debug for FileLocation {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-impl ::protobuf::reflect::ProtobufValue for PingRequest {
-    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
-        ::protobuf::reflect::ReflectValueRef::Message(self)
-    }
-}
-
-#[derive(PartialEq,Clone,Default)]
-pub struct PingResponse {
-    // special fields
-    pub unknown_fields: ::protobuf::UnknownFields,
-    pub cached_size: ::protobuf::CachedSize,
-}
-
-impl<'a> ::std::default::Default for &'a PingResponse {
-    fn default() -> &'a PingResponse {
-        <PingResponse as ::protobuf::Message>::default_instance()
-    }
-}
-
-impl PingResponse {
-    pub fn new() -> PingResponse {
-        ::std::default::Default::default()
-    }
-}
-
-impl ::protobuf::Message for PingResponse {
-    fn is_initialized(&self) -> bool {
-        true
-    }
-
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        while !is.eof()? {
-            let (field_number, wire_type) = is.read_tag_unpack()?;
-            match field_number {
-                _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
-            };
-        }
-        ::std::result::Result::Ok(())
-    }
-
-    // Compute sizes of nested messages
-    #[allow(unused_variables)]
-    fn compute_size(&self) -> u32 {
-        let mut my_size = 0;
-        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
-        self.cached_size.set(my_size);
-        my_size
-    }
-
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        os.write_unknown_fields(self.get_unknown_fields())?;
-        ::std::result::Result::Ok(())
-    }
-
-    fn get_cached_size(&self) -> u32 {
-        self.cached_size.get()
-    }
-
-    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
-        &self.unknown_fields
-    }
-
-    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
-        &mut self.unknown_fields
-    }
-
-    fn as_any(&self) -> &dyn (::std::any::Any) {
-        self as &dyn (::std::any::Any)
-    }
-    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
-        self as &mut dyn (::std::any::Any)
-    }
-    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
-        self
-    }
-
-    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
-        Self::descriptor_static()
-    }
-
-    fn new() -> PingResponse {
-        PingResponse::new()
-    }
-
-    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
-        unsafe {
-            descriptor.get(|| {
-                let fields = ::std::vec::Vec::new();
-                ::protobuf::reflect::MessageDescriptor::new_pb_name::<PingResponse>(
-                    "PingResponse",
-                    fields,
-                    file_descriptor_proto()
-                )
-            })
-        }
-    }
-
-    fn default_instance() -> &'static PingResponse {
-        static mut instance: ::protobuf::lazy::Lazy<PingResponse> = ::protobuf::lazy::Lazy::INIT;
-        unsafe {
-            instance.get(PingResponse::new)
-        }
-    }
-}
-
-impl ::protobuf::Clear for PingResponse {
-    fn clear(&mut self) {
-        self.unknown_fields.clear();
-    }
-}
-
-impl ::std::fmt::Debug for PingResponse {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        ::protobuf::text_format::fmt(self, f)
-    }
-}
-
-impl ::protobuf::reflect::ProtobufValue for PingResponse {
+impl ::protobuf::reflect::ProtobufValue for FileLocation {
     fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
         ::protobuf::reflect::ReflectValueRef::Message(self)
     }
@@ -269,6 +234,7 @@ impl ::protobuf::reflect::ProtobufValue for PingResponse {
 #[derive(PartialEq,Clone,Default)]
 pub struct TaskGetRequest {
     // message fields
+    pub task_type: TaskType,
     pub host: ::std::string::String,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
@@ -286,7 +252,22 @@ impl TaskGetRequest {
         ::std::default::Default::default()
     }
 
-    // string host = 1;
+    // .TaskType task_type = 1;
+
+
+    pub fn get_task_type(&self) -> TaskType {
+        self.task_type
+    }
+    pub fn clear_task_type(&mut self) {
+        self.task_type = TaskType::ANY;
+    }
+
+    // Param is passed by value, moved
+    pub fn set_task_type(&mut self, v: TaskType) {
+        self.task_type = v;
+    }
+
+    // string host = 2;
 
 
     pub fn get_host(&self) -> &str {
@@ -323,6 +304,9 @@ impl ::protobuf::Message for TaskGetRequest {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
+                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.task_type, 1, &mut self.unknown_fields)?
+                },
+                2 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.host)?;
                 },
                 _ => {
@@ -337,8 +321,11 @@ impl ::protobuf::Message for TaskGetRequest {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
+        if self.task_type != TaskType::ANY {
+            my_size += ::protobuf::rt::enum_size(1, self.task_type);
+        }
         if !self.host.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.host);
+            my_size += ::protobuf::rt::string_size(2, &self.host);
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -346,8 +333,11 @@ impl ::protobuf::Message for TaskGetRequest {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if self.task_type != TaskType::ANY {
+            os.write_enum(1, self.task_type.value())?;
+        }
         if !self.host.is_empty() {
-            os.write_string(1, &self.host)?;
+            os.write_string(2, &self.host)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -388,6 +378,11 @@ impl ::protobuf::Message for TaskGetRequest {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeEnum<TaskType>>(
+                    "task_type",
+                    |m: &TaskGetRequest| { &m.task_type },
+                    |m: &mut TaskGetRequest| { &mut m.task_type },
+                ));
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "host",
                     |m: &TaskGetRequest| { &m.host },
@@ -412,6 +407,7 @@ impl ::protobuf::Message for TaskGetRequest {
 
 impl ::protobuf::Clear for TaskGetRequest {
     fn clear(&mut self) {
+        self.task_type = TaskType::ANY;
         self.host.clear();
         self.unknown_fields.clear();
     }
@@ -432,7 +428,8 @@ impl ::protobuf::reflect::ProtobufValue for TaskGetRequest {
 #[derive(PartialEq,Clone,Default)]
 pub struct TaskGetResponse {
     // message fields
-    pub input_path: ::std::string::String,
+    pub task_type: TaskType,
+    pub file_location: ::protobuf::SingularPtrField<FileLocation>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -449,35 +446,62 @@ impl TaskGetResponse {
         ::std::default::Default::default()
     }
 
-    // string input_path = 1;
+    // .TaskType task_type = 1;
 
 
-    pub fn get_input_path(&self) -> &str {
-        &self.input_path
+    pub fn get_task_type(&self) -> TaskType {
+        self.task_type
     }
-    pub fn clear_input_path(&mut self) {
-        self.input_path.clear();
+    pub fn clear_task_type(&mut self) {
+        self.task_type = TaskType::ANY;
     }
 
     // Param is passed by value, moved
-    pub fn set_input_path(&mut self, v: ::std::string::String) {
-        self.input_path = v;
+    pub fn set_task_type(&mut self, v: TaskType) {
+        self.task_type = v;
+    }
+
+    // .FileLocation file_location = 2;
+
+
+    pub fn get_file_location(&self) -> &FileLocation {
+        self.file_location.as_ref().unwrap_or_else(|| FileLocation::default_instance())
+    }
+    pub fn clear_file_location(&mut self) {
+        self.file_location.clear();
+    }
+
+    pub fn has_file_location(&self) -> bool {
+        self.file_location.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_file_location(&mut self, v: FileLocation) {
+        self.file_location = ::protobuf::SingularPtrField::some(v);
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_input_path(&mut self) -> &mut ::std::string::String {
-        &mut self.input_path
+    pub fn mut_file_location(&mut self) -> &mut FileLocation {
+        if self.file_location.is_none() {
+            self.file_location.set_default();
+        }
+        self.file_location.as_mut().unwrap()
     }
 
     // Take field
-    pub fn take_input_path(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.input_path, ::std::string::String::new())
+    pub fn take_file_location(&mut self) -> FileLocation {
+        self.file_location.take().unwrap_or_else(|| FileLocation::new())
     }
 }
 
 impl ::protobuf::Message for TaskGetResponse {
     fn is_initialized(&self) -> bool {
+        for v in &self.file_location {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
         true
     }
 
@@ -486,7 +510,10 @@ impl ::protobuf::Message for TaskGetResponse {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.input_path)?;
+                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.task_type, 1, &mut self.unknown_fields)?
+                },
+                2 => {
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.file_location)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -500,8 +527,12 @@ impl ::protobuf::Message for TaskGetResponse {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if !self.input_path.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.input_path);
+        if self.task_type != TaskType::ANY {
+            my_size += ::protobuf::rt::enum_size(1, self.task_type);
+        }
+        if let Some(ref v) = self.file_location.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -509,8 +540,13 @@ impl ::protobuf::Message for TaskGetResponse {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if !self.input_path.is_empty() {
-            os.write_string(1, &self.input_path)?;
+        if self.task_type != TaskType::ANY {
+            os.write_enum(1, self.task_type.value())?;
+        }
+        if let Some(ref v) = self.file_location.as_ref() {
+            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -551,10 +587,15 @@ impl ::protobuf::Message for TaskGetResponse {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "input_path",
-                    |m: &TaskGetResponse| { &m.input_path },
-                    |m: &mut TaskGetResponse| { &mut m.input_path },
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeEnum<TaskType>>(
+                    "task_type",
+                    |m: &TaskGetResponse| { &m.task_type },
+                    |m: &mut TaskGetResponse| { &mut m.task_type },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(
+                    "file_location",
+                    |m: &TaskGetResponse| { &m.file_location },
+                    |m: &mut TaskGetResponse| { &mut m.file_location },
                 ));
                 ::protobuf::reflect::MessageDescriptor::new_pb_name::<TaskGetResponse>(
                     "TaskGetResponse",
@@ -575,7 +616,8 @@ impl ::protobuf::Message for TaskGetResponse {
 
 impl ::protobuf::Clear for TaskGetResponse {
     fn clear(&mut self) {
-        self.input_path.clear();
+        self.task_type = TaskType::ANY;
+        self.file_location.clear();
         self.unknown_fields.clear();
     }
 }
@@ -592,31 +634,107 @@ impl ::protobuf::reflect::ProtobufValue for TaskGetResponse {
     }
 }
 
+#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+pub enum TaskType {
+    ANY = 0,
+    MAP = 1,
+    REDUCE = 2,
+}
+
+impl ::protobuf::ProtobufEnum for TaskType {
+    fn value(&self) -> i32 {
+        *self as i32
+    }
+
+    fn from_i32(value: i32) -> ::std::option::Option<TaskType> {
+        match value {
+            0 => ::std::option::Option::Some(TaskType::ANY),
+            1 => ::std::option::Option::Some(TaskType::MAP),
+            2 => ::std::option::Option::Some(TaskType::REDUCE),
+            _ => ::std::option::Option::None
+        }
+    }
+
+    fn values() -> &'static [Self] {
+        static values: &'static [TaskType] = &[
+            TaskType::ANY,
+            TaskType::MAP,
+            TaskType::REDUCE,
+        ];
+        values
+    }
+
+    fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            descriptor.get(|| {
+                ::protobuf::reflect::EnumDescriptor::new_pb_name::<TaskType>("TaskType", file_descriptor_proto())
+            })
+        }
+    }
+}
+
+impl ::std::marker::Copy for TaskType {
+}
+
+impl ::std::default::Default for TaskType {
+    fn default() -> Self {
+        TaskType::ANY
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for TaskType {
+    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
+        ::protobuf::reflect::ReflectValueRef::Enum(self.descriptor())
+    }
+}
+
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\x1aassets/pb/map_reduce.proto\"\r\n\x0bPingRequest\"\x0e\n\x0cPingRes\
-    ponse\"$\n\x0eTaskGetRequest\x12\x12\n\x04host\x18\x01\x20\x01(\tR\x04ho\
-    st\"0\n\x0fTaskGetResponse\x12\x1d\n\ninput_path\x18\x01\x20\x01(\tR\tin\
-    putPath2c\n\nMasterGRPC\x12%\n\x04Ping\x12\x0c.PingRequest\x1a\r.PingRes\
-    ponse\"\0\x12.\n\x07TaskGet\x12\x0f.TaskGetRequest\x1a\x10.TaskGetRespon\
-    se\"\0J\x82\x03\n\x06\x12\x04\0\0\x11\x01\n\x08\n\x01\x0c\x12\x03\0\0\
-    \x12\n\t\n\x02\x04\0\x12\x03\x02\0\x16\n\n\n\x03\x04\0\x01\x12\x03\x02\
-    \x08\x13\n\t\n\x02\x04\x01\x12\x03\x04\0\x17\n\n\n\x03\x04\x01\x01\x12\
-    \x03\x04\x08\x14\n\n\n\x02\x04\x02\x12\x04\x06\0\x08\x01\n\n\n\x03\x04\
-    \x02\x01\x12\x03\x06\x08\x16\n\x0b\n\x04\x04\x02\x02\0\x12\x03\x07\x04\
-    \x14\n\r\n\x05\x04\x02\x02\0\x04\x12\x04\x07\x04\x06\x18\n\x0c\n\x05\x04\
-    \x02\x02\0\x05\x12\x03\x07\x04\n\n\x0c\n\x05\x04\x02\x02\0\x01\x12\x03\
-    \x07\x0b\x0f\n\x0c\n\x05\x04\x02\x02\0\x03\x12\x03\x07\x12\x13\n\n\n\x02\
-    \x04\x03\x12\x04\n\0\x0c\x01\n\n\n\x03\x04\x03\x01\x12\x03\n\x08\x17\n\
-    \x0b\n\x04\x04\x03\x02\0\x12\x03\x0b\x04\x1a\n\r\n\x05\x04\x03\x02\0\x04\
-    \x12\x04\x0b\x04\n\x19\n\x0c\n\x05\x04\x03\x02\0\x05\x12\x03\x0b\x04\n\n\
-    \x0c\n\x05\x04\x03\x02\0\x01\x12\x03\x0b\x0b\x15\n\x0c\n\x05\x04\x03\x02\
-    \0\x03\x12\x03\x0b\x18\x19\n\n\n\x02\x06\0\x12\x04\x0e\0\x11\x01\n\n\n\
-    \x03\x06\0\x01\x12\x03\x0e\x08\x12\n\x0b\n\x04\x06\0\x02\0\x12\x03\x0f\
-    \x043\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03\x0f\x08\x0c\n\x0c\n\x05\x06\0\
-    \x02\0\x02\x12\x03\x0f\r\x18\n\x0c\n\x05\x06\0\x02\0\x03\x12\x03\x0f#/\n\
-    \x0b\n\x04\x06\0\x02\x01\x12\x03\x10\x04<\n\x0c\n\x05\x06\0\x02\x01\x01\
-    \x12\x03\x10\x08\x0f\n\x0c\n\x05\x06\0\x02\x01\x02\x12\x03\x10\x10\x1e\n\
-    \x0c\n\x05\x06\0\x02\x01\x03\x12\x03\x10)8b\x06proto3\
+    \n\x1aassets/pb/map_reduce.proto\"6\n\x0cFileLocation\x12\x12\n\x04host\
+    \x18\x01\x20\x01(\tR\x04host\x12\x12\n\x04path\x18\x02\x20\x01(\tR\x04pa\
+    th\"L\n\x0eTaskGetRequest\x12&\n\ttask_type\x18\x01\x20\x01(\x0e2\t.Task\
+    TypeR\x08taskType\x12\x12\n\x04host\x18\x02\x20\x01(\tR\x04host\"m\n\x0f\
+    TaskGetResponse\x12&\n\ttask_type\x18\x01\x20\x01(\x0e2\t.TaskTypeR\x08t\
+    askType\x122\n\rfile_location\x18\x02\x20\x01(\x0b2\r.FileLocationR\x0cf\
+    ileLocation*(\n\x08TaskType\x12\x07\n\x03ANY\x10\0\x12\x07\n\x03MAP\x10\
+    \x01\x12\n\n\x06REDUCE\x10\x022<\n\nMasterGRPC\x12.\n\x07TaskGet\x12\x0f\
+    .TaskGetRequest\x1a\x10.TaskGetResponse\"\0J\xe0\x05\n\x06\x12\x04\0\0\
+    \x19\x01\n\x08\n\x01\x0c\x12\x03\0\0\x12\n\n\n\x02\x05\0\x12\x04\x02\0\
+    \x06\x01\n\n\n\x03\x05\0\x01\x12\x03\x02\x05\r\n\x0b\n\x04\x05\0\x02\0\
+    \x12\x03\x03\x04\x0c\n\x0c\n\x05\x05\0\x02\0\x01\x12\x03\x03\x04\x07\n\
+    \x0c\n\x05\x05\0\x02\0\x02\x12\x03\x03\n\x0b\n\x0b\n\x04\x05\0\x02\x01\
+    \x12\x03\x04\x04\x0c\n\x0c\n\x05\x05\0\x02\x01\x01\x12\x03\x04\x04\x07\n\
+    \x0c\n\x05\x05\0\x02\x01\x02\x12\x03\x04\n\x0b\n\x0b\n\x04\x05\0\x02\x02\
+    \x12\x03\x05\x04\x0f\n\x0c\n\x05\x05\0\x02\x02\x01\x12\x03\x05\x04\n\n\
+    \x0c\n\x05\x05\0\x02\x02\x02\x12\x03\x05\r\x0e\n\n\n\x02\x04\0\x12\x04\
+    \x08\0\x0b\x01\n\n\n\x03\x04\0\x01\x12\x03\x08\x08\x14\n\x0b\n\x04\x04\0\
+    \x02\0\x12\x03\t\x04\x14\n\r\n\x05\x04\0\x02\0\x04\x12\x04\t\x04\x08\x16\
+    \n\x0c\n\x05\x04\0\x02\0\x05\x12\x03\t\x04\n\n\x0c\n\x05\x04\0\x02\0\x01\
+    \x12\x03\t\x0b\x0f\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\t\x12\x13\n\x0b\n\
+    \x04\x04\0\x02\x01\x12\x03\n\x04\x14\n\r\n\x05\x04\0\x02\x01\x04\x12\x04\
+    \n\x04\t\x14\n\x0c\n\x05\x04\0\x02\x01\x05\x12\x03\n\x04\n\n\x0c\n\x05\
+    \x04\0\x02\x01\x01\x12\x03\n\x0b\x0f\n\x0c\n\x05\x04\0\x02\x01\x03\x12\
+    \x03\n\x12\x13\n\n\n\x02\x04\x01\x12\x04\r\0\x10\x01\n\n\n\x03\x04\x01\
+    \x01\x12\x03\r\x08\x16\n\x0b\n\x04\x04\x01\x02\0\x12\x03\x0e\x04\x1b\n\r\
+    \n\x05\x04\x01\x02\0\x04\x12\x04\x0e\x04\r\x18\n\x0c\n\x05\x04\x01\x02\0\
+    \x06\x12\x03\x0e\x04\x0c\n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03\x0e\r\x16\
+    \n\x0c\n\x05\x04\x01\x02\0\x03\x12\x03\x0e\x19\x1a\n\x0b\n\x04\x04\x01\
+    \x02\x01\x12\x03\x0f\x04\x14\n\r\n\x05\x04\x01\x02\x01\x04\x12\x04\x0f\
+    \x04\x0e\x1b\n\x0c\n\x05\x04\x01\x02\x01\x05\x12\x03\x0f\x04\n\n\x0c\n\
+    \x05\x04\x01\x02\x01\x01\x12\x03\x0f\x0b\x0f\n\x0c\n\x05\x04\x01\x02\x01\
+    \x03\x12\x03\x0f\x12\x13\n\n\n\x02\x04\x02\x12\x04\x12\0\x15\x01\n\n\n\
+    \x03\x04\x02\x01\x12\x03\x12\x08\x17\n\x0b\n\x04\x04\x02\x02\0\x12\x03\
+    \x13\x04\x1b\n\r\n\x05\x04\x02\x02\0\x04\x12\x04\x13\x04\x12\x19\n\x0c\n\
+    \x05\x04\x02\x02\0\x06\x12\x03\x13\x04\x0c\n\x0c\n\x05\x04\x02\x02\0\x01\
+    \x12\x03\x13\r\x16\n\x0c\n\x05\x04\x02\x02\0\x03\x12\x03\x13\x19\x1a\n\
+    \x0b\n\x04\x04\x02\x02\x01\x12\x03\x14\x04#\n\r\n\x05\x04\x02\x02\x01\
+    \x04\x12\x04\x14\x04\x13\x1b\n\x0c\n\x05\x04\x02\x02\x01\x06\x12\x03\x14\
+    \x04\x10\n\x0c\n\x05\x04\x02\x02\x01\x01\x12\x03\x14\x11\x1e\n\x0c\n\x05\
+    \x04\x02\x02\x01\x03\x12\x03\x14!\"\n\n\n\x02\x06\0\x12\x04\x17\0\x19\
+    \x01\n\n\n\x03\x06\0\x01\x12\x03\x17\x08\x12\n\x0b\n\x04\x06\0\x02\0\x12\
+    \x03\x18\x04<\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03\x18\x08\x0f\n\x0c\n\
+    \x05\x06\0\x02\0\x02\x12\x03\x18\x10\x1e\n\x0c\n\x05\x06\0\x02\0\x03\x12\
+    \x03\x18)8b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy::INIT;
