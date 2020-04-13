@@ -1,4 +1,4 @@
-use crate::{master::Master, FileLocation, Task};
+use crate::{master::Master, Task};
 
 extern crate grpcio;
 use grpcio::{RpcContext, UnarySink};
