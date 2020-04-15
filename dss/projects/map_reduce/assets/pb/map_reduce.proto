@@ -11,16 +11,16 @@ message FileLocation {
     string path = 2;
 }
 
-message TaskGetRequest {
+message JobGetRequest {
     TaskType task_type = 1;
     string host = 2;
 }
 
-message TaskGetResponse {
+message JobGetResponse {
     TaskType task_type = 1;
     FileLocation file_location = 2;
 }
 
 service MasterGRPC {
-    rpc TaskGet(TaskGetRequest) returns (TaskGetResponse) {}
+    rpc JobGet(JobGetRequest) returns (JobGetResponse) {}
 }

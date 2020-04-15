@@ -18,9 +18,9 @@
 #![allow(unused_imports)]
 #![allow(unused_results)]
 
-const METHOD_MASTER_GRPC_TASK_GET: ::grpcio::Method<super::map_reduce::TaskGetRequest, super::map_reduce::TaskGetResponse> = ::grpcio::Method {
+const METHOD_MASTER_GRPC_JOB_GET: ::grpcio::Method<super::map_reduce::JobGetRequest, super::map_reduce::JobGetResponse> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
-    name: "/MasterGRPC/TaskGet",
+    name: "/MasterGRPC/JobGet",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
@@ -37,20 +37,20 @@ impl MasterGrpcClient {
         }
     }
 
-    pub fn task_get_opt(&self, req: &super::map_reduce::TaskGetRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::map_reduce::TaskGetResponse> {
-        self.client.unary_call(&METHOD_MASTER_GRPC_TASK_GET, req, opt)
+    pub fn job_get_opt(&self, req: &super::map_reduce::JobGetRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::map_reduce::JobGetResponse> {
+        self.client.unary_call(&METHOD_MASTER_GRPC_JOB_GET, req, opt)
     }
 
-    pub fn task_get(&self, req: &super::map_reduce::TaskGetRequest) -> ::grpcio::Result<super::map_reduce::TaskGetResponse> {
-        self.task_get_opt(req, ::grpcio::CallOption::default())
+    pub fn job_get(&self, req: &super::map_reduce::JobGetRequest) -> ::grpcio::Result<super::map_reduce::JobGetResponse> {
+        self.job_get_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn task_get_async_opt(&self, req: &super::map_reduce::TaskGetRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::map_reduce::TaskGetResponse>> {
-        self.client.unary_call_async(&METHOD_MASTER_GRPC_TASK_GET, req, opt)
+    pub fn job_get_async_opt(&self, req: &super::map_reduce::JobGetRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::map_reduce::JobGetResponse>> {
+        self.client.unary_call_async(&METHOD_MASTER_GRPC_JOB_GET, req, opt)
     }
 
-    pub fn task_get_async(&self, req: &super::map_reduce::TaskGetRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::map_reduce::TaskGetResponse>> {
-        self.task_get_async_opt(req, ::grpcio::CallOption::default())
+    pub fn job_get_async(&self, req: &super::map_reduce::JobGetRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::map_reduce::JobGetResponse>> {
+        self.job_get_async_opt(req, ::grpcio::CallOption::default())
     }
     pub fn spawn<F>(&self, f: F) where F: ::futures::Future<Item = (), Error = ()> + Send + 'static {
         self.client.spawn(f)
@@ -58,14 +58,14 @@ impl MasterGrpcClient {
 }
 
 pub trait MasterGrpc {
-    fn task_get(&mut self, ctx: ::grpcio::RpcContext, req: super::map_reduce::TaskGetRequest, sink: ::grpcio::UnarySink<super::map_reduce::TaskGetResponse>);
+    fn job_get(&mut self, ctx: ::grpcio::RpcContext, req: super::map_reduce::JobGetRequest, sink: ::grpcio::UnarySink<super::map_reduce::JobGetResponse>);
 }
 
 pub fn create_master_grpc<S: MasterGrpc + Send + Clone + 'static>(s: S) -> ::grpcio::Service {
     let mut builder = ::grpcio::ServiceBuilder::new();
     let mut instance = s;
-    builder = builder.add_unary_handler(&METHOD_MASTER_GRPC_TASK_GET, move |ctx, req, resp| {
-        instance.task_get(ctx, req, resp)
+    builder = builder.add_unary_handler(&METHOD_MASTER_GRPC_JOB_GET, move |ctx, req, resp| {
+        instance.job_get(ctx, req, resp)
     });
     builder.build()
 }
