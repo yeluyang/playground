@@ -8,8 +8,14 @@ struct Worker {
 }
 
 impl Worker {
-    fn new() -> Self {
-        unimplemented!()
+    fn new(host: String) -> Self {
+        let client = MasterClient::new(&host);
+        Self {
+            task: None,
+
+            host,
+            client,
+        }
     }
 
     fn get_job(&mut self) {

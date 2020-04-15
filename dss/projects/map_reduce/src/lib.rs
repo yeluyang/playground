@@ -1,3 +1,5 @@
+#![feature(get_mut_unchecked)]
+
 use std::collections::HashMap;
 
 mod master;

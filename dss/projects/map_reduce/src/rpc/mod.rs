@@ -3,7 +3,7 @@ use std::sync::Arc;
 extern crate grpcio;
 use grpcio::{ChannelBuilder, EnvBuilder, RpcContext, UnarySink};
 
-use crate::{master::Master, FileLocation, Job, Task};
+use crate::{master::Master, Job};
 
 mod grpc;
 use grpc::{JobGetRequest, JobGetResponse, MasterGrpc, MasterGrpcClient, TaskType};
