@@ -4,14 +4,12 @@
 
 use std::collections::HashMap;
 
+mod error;
 mod master;
 mod rpc;
 mod worker;
 
-struct FileLocation {
-    host: String,
-    path: String,
-}
+pub use error::{Error, Result};
 
 #[derive(Debug, Clone)]
 enum TaskType {

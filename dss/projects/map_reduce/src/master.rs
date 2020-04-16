@@ -1,8 +1,6 @@
-use std::{collections::HashMap, path::Path, rc::Rc};
+use std::{collections::HashMap, rc::Rc};
 
-use crate::{FileLocation, Job, Task, TaskType};
-
-use super::rpc::MasterServer;
+use crate::{Job, Task, TaskType};
 
 pub(crate) struct Master {
     map_tasks: HashMap<String, Vec<Rc<Task>>>,

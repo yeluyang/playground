@@ -3,7 +3,7 @@ use std::sync::Arc;
 extern crate grpcio;
 use grpcio::{ChannelBuilder, EnvBuilder, RpcContext, UnarySink};
 
-use crate::{master::Master, Job};
+use crate::{master::Master, Job, Result};
 
 mod grpc;
 use grpc::{JobGetRequest, JobGetResponse, MasterGrpc, MasterGrpcClient, TaskType};
@@ -13,7 +13,7 @@ pub(crate) struct MasterServer {
 }
 
 impl MasterServer {
-    pub(crate) fn new<F: Fn()>(master: Master) -> Self {
+    pub(crate) fn new(master: Master) -> Self {
         Self { master }
     }
 }
@@ -43,19 +43,19 @@ impl MasterClient {
         }
     }
 
-    pub fn get_job(&self, host: String) -> Option<Job> {
+    pub fn get_job(&self, host: String) -> Result<Option<Job>> {
         let mut req = JobGetRequest::new();
         req.host = host;
 
-        let mut rsp = self.client.job_get(&req).unwrap();
+        let mut rsp = self.client.job_get(&req)?;
 
         let file = rsp.take_file_location();
         if file.host != req.host || file.path.is_empty() {
-            None
+            Ok(None)
         } else {
             match rsp.get_task_type() {
-                TaskType::MAP => Some(Job::Map(file.path)),
-                TaskType::REDUCE => Some(Job::Reduce(file.path)),
+                TaskType::MAP => Ok(Some(Job::Map(file.path))),
+                TaskType::REDUCE => Ok(Some(Job::Reduce(file.path))),
                 TaskType::ANY => unreachable!(),
             }
         }
