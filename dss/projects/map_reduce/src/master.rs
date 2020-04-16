@@ -11,7 +11,7 @@ pub(crate) struct Master {
 }
 
 impl Master {
-    pub(crate) fn new<F>(tasks: Vec<Task>) -> Self {
+    pub(crate) fn new(tasks: Vec<Task>) -> Self {
         let mut m = Self {
             map_tasks: HashMap::new(),
             reduce_tasks: HashMap::new(),
@@ -56,9 +56,9 @@ impl Master {
             }
         };
 
-        if let Some(tasks) = tasks.get_mut(&host) {
-            while let Some(mut task) = tasks.pop() {
-                if !task.is_allocated {
+        if let Some(host_tasks) = tasks.get_mut(&host) {
+            while let Some(mut task) = host_tasks.pop() {
+                let job = if !task.is_allocated {
                     unsafe {
                         Rc::get_mut_unchecked(&mut task).is_allocated = true;
                     }
@@ -67,11 +67,89 @@ impl Master {
                         TaskType::Reduce => Some(Job::Reduce(task.task_files[&host].clone())),
                     };
                     self.tasks.push(task);
-                    return job;
+
+                    job
+                } else {
+                    None
                 };
+                if host_tasks.is_empty() {
+                    tasks.remove(&host);
+                }
+                return job;
             }
         };
 
         None
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_new() {
+        struct TestCase {
+            tasks: Vec<Task>,
+            map_tasks_num: usize,
+            reduce_tasks_num: usize,
+            alloc_map_tasks_num: usize,
+            alloc_reduce_tasks_num: usize,
+        }
+        let cases = &[
+            TestCase {
+                tasks: Vec::new(),
+                map_tasks_num: 0,
+                reduce_tasks_num: 0,
+                alloc_map_tasks_num: 0,
+                alloc_reduce_tasks_num: 0,
+            },
+            TestCase {
+                tasks: vec![
+                    Task::new(
+                        TaskType::Map,
+                        vec![("127.0.0.1".to_owned(), "/path/to/map/file".to_owned())],
+                    ),
+                    Task::new(
+                        TaskType::Reduce,
+                        vec![("127.0.0.1".to_owned(), "/path/to/reduce/file".to_owned())],
+                    ),
+                ],
+                map_tasks_num: 1,
+                reduce_tasks_num: 1,
+                alloc_map_tasks_num: 1,
+                alloc_reduce_tasks_num: 1,
+            },
+        ];
+
+        for c in cases {
+            let mut m = Master::new(c.tasks.clone());
+            assert_eq!(m.map_tasks.len(), c.map_tasks_num);
+            assert_eq!(m.reduce_tasks.len(), c.reduce_tasks_num);
+
+            for _ in 0..c.alloc_map_tasks_num {
+                let job = m
+                    .alloc_job(Some(TaskType::Map), "127.0.0.1".to_owned())
+                    .unwrap();
+                assert!(matches!(job, Job::Map(_)));
+            }
+            assert_eq!(m.map_tasks.len(), c.map_tasks_num - c.alloc_map_tasks_num);
+
+            for _ in 0..c.alloc_reduce_tasks_num {
+                let job = m
+                    .alloc_job(Some(TaskType::Reduce), "127.0.0.1".to_owned())
+                    .unwrap();
+                assert!(matches!(job, Job::Reduce(_)));
+            }
+            assert_eq!(
+                m.reduce_tasks.len(),
+                c.reduce_tasks_num - c.alloc_reduce_tasks_num
+            );
+
+            assert_eq!(
+                m.tasks.len(),
+                c.alloc_map_tasks_num + c.alloc_reduce_tasks_num
+            );
+        }
     }
 }
