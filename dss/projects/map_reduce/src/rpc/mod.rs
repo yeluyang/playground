@@ -6,8 +6,11 @@ use grpcio::{ChannelBuilder, EnvBuilder, RpcContext, UnarySink};
 use crate::{master::Master, Job, Result};
 
 mod grpc;
-use grpc::{JobGetRequest, JobGetResponse, MasterGrpc, MasterGrpcClient, TaskType};
+use grpc::{
+    create_master_grpc, JobGetRequest, JobGetResponse, MasterGrpc, MasterGrpcClient, TaskType,
+};
 
+#[derive(Clone)]
 pub(crate) struct MasterServer {
     master: Master,
 }
@@ -57,6 +60,59 @@ impl MasterClient {
                 TaskType::MAP => Ok(Some(Job::Map(file.path))),
                 TaskType::REDUCE => Ok(Some(Job::Reduce(file.path))),
                 TaskType::ANY => unreachable!(),
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[cfg(test)]
+    mod server {
+        use crate::Task;
+
+        use super::*;
+
+        #[test]
+        fn test_new() {
+            struct TestCase {
+                host: String,
+                port: u16,
+                master: Master,
+            }
+            let cases = &[TestCase {
+                host: "127.0.0.1".to_owned(),
+                port: 10086,
+                master: Master::new(vec![Task::new(
+                    crate::TaskType::Map,
+                    vec![("127.0.0.1".to_owned(), "/path/to/map/file".to_owned())],
+                )]),
+            }];
+            for c in cases {
+                let server = grpcio::ServerBuilder::new(Arc::new(EnvBuilder::new().build()))
+                    .register_service(create_master_grpc(MasterServer::new(c.master.clone())))
+                    .bind(c.host.clone(), c.port)
+                    .build()
+                    .unwrap();
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod client {
+        use super::*;
+
+        #[test]
+        fn test_new() {
+            struct TestCase {
+                host: &'static str,
+            }
+            let cases = &[TestCase { host: "127.0.0.1" }];
+
+            for case in cases {
+                let client = MasterClient::new(case.host);
             }
         }
     }
