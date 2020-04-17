@@ -1,11 +1,15 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::HashMap,
+    sync::{atomic::Ordering, Arc},
+};
 
 use crate::{Job, Task, TaskType};
 
+#[derive(Clone)]
 pub(crate) struct Master {
-    map_tasks: HashMap<String, Vec<Rc<Task>>>,
-    reduce_tasks: HashMap<String, Vec<Rc<Task>>>,
-    tasks: Vec<Rc<Task>>,
+    map_tasks: HashMap<String, Vec<Arc<Task>>>,
+    reduce_tasks: HashMap<String, Vec<Arc<Task>>>,
+    allocated: Vec<Arc<Task>>,
 }
 
 impl Master {
@@ -13,11 +17,11 @@ impl Master {
         let mut m = Self {
             map_tasks: HashMap::new(),
             reduce_tasks: HashMap::new(),
-            tasks: Vec::new(),
+            allocated: Vec::new(),
         };
 
         for task in tasks {
-            let task = Rc::new(task);
+            let task = Arc::new(task);
 
             let specified_tasks = match task.task_type {
                 TaskType::Map => &mut m.map_tasks,
@@ -40,7 +44,7 @@ impl Master {
     }
 
     pub fn alloc_job(&mut self, task_type: Option<TaskType>, host: String) -> Option<Job> {
-        let tasks = match task_type {
+        let master_tasks = match task_type {
             Some(task_type) => match task_type {
                 TaskType::Map => &mut self.map_tasks,
                 TaskType::Reduce => &mut self.reduce_tasks,
@@ -54,24 +58,24 @@ impl Master {
             }
         };
 
-        if let Some(host_tasks) = tasks.get_mut(&host) {
-            while let Some(mut task) = host_tasks.pop() {
-                let job = if !task.is_allocated {
-                    unsafe {
-                        Rc::get_mut_unchecked(&mut task).is_allocated = true;
-                    }
+        if let Some(host_tasks) = master_tasks.get_mut(&host) {
+            while let Some(task) = host_tasks.pop() {
+                let job = if !task
+                    .is_allocated
+                    .compare_and_swap(false, true, Ordering::SeqCst)
+                {
                     let job = match task.task_type {
                         TaskType::Map => Some(Job::Map(task.task_files[&host].clone())),
                         TaskType::Reduce => Some(Job::Reduce(task.task_files[&host].clone())),
                     };
-                    self.tasks.push(task);
+                    self.allocated.push(task);
 
                     job
                 } else {
                     None
                 };
                 if host_tasks.is_empty() {
-                    tasks.remove(&host);
+                    master_tasks.remove(&host);
                 }
                 return job;
             }
@@ -145,7 +149,7 @@ mod test {
             );
 
             assert_eq!(
-                m.tasks.len(),
+                m.allocated.len(),
                 c.alloc_map_tasks_num + c.alloc_reduce_tasks_num
             );
         }

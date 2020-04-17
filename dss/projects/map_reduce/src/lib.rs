@@ -2,7 +2,10 @@
 #![feature(option_unwrap_none)]
 #![feature(matches_macro)]
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 mod error;
 mod master;
@@ -17,11 +20,21 @@ enum TaskType {
     Reduce,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct Task {
-    is_allocated: bool,
+    is_allocated: AtomicBool,
     task_type: TaskType,
     task_files: HashMap<String, String>,
+}
+
+impl Clone for Task {
+    fn clone(&self) -> Self {
+        Self {
+            is_allocated: AtomicBool::new(self.is_allocated.load(Ordering::SeqCst)),
+            task_type: self.task_type.clone(),
+            task_files: self.task_files.clone(),
+        }
+    }
 }
 
 impl Task {
@@ -31,7 +44,7 @@ impl Task {
             task_files.insert(host, path).unwrap_none();
         }
         Self {
-            is_allocated: false,
+            is_allocated: AtomicBool::new(false),
 
             task_type,
             task_files,
