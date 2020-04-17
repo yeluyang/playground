@@ -27,3 +27,20 @@ impl Worker {
         unimplemented!()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_new() {
+        struct TestCase {
+            host: &'static str,
+        }
+        let cases = &[TestCase { host: "127.0.0.1" }];
+
+        for case in cases {
+            let w = Worker::new(case.host.to_owned());
+        }
+    }
+}
