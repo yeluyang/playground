@@ -6,7 +6,9 @@ use grpcio::{ChannelBuilder, EnvBuilder, RpcContext, UnarySink};
 use crate::{master::Master, Job, Result, Task};
 
 mod grpc;
-use grpc::{create_master_grpc, JobGetRequest, JobGetResponse, MasterGrpc, MasterGrpcClient};
+use grpc::{
+    create_master_grpc, FileLocation, JobGetRequest, JobGetResponse, MasterGrpc, MasterGrpcClient,
+};
 
 #[derive(Clone)]
 struct MasterGrpcServer {
@@ -23,13 +25,29 @@ impl MasterGrpcServer {
 
 impl MasterGrpc for MasterGrpcServer {
     fn job_get(&mut self, ctx: RpcContext, req: JobGetRequest, sink: UnarySink<JobGetResponse>) {
-        let task_type = match req.get_task_type() {
-            grpc::TaskType::ANY => None,
-            grpc::TaskType::MAP => Some(crate::TaskType::Map),
-            grpc::TaskType::REDUCE => Some(crate::TaskType::Reduce),
+        let task_type = grpc::crate_task_type_from(req.get_task_type());
+        let job = self.master.alloc_job(task_type, req.get_host().to_owned());
+
+        let rsp = match job {
+            None => JobGetResponse::new(),
+            Some(job) => {
+                let (task_type, path) = match job {
+                    Job::Map(path) => (grpc::TaskType::MAP, path),
+                    Job::Reduce(path) => (grpc::TaskType::REDUCE, path),
+                };
+
+                let mut rsp = JobGetResponse::new();
+                rsp.task_type = task_type;
+
+                let mut file_loc = FileLocation::new();
+                file_loc.host = req.get_host().to_owned();
+                file_loc.path = path;
+                rsp.set_file_location(file_loc);
+
+                rsp
+            }
         };
-        let task = self.master.alloc_job(task_type, req.get_host().to_owned());
-        let rsp = JobGetResponse::new();
+
         sink.success(rsp);
     }
 }
@@ -71,9 +89,10 @@ impl MasterClient {
         }
     }
 
-    pub fn get_job(&self, host: String) -> Result<Option<Job>> {
+    pub fn get_job(&self, host: String, task_type: Option<crate::TaskType>) -> Result<Option<Job>> {
         let mut req = JobGetRequest::new();
         req.host = host;
+        req.task_type = grpc::grpc_task_type_from(task_type);
 
         let mut rsp = self.inner.job_get(&req)?;
 
@@ -94,14 +113,8 @@ impl MasterClient {
 mod test {
     use super::*;
 
-    #[cfg(test)]
-    mod server {
-        use crate::Task;
-
-        use super::*;
-
         #[test]
-        fn test_new() {
+    fn test_rpc() {
             struct TestCase {
                 host: String,
                 port: u16,
@@ -121,27 +134,17 @@ mod test {
                     ),
                 ],
             }];
+
             for c in cases {
+            let client = MasterClient::new(&format!("{}:{}", c.host, c.port));
+
                 let mut server = MasterServer::new(&c.host, c.port, c.tasks.clone()).unwrap();
-                server.run(Some(Duration::from_secs(1))).unwrap();
-            }
-        }
-    }
-
-    #[cfg(test)]
-    mod client {
-        use super::*;
-
-        #[test]
-        fn test_new() {
-            struct TestCase {
-                host: &'static str,
-            }
-            let cases = &[TestCase { host: "127.0.0.1" }];
-
-            for case in cases {
-                let client = MasterClient::new(case.host);
-            }
+            thread::spawn(move || server.run(Some(Duration::from_secs(60))).unwrap());
+            client
+                .get_job("127.0.0.1".to_owned(), Some(crate::TaskType::Map))
+                .unwrap()
+                .unwrap();
+            thread::sleep(Duration::from_secs(4));
         }
     }
 }

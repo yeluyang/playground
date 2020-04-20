@@ -1,4 +1,4 @@
-use crate::{rpc::MasterClient, Job, Result};
+use crate::{rpc::MasterClient, Job, Result, TaskType};
 
 struct Worker {
     host: String,
@@ -18,8 +18,8 @@ impl Worker {
         }
     }
 
-    fn get_job(&mut self) -> Result<()> {
-        self.task = self.client.get_job(self.host.clone())?;
+    fn get_job(&mut self, task_type: Option<TaskType>) -> Result<()> {
+        self.task = self.client.get_job(self.host.clone(), task_type)?;
         Ok(())
     }
 
