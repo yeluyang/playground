@@ -25,6 +25,8 @@ impl MasterGrpcServer {
 
 impl MasterGrpc for MasterGrpcServer {
     fn job_get(&mut self, ctx: RpcContext, req: JobGetRequest, sink: UnarySink<JobGetResponse>) {
+        debug!("JobGet invoked: request={:?}", req);
+
         let task_type = grpc::crate_task_type_from(req.get_task_type());
         let job = self.master.alloc_job(task_type, req.get_host().to_owned());
 
@@ -113,32 +115,35 @@ impl MasterClient {
 mod test {
     use super::*;
 
-        #[test]
-    fn test_rpc() {
-            struct TestCase {
-                host: String,
-                port: u16,
-                tasks: Vec<Task>,
-            }
-            let cases = &[TestCase {
-                host: "127.0.0.1".to_owned(),
-                port: 10086,
-                tasks: vec![
-                    Task::new(
-                        crate::TaskType::Map,
-                        vec![("127.0.0.1".to_owned(), "/path/to/map/file".to_owned())],
-                    ),
-                    Task::new(
-                        crate::TaskType::Reduce,
-                        vec![("127.0.0.1".to_owned(), "/path/to/reduce/file".to_owned())],
-                    ),
-                ],
-            }];
+    use crate::{test, Task};
 
-            for c in cases {
+    #[test]
+    fn test_rpc() {
+        self::test::init();
+        struct TestCase {
+            host: String,
+            port: u16,
+            tasks: Vec<Task>,
+        }
+        let cases = &[TestCase {
+            host: "127.0.0.1".to_owned(),
+            port: 10086,
+            tasks: vec![
+                Task::new(
+                    crate::TaskType::Map,
+                    vec![("127.0.0.1".to_owned(), "/path/to/map/file".to_owned())],
+                ),
+                Task::new(
+                    crate::TaskType::Reduce,
+                    vec![("127.0.0.1".to_owned(), "/path/to/reduce/file".to_owned())],
+                ),
+            ],
+        }];
+
+        for c in cases {
             let client = MasterClient::new(&format!("{}:{}", c.host, c.port));
 
-                let mut server = MasterServer::new(&c.host, c.port, c.tasks.clone()).unwrap();
+            let mut server = MasterServer::new(&c.host, c.port, c.tasks.clone()).unwrap();
             thread::spawn(move || server.run(Some(Duration::from_secs(60))).unwrap());
             client
                 .get_job("127.0.0.1".to_owned(), Some(crate::TaskType::Map))

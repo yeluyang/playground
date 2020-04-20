@@ -7,9 +7,14 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+#[macro_use]
+extern crate log;
+
 mod error;
 mod master;
 mod rpc;
+#[cfg(test)]
+pub(crate) mod test;
 mod worker;
 
 pub use error::{Error, Result};
