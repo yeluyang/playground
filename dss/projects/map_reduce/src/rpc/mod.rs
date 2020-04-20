@@ -1,13 +1,7 @@
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, thread, time::Duration};
 
 extern crate grpcio;
 use grpcio::{ChannelBuilder, EnvBuilder, RpcContext, UnarySink};
-
-extern crate signal;
-use signal::{trap::Trap, Signal};
 
 use crate::{master::Master, Job, Result, Task};
 
@@ -54,19 +48,12 @@ impl MasterServer {
         })
     }
 
-    pub fn run(&mut self) -> Result<()> {
-        let mut trap = Trap::trap(&[
-            Signal::SIGINT,
-            Signal::SIGABRT,
-            Signal::SIGKILL,
-            Signal::SIGTERM,
-        ]);
-        while let Some(_) = trap.next() {
-            println!("exit");
-            self.inner.shutdown();
-            self.inner.cancel_all_calls();
-            break;
-        }
+    pub fn run(&mut self, time: Option<Duration>) -> Result<()> {
+        self.inner.start();
+        match time {
+            Some(time) => thread::sleep(time),
+            None => loop {},
+        };
         Ok(())
     }
 }
@@ -136,7 +123,7 @@ mod test {
             }];
             for c in cases {
                 let mut server = MasterServer::new(&c.host, c.port, c.tasks.clone()).unwrap();
-                server.run();
+                server.run(Some(Duration::from_secs(1))).unwrap();
             }
         }
     }
