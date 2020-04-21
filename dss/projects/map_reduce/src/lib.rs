@@ -4,6 +4,7 @@
 
 use std::{
     collections::HashMap,
+    fmt::{self, Display, Formatter},
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -25,11 +26,36 @@ enum TaskType {
     Reduce,
 }
 
+impl Display for TaskType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Map => "MAP",
+                Self::Reduce => "REDUCE",
+            }
+        )
+    }
+}
+
 #[derive(Debug)]
 struct Task {
     is_allocated: AtomicBool,
     task_type: TaskType,
     task_files: HashMap<String, String>,
+}
+
+impl Display for Task {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "allocated={:?}, type={}, files.num={}",
+            self.is_allocated,
+            self.task_type,
+            self.task_files.len()
+        )
+    }
 }
 
 impl Clone for Task {
@@ -44,10 +70,14 @@ impl Clone for Task {
 
 impl Task {
     fn new(task_type: TaskType, files: Vec<(String, String)>) -> Self {
+        debug!("create a {} task with {} files", task_type, files.len());
+
         let mut task_files = HashMap::new();
         for (host, path) in files {
+            trace!("insert files {{ {}:{} }} into task", host, path);
             task_files.insert(host, path).unwrap_none();
         }
+
         Self {
             is_allocated: AtomicBool::new(false),
 
@@ -57,6 +87,7 @@ impl Task {
     }
 }
 
+#[derive(Debug)]
 enum Job {
     Map { host: String, path: String },
     Reduce { host: String, path: String },

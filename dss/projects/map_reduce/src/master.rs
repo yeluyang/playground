@@ -14,6 +14,8 @@ pub(crate) struct Master {
 
 impl Master {
     pub(crate) fn new(tasks: Vec<Task>) -> Self {
+        debug!("creating master storage with {} tasks", tasks.len());
+
         let mut m = Self {
             map_tasks: HashMap::new(),
             reduce_tasks: HashMap::new(),
@@ -21,17 +23,24 @@ impl Master {
         };
 
         for task in tasks {
+            trace!("inserting task into master: task={{ {} }}", task);
             let task = Arc::new(task);
 
-            let specified_tasks = match task.task_type {
+            let type_tasks = match task.task_type {
                 TaskType::Map => &mut m.map_tasks,
                 TaskType::Reduce => &mut m.reduce_tasks,
             };
 
-            for (host, _) in &task.task_files {
-                match specified_tasks.get_mut(host) {
+            for (host, path) in &task.task_files {
+                trace!(
+                    "inserting replicated files of task: type={}, file={{ host={}, path={} }}",
+                    task.task_type,
+                    host,
+                    path
+                );
+                match type_tasks.get_mut(host) {
                     None => {
-                        specified_tasks.insert(host.clone(), vec![task.clone()]);
+                        type_tasks.insert(host.clone(), vec![task.clone()]);
                     }
                     Some(tasks) => {
                         tasks.push(task.clone());
@@ -40,26 +49,37 @@ impl Master {
             }
         }
 
+        trace!(
+            "created master: {} map tasks, {} reduce tasks",
+            m.map_tasks.len(),
+            m.reduce_tasks.len()
+        );
+
         m
     }
 
     pub fn alloc_job(&mut self, task_type: Option<TaskType>, host: &str) -> Option<Job> {
-        let master_tasks = match task_type {
+        debug!("allocating task: type={:?}, host={}", task_type, host);
+
+        let (task_type, type_tasks) = match task_type {
             Some(task_type) => match task_type {
-                TaskType::Map => &mut self.map_tasks,
-                TaskType::Reduce => &mut self.reduce_tasks,
+                TaskType::Map => (TaskType::Map, &mut self.map_tasks),
+                TaskType::Reduce => (TaskType::Reduce, &mut self.reduce_tasks),
             },
             None => {
+                trace!("type of task requested is not specified, now have: map_tasks.num={}, reduce_tasks.num={}", self.map_tasks.len(), self.reduce_tasks.len());
                 if self.map_tasks.len() > self.reduce_tasks.len() {
-                    &mut self.map_tasks
+                    (TaskType::Map, &mut self.map_tasks)
                 } else {
-                    &mut self.reduce_tasks
+                    (TaskType::Reduce, &mut self.reduce_tasks)
                 }
             }
         };
 
-        if let Some(host_tasks) = master_tasks.get_mut(host) {
+        if let Some(host_tasks) = type_tasks.get_mut(host) {
+            trace!("get {} tasks on {}", host_tasks.len(), host);
             while let Some(task) = host_tasks.pop() {
+                trace!("handling task={{ {} }}", task);
                 let job = if !task
                     .is_allocated
                     .compare_and_swap(false, true, Ordering::SeqCst)
@@ -74,19 +94,31 @@ impl Master {
                             path: task.task_files[host].clone(),
                         }),
                     };
+                    trace!("allocating job={{ {:?} }}", job);
                     self.allocated.push(task);
 
                     job
                 } else {
-                    None
+                    trace!("met allocated task or other thread took it before this thread");
+                    continue;
                 };
                 if host_tasks.is_empty() {
-                    master_tasks.remove(host);
+                    trace!(
+                        "no more {} tasks on host={}, remove its place from master",
+                        task_type,
+                        host
+                    );
+                    type_tasks.remove(host);
                 }
                 return job;
             }
+
+            unreachable!();
         };
 
+        // TODO: when no task of specified type on host
+        // TODO: when no task of any type on host
+        trace!("task not found on specified host");
         None
     }
 }
@@ -96,7 +128,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_new() {
+    fn test_alloc_job() {
         struct TestCase {
             tasks: Vec<Task>,
             map_tasks_num: usize,

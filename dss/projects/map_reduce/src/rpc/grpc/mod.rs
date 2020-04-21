@@ -21,3 +21,13 @@ pub(crate) fn grpc_task_type_from(task_type: Option<crate::TaskType>) -> self::T
         },
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_task_type_convert() {
+        unimplemented!()
+    }
+}
