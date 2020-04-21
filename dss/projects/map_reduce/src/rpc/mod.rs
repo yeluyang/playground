@@ -28,21 +28,21 @@ impl MasterGrpc for MasterGrpcServer {
         debug!("JobGet invoked: request={:?}", req);
 
         let task_type = grpc::crate_task_type_from(req.get_task_type());
-        let job = self.master.alloc_job(task_type, req.get_host().to_owned());
+        let job = self.master.alloc_job(task_type, req.get_host());
 
         let rsp = match job {
             None => JobGetResponse::new(),
             Some(job) => {
-                let (task_type, path) = match job {
-                    Job::Map(path) => (grpc::TaskType::MAP, path),
-                    Job::Reduce(path) => (grpc::TaskType::REDUCE, path),
+                let (task_type, host, path) = match job {
+                    Job::Map { host, path } => (grpc::TaskType::MAP, host, path),
+                    Job::Reduce { host, path } => (grpc::TaskType::REDUCE, host, path),
                 };
 
                 let mut rsp = JobGetResponse::new();
                 rsp.task_type = task_type;
 
                 let mut file_loc = FileLocation::new();
-                file_loc.host = req.get_host().to_owned();
+                file_loc.host = host;
                 file_loc.path = path;
                 rsp.set_file_location(file_loc);
 
@@ -99,12 +99,18 @@ impl MasterClient {
         let mut rsp = self.inner.job_get(&req)?;
 
         let file = rsp.take_file_location();
-        if file.host != req.host || file.path.is_empty() {
+        if file.path.is_empty() {
             Ok(None)
         } else {
             match rsp.get_task_type() {
-                grpc::TaskType::MAP => Ok(Some(Job::Map(file.path))),
-                grpc::TaskType::REDUCE => Ok(Some(Job::Reduce(file.path))),
+                grpc::TaskType::MAP => Ok(Some(Job::Map {
+                    host: file.host,
+                    path: file.path,
+                })),
+                grpc::TaskType::REDUCE => Ok(Some(Job::Reduce {
+                    host: file.host,
+                    path: file.path,
+                })),
                 grpc::TaskType::ANY => unreachable!(),
             }
         }
@@ -145,10 +151,24 @@ mod test {
 
             let mut server = MasterServer::new(&c.host, c.port, c.tasks.clone()).unwrap();
             thread::spawn(move || server.run(Some(Duration::from_secs(60))).unwrap());
-            client
-                .get_job("127.0.0.1".to_owned(), Some(crate::TaskType::Map))
-                .unwrap()
-                .unwrap();
+            for t in &c.tasks {
+                for (host, path) in &t.task_files {
+                    let job = client
+                        .get_job(host.clone(), Some(t.task_type.clone()))
+                        .expect("get Err from `get_job`, expect Ok")
+                        .expect("get None from `get_job`, expect Some");
+                    match t.task_type {
+                        crate::TaskType::Map => assert!(matches!(job, Job::Map{..})),
+                        crate::TaskType::Reduce => assert!(matches!(job, Job::Reduce{..})),
+                    };
+                    let (job_host, job_path) = &match job {
+                        Job::Map { host, path } => (host, path),
+                        Job::Reduce { host, path } => (host, path),
+                    };
+                    assert_eq!(job_host, host);
+                    assert_eq!(job_path, path);
+                }
+            }
             thread::sleep(Duration::from_secs(4));
         }
     }

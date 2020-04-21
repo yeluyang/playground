@@ -58,6 +58,6 @@ impl Task {
 }
 
 enum Job {
-    Map(String),
-    Reduce(String),
+    Map { host: String, path: String },
+    Reduce { host: String, path: String },
 }

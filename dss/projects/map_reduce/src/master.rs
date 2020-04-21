@@ -43,7 +43,7 @@ impl Master {
         m
     }
 
-    pub fn alloc_job(&mut self, task_type: Option<TaskType>, host: String) -> Option<Job> {
+    pub fn alloc_job(&mut self, task_type: Option<TaskType>, host: &str) -> Option<Job> {
         let master_tasks = match task_type {
             Some(task_type) => match task_type {
                 TaskType::Map => &mut self.map_tasks,
@@ -58,15 +58,21 @@ impl Master {
             }
         };
 
-        if let Some(host_tasks) = master_tasks.get_mut(&host) {
+        if let Some(host_tasks) = master_tasks.get_mut(host) {
             while let Some(task) = host_tasks.pop() {
                 let job = if !task
                     .is_allocated
                     .compare_and_swap(false, true, Ordering::SeqCst)
                 {
                     let job = match task.task_type {
-                        TaskType::Map => Some(Job::Map(task.task_files[&host].clone())),
-                        TaskType::Reduce => Some(Job::Reduce(task.task_files[&host].clone())),
+                        TaskType::Map => Some(Job::Map {
+                            host: host.to_owned(),
+                            path: task.task_files[host].clone(),
+                        }),
+                        TaskType::Reduce => Some(Job::Reduce {
+                            host: host.to_owned(),
+                            path: task.task_files[host].clone(),
+                        }),
                     };
                     self.allocated.push(task);
 
@@ -75,7 +81,7 @@ impl Master {
                     None
                 };
                 if host_tasks.is_empty() {
-                    master_tasks.remove(&host);
+                    master_tasks.remove(host);
                 }
                 return job;
             }
@@ -130,18 +136,14 @@ mod test {
             assert_eq!(m.reduce_tasks.len(), c.reduce_tasks_num);
 
             for _ in 0..c.alloc_map_tasks_num {
-                let job = m
-                    .alloc_job(Some(TaskType::Map), "127.0.0.1".to_owned())
-                    .unwrap();
-                assert!(matches!(job, Job::Map(_)));
+                let job = m.alloc_job(Some(TaskType::Map), "127.0.0.1").unwrap();
+                assert!(matches!(job, Job::Map{..}));
             }
             assert_eq!(m.map_tasks.len(), c.map_tasks_num - c.alloc_map_tasks_num);
 
             for _ in 0..c.alloc_reduce_tasks_num {
-                let job = m
-                    .alloc_job(Some(TaskType::Reduce), "127.0.0.1".to_owned())
-                    .unwrap();
-                assert!(matches!(job, Job::Reduce(_)));
+                let job = m.alloc_job(Some(TaskType::Reduce), "127.0.0.1").unwrap();
+                assert!(matches!(job, Job::Reduce{..}));
             }
             assert_eq!(
                 m.reduce_tasks.len(),
