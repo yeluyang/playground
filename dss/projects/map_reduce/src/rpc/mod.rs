@@ -27,7 +27,7 @@ impl MasterGrpc for MasterGrpcServer {
     fn job_get(&mut self, ctx: RpcContext, req: JobGetRequest, sink: UnarySink<JobGetResponse>) {
         debug!("JobGet invoked: request={{ {:?} }}", req);
 
-        let task_type = grpc::crate_task_type_from(req.get_task_type());
+        let task_type = grpc::crate_task_type_from(&req.get_task_type());
         let job = self.master.alloc_job(task_type, req.get_host());
 
         trace!("get job={:?}", job);
@@ -112,7 +112,7 @@ impl MasterClient {
 
         let mut req = JobGetRequest::new();
         req.host = host;
-        req.task_type = grpc::grpc_task_type_from(task_type);
+        req.task_type = grpc::grpc_task_type_from(&task_type);
 
         let mut rsp = self.inner.job_get(&req)?;
         trace!("got response={:?}", rsp);
@@ -144,7 +144,7 @@ mod test {
 
     #[test]
     fn test_job_get() {
-        self::test::init();
+        self::test::setup_logger();
         struct TestCase {
             host: String,
             port: u16,

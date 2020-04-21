@@ -20,7 +20,7 @@ mod worker;
 
 pub use error::{Error, Result};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum TaskType {
     Map,
     Reduce,

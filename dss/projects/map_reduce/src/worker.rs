@@ -10,7 +10,7 @@ struct Worker {
 
 impl Worker {
     fn new(host: String, port: u16) -> Self {
-        debug!("creating worker on: host={}, port={}", host, port);
+        debug!("creating worker connected to {}:{}", host, port);
 
         let client = MasterClient::new(&host, port);
 
