@@ -140,7 +140,10 @@ impl MasterClient {
 mod test {
     use super::*;
 
-    use crate::{test, Task};
+    use crate::{
+        test::{self, ServeTime},
+        Task,
+    };
 
     #[test]
     fn test_job_get() {
@@ -149,8 +152,9 @@ mod test {
             host: String,
             port: u16,
             tasks: Vec<Task>,
+            serve_time: ServeTime,
         }
-        let cases = &[TestCase {
+        let cases = [TestCase {
             host: "127.0.0.1".to_owned(),
             port: 10086,
             tasks: vec![
@@ -163,32 +167,39 @@ mod test {
                     vec![("127.0.0.1".to_owned(), "/path/to/reduce/file".to_owned())],
                 ),
             ],
+            serve_time: ServeTime::new(4, 1),
         }];
 
-        for c in cases {
-            let client = MasterClient::new(&c.host, c.port);
+        for c in &cases {
+            {
+                let client = MasterClient::new(&c.host, c.port);
 
-            let mut server = MasterServer::new(&c.host, c.port, c.tasks.clone()).unwrap();
-            thread::spawn(move || server.run(Some(Duration::from_secs(60))).unwrap());
-            for t in &c.tasks {
-                for (host, path) in &t.task_files {
-                    let job = client
-                        .get_job(host.clone(), Some(t.task_type.clone()))
-                        .expect("get Err from `get_job`, expect Ok")
-                        .expect("get None from `get_job`, expect Some");
-                    match t.task_type {
-                        crate::TaskType::Map => assert!(matches!(job, Job::Map{..})),
-                        crate::TaskType::Reduce => assert!(matches!(job, Job::Reduce{..})),
-                    };
-                    let (job_host, job_path) = &match job {
-                        Job::Map { host, path } => (host, path),
-                        Job::Reduce { host, path } => (host, path),
-                    };
-                    assert_eq!(job_host, host);
-                    assert_eq!(job_path, path);
+                let mut server = MasterServer::new(&c.host, c.port, c.tasks.clone()).unwrap();
+                let serve_time = c.serve_time.serve;
+                thread::spawn(move || server.run(Some(serve_time)).unwrap());
+                c.serve_time.wait_init();
+
+                for t in &c.tasks {
+                    for (host, path) in &t.task_files {
+                        let job = client
+                            .get_job(host.clone(), Some(t.task_type.clone()))
+                            .expect("get Err from `get_job`, expect Ok")
+                            .expect("get None from `get_job`, expect Some");
+                        match t.task_type {
+                            crate::TaskType::Map => assert!(matches!(job, Job::Map{..})),
+                            crate::TaskType::Reduce => assert!(matches!(job, Job::Reduce{..})),
+                        };
+                        let (job_host, job_path) = &match job {
+                            Job::Map { host, path } => (host, path),
+                            Job::Reduce { host, path } => (host, path),
+                        };
+                        assert_eq!(job_host, host);
+                        assert_eq!(job_path, path);
+                    }
                 }
+
+                c.serve_time.wait_exit();
             }
-            thread::sleep(Duration::from_secs(4));
         }
     }
 }

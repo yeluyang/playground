@@ -1,3 +1,5 @@
+use std::{cmp, thread, time::Duration};
+
 extern crate env_logger;
 use env_logger::{Builder, Env};
 
@@ -12,48 +14,75 @@ pub(crate) fn setup_logger() {
     })
 }
 
-fn setup_type_dataset(
-    tasks: Vec<Task>,
-    task_type: TaskType,
-    hosts: &[&str],
-    tasks_num: usize,
-    replicated_num: usize,
-) -> Vec<Task> {
-    let mut host_index = 0usize;
-    for i in 0..tasks_num {
-        let mut files: Vec<(String, String)> = Vec::with_capacity(replicated_num);
-        for _ in 0..replicated_num {
-            files.push((
-                hosts[host_index].to_owned(),
-                match task_type {
-                    TaskType::Map => format!("/path/to/map/files/{}", i),
-                    TaskType::Reduce => format!("/path/to/reduce/files/{}", i),
-                },
-            ));
-            host_index = (host_index + 1) % hosts.len();
-        }
-        Task::new(task_type.clone(), files);
-    }
-
-    tasks
+pub(crate) struct DataSet {
+    pub(crate) tasks: Vec<Task>,
+    pub(crate) hosts: Vec<String>,
+    pub(crate) map_tasks_num: usize,
+    pub(crate) reduce_tasks_num: usize,
+    pub(crate) replicated_num: usize,
 }
 
-pub(crate) fn setup_dataset(
-    hosts: &[&str],
-    map_tasks_num: usize,
-    reduce_tasks_num: usize,
-    replicated_num: usize,
-) -> Vec<Task> {
-    let mut tasks: Vec<Task> = Vec::new();
+impl DataSet {
+    pub(crate) fn new(
+        hosts: Vec<String>,
+        map_tasks_num: usize,
+        reduce_tasks_num: usize,
+        replicated_num: usize,
+    ) -> Self {
+        let mut dataset = Self {
+            hosts,
+            map_tasks_num,
+            reduce_tasks_num,
+            replicated_num,
+            tasks: Vec::new(),
+        };
+        dataset.setup_type_dataset(TaskType::Map, map_tasks_num);
+        dataset.setup_type_dataset(TaskType::Reduce, reduce_tasks_num);
 
-    tasks = setup_type_dataset(tasks, TaskType::Map, hosts, map_tasks_num, replicated_num);
-    tasks = setup_type_dataset(
-        tasks,
-        TaskType::Reduce,
-        hosts,
-        reduce_tasks_num,
-        replicated_num,
-    );
+        dataset
+    }
 
-    tasks
+    fn setup_type_dataset(&mut self, task_type: TaskType, tasks_num: usize) {
+        let mut host_index = 0usize;
+        for i in 0..tasks_num {
+            let mut files: Vec<(String, String)> = Vec::with_capacity(self.replicated_num);
+            for _ in 0..cmp::min(self.replicated_num, self.hosts.len()) {
+                files.push((
+                    self.hosts[host_index].clone(),
+                    match task_type {
+                        TaskType::Map => format!("/path/to/map/files/{}", i),
+                        TaskType::Reduce => format!("/path/to/reduce/files/{}", i),
+                    },
+                ));
+                host_index = (host_index + 1) % self.hosts.len();
+            }
+            self.tasks.push(Task::new(task_type.clone(), files));
+        }
+    }
+}
+
+pub(crate) struct ServeTime {
+    pub(crate) serve: Duration,
+    wait_init: Duration,
+}
+
+impl ServeTime {
+    pub(crate) fn new(serve_time: u64, wait_init_time: u64) -> Self {
+        assert!(serve_time > wait_init_time);
+        Self {
+            serve: Duration::from_secs(serve_time),
+            wait_init: Duration::from_secs(wait_init_time),
+        }
+    }
+
+    pub fn wait_init(&self) {
+        debug!("wait master server init: {:?}", self.wait_init);
+        thread::sleep(self.wait_init);
+    }
+
+    pub fn wait_exit(&self) {
+        let wait_exit = self.serve - self.wait_init;
+        debug!("wait master server exit: {:?}", wait_exit);
+        thread::sleep(wait_exit);
+    }
 }
