@@ -14,7 +14,7 @@ pub(crate) fn setup_logger() {
     })
 }
 
-pub(crate) struct DataSet {
+pub(crate) struct Dataset {
     pub(crate) tasks: Vec<Task>,
     pub(crate) hosts: Vec<String>,
     pub(crate) map_tasks_num: usize,
@@ -22,7 +22,7 @@ pub(crate) struct DataSet {
     pub(crate) replicated_num: usize,
 }
 
-impl DataSet {
+impl Dataset {
     pub(crate) fn new(
         hosts: Vec<String>,
         map_tasks_num: usize,

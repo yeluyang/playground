@@ -27,8 +27,7 @@ impl MasterGrpc for MasterGrpcServer {
     fn job_get(&mut self, ctx: RpcContext, req: JobGetRequest, sink: UnarySink<JobGetResponse>) {
         debug!("JobGet invoked: request={{ {:?} }}", req);
 
-        let task_type = grpc::crate_task_type_from(&req.get_task_type());
-        let job = self.master.alloc_job(task_type, req.get_host());
+        let job = self.master.alloc_job(req.get_host());
 
         trace!("get job={:?}", job);
         let rsp = match job {
@@ -104,15 +103,11 @@ impl MasterClient {
         }
     }
 
-    pub fn get_job(&self, host: String, task_type: Option<crate::TaskType>) -> Result<Option<Job>> {
-        debug!(
-            "getting job: expected={{ type={:?}, host={} }}",
-            task_type, host
-        );
+    pub fn get_job(&self, host: String) -> Result<Option<Job>> {
+        debug!("getting job, expected on host={}", host);
 
         let mut req = JobGetRequest::new();
         req.host = host;
-        req.task_type = grpc::grpc_task_type_from(&task_type);
 
         let mut rsp = self.inner.job_get(&req)?;
         trace!("got response={:?}", rsp);
@@ -130,7 +125,6 @@ impl MasterClient {
                     host: file.host,
                     path: file.path,
                 })),
-                grpc::TaskType::ANY => unreachable!(),
             }
         }
     }
@@ -140,10 +134,7 @@ impl MasterClient {
 mod test {
     use super::*;
 
-    use crate::{
-        test::{self, ServeTime},
-        Task,
-    };
+    use crate::test::{self, Dataset, ServeTime};
 
     #[test]
     fn test_job_get() {
@@ -151,22 +142,13 @@ mod test {
         struct TestCase {
             host: String,
             port: u16,
-            tasks: Vec<Task>,
+            dataset: Dataset,
             serve_time: ServeTime,
         }
         let cases = [TestCase {
             host: "127.0.0.1".to_owned(),
             port: 10086,
-            tasks: vec![
-                Task::new(
-                    crate::TaskType::Map,
-                    vec![("127.0.0.1".to_owned(), "/path/to/map/file".to_owned())],
-                ),
-                Task::new(
-                    crate::TaskType::Reduce,
-                    vec![("127.0.0.1".to_owned(), "/path/to/reduce/file".to_owned())],
-                ),
-            ],
+            dataset: Dataset::new(vec!["127.0.0.1".to_owned()], 4, 4, 1),
             serve_time: ServeTime::new(4, 1),
         }];
 
@@ -174,27 +156,24 @@ mod test {
             {
                 let client = MasterClient::new(&c.host, c.port);
 
-                let mut server = MasterServer::new(&c.host, c.port, c.tasks.clone()).unwrap();
+                let mut server =
+                    MasterServer::new(&c.host, c.port, c.dataset.tasks.clone()).unwrap();
                 let serve_time = c.serve_time.serve;
                 thread::spawn(move || server.run(Some(serve_time)).unwrap());
                 c.serve_time.wait_init();
 
-                for t in &c.tasks {
-                    for (host, path) in &t.task_files {
+                for t in &c.dataset.tasks {
+                    for (host, _) in &t.task_files {
                         let job = client
-                            .get_job(host.clone(), Some(t.task_type.clone()))
+                            .get_job(host.clone())
                             .expect("get Err from `get_job`, expect Ok")
                             .expect("get None from `get_job`, expect Some");
-                        match t.task_type {
-                            crate::TaskType::Map => assert!(matches!(job, Job::Map{..})),
-                            crate::TaskType::Reduce => assert!(matches!(job, Job::Reduce{..})),
-                        };
                         let (job_host, job_path) = &match job {
                             Job::Map { host, path } => (host, path),
                             Job::Reduce { host, path } => (host, path),
                         };
-                        assert_eq!(job_host, host);
-                        assert_eq!(job_path, path);
+                        assert!(c.dataset.hosts.contains(job_host));
+                        assert!(!job_path.is_empty());
                     }
                 }
 

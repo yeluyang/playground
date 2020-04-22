@@ -58,22 +58,13 @@ impl Master {
         m
     }
 
-    pub fn alloc_job(&mut self, task_type: Option<TaskType>, host: &str) -> Option<Job> {
-        debug!("allocating task: type={:?}, host={}", task_type, host);
+    pub fn alloc_job(&mut self, host: &str) -> Option<Job> {
+        debug!("allocating task: host={}", host);
 
-        let (task_type, type_tasks) = match task_type {
-            Some(task_type) => match task_type {
-                TaskType::Map => (TaskType::Map, &mut self.map_tasks),
-                TaskType::Reduce => (TaskType::Reduce, &mut self.reduce_tasks),
-            },
-            None => {
-                trace!("type of task requested is not specified, now have: map_tasks.num={}, reduce_tasks.num={}", self.map_tasks.len(), self.reduce_tasks.len());
-                if self.map_tasks.len() > self.reduce_tasks.len() {
-                    (TaskType::Map, &mut self.map_tasks)
-                } else {
-                    (TaskType::Reduce, &mut self.reduce_tasks)
-                }
-            }
+        let (task_type, type_tasks) = if self.map_tasks.len() > self.reduce_tasks.len() {
+            (TaskType::Map, &mut self.map_tasks)
+        } else {
+            (TaskType::Reduce, &mut self.reduce_tasks)
         };
 
         if let Some(host_tasks) = type_tasks.get_mut(host) {
@@ -127,65 +118,42 @@ impl Master {
 mod test {
     use super::*;
 
+    use crate::test::Dataset;
+
     #[test]
     fn test_alloc_job() {
         struct TestCase {
-            tasks: Vec<Task>,
-            map_tasks_num: usize,
-            reduce_tasks_num: usize,
-            alloc_map_tasks_num: usize,
-            alloc_reduce_tasks_num: usize,
+            dataset: Dataset,
         }
         let cases = &[
             TestCase {
-                tasks: Vec::new(),
-                map_tasks_num: 0,
-                reduce_tasks_num: 0,
-                alloc_map_tasks_num: 0,
-                alloc_reduce_tasks_num: 0,
+                dataset: Dataset::new(vec![], 0, 0, 0),
             },
             TestCase {
-                tasks: vec![
-                    Task::new(
-                        TaskType::Map,
-                        vec![("127.0.0.1".to_owned(), "/path/to/map/file".to_owned())],
-                    ),
-                    Task::new(
-                        TaskType::Reduce,
-                        vec![("127.0.0.1".to_owned(), "/path/to/reduce/file".to_owned())],
-                    ),
-                ],
-                map_tasks_num: 1,
-                reduce_tasks_num: 1,
-                alloc_map_tasks_num: 1,
-                alloc_reduce_tasks_num: 1,
+                dataset: Dataset::new(vec!["127.0.0.1".to_owned()], 4, 4, 1),
             },
         ];
 
         for c in cases {
-            let mut m = Master::new(c.tasks.clone());
-            assert_eq!(m.map_tasks.len(), c.map_tasks_num);
-            assert_eq!(m.reduce_tasks.len(), c.reduce_tasks_num);
+            let mut m = Master::new(c.dataset.tasks.clone());
 
-            for _ in 0..c.alloc_map_tasks_num {
-                let job = m.alloc_job(Some(TaskType::Map), "127.0.0.1").unwrap();
-                assert!(matches!(job, Job::Map{..}));
+            let mut map_count = 0usize;
+            let mut reduce_count = 0usize;
+            for _ in 0..c.dataset.tasks.len() {
+                let job = m.alloc_job("127.0.0.1").unwrap();
+                match job {
+                    Job::Map { .. } => map_count += 1,
+                    Job::Reduce { .. } => reduce_count += 1,
+                };
+                let (host, path) = job.get_file_location();
+                assert_eq!(host, "127.0.0.1");
+                assert!(!path.is_empty());
             }
-            assert_eq!(m.map_tasks.len(), c.map_tasks_num - c.alloc_map_tasks_num);
-
-            for _ in 0..c.alloc_reduce_tasks_num {
-                let job = m.alloc_job(Some(TaskType::Reduce), "127.0.0.1").unwrap();
-                assert!(matches!(job, Job::Reduce{..}));
-            }
-            assert_eq!(
-                m.reduce_tasks.len(),
-                c.reduce_tasks_num - c.alloc_reduce_tasks_num
-            );
-
-            assert_eq!(
-                m.allocated.len(),
-                c.alloc_map_tasks_num + c.alloc_reduce_tasks_num
-            );
+            assert_eq!(map_count, c.dataset.map_tasks_num);
+            assert_eq!(reduce_count, c.dataset.reduce_tasks_num);
+            assert!(m.map_tasks.is_empty());
+            assert!(m.reduce_tasks.is_empty());
+            assert_eq!(m.allocated.len(), c.dataset.tasks.len());
         }
     }
 }

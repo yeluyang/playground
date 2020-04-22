@@ -1,6 +1,5 @@
 #![feature(get_mut_unchecked)]
 #![feature(option_unwrap_none)]
-#![feature(matches_macro)]
 
 use std::{
     collections::HashMap,
@@ -91,4 +90,13 @@ impl Task {
 enum Job {
     Map { host: String, path: String },
     Reduce { host: String, path: String },
+}
+
+impl<'a> Job {
+    fn get_file_location(&'a self) -> (&'a str, &'a str) {
+        match self {
+            Job::Map { host, path } => (host, path),
+            Job::Reduce { host, path } => (host, path),
+        }
+    }
 }

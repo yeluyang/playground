@@ -234,7 +234,6 @@ impl ::protobuf::reflect::ProtobufValue for FileLocation {
 #[derive(PartialEq,Clone,Default)]
 pub struct JobGetRequest {
     // message fields
-    pub task_type: TaskType,
     pub host: ::std::string::String,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
@@ -252,22 +251,7 @@ impl JobGetRequest {
         ::std::default::Default::default()
     }
 
-    // .TaskType task_type = 1;
-
-
-    pub fn get_task_type(&self) -> TaskType {
-        self.task_type
-    }
-    pub fn clear_task_type(&mut self) {
-        self.task_type = TaskType::ANY;
-    }
-
-    // Param is passed by value, moved
-    pub fn set_task_type(&mut self, v: TaskType) {
-        self.task_type = v;
-    }
-
-    // string host = 2;
+    // string host = 1;
 
 
     pub fn get_host(&self) -> &str {
@@ -304,9 +288,6 @@ impl ::protobuf::Message for JobGetRequest {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.task_type, 1, &mut self.unknown_fields)?
-                },
-                2 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.host)?;
                 },
                 _ => {
@@ -321,11 +302,8 @@ impl ::protobuf::Message for JobGetRequest {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if self.task_type != TaskType::ANY {
-            my_size += ::protobuf::rt::enum_size(1, self.task_type);
-        }
         if !self.host.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.host);
+            my_size += ::protobuf::rt::string_size(1, &self.host);
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -333,11 +311,8 @@ impl ::protobuf::Message for JobGetRequest {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if self.task_type != TaskType::ANY {
-            os.write_enum(1, self.task_type.value())?;
-        }
         if !self.host.is_empty() {
-            os.write_string(2, &self.host)?;
+            os.write_string(1, &self.host)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -378,11 +353,6 @@ impl ::protobuf::Message for JobGetRequest {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeEnum<TaskType>>(
-                    "task_type",
-                    |m: &JobGetRequest| { &m.task_type },
-                    |m: &mut JobGetRequest| { &mut m.task_type },
-                ));
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "host",
                     |m: &JobGetRequest| { &m.host },
@@ -407,7 +377,6 @@ impl ::protobuf::Message for JobGetRequest {
 
 impl ::protobuf::Clear for JobGetRequest {
     fn clear(&mut self) {
-        self.task_type = TaskType::ANY;
         self.host.clear();
         self.unknown_fields.clear();
     }
@@ -453,7 +422,7 @@ impl JobGetResponse {
         self.task_type
     }
     pub fn clear_task_type(&mut self) {
-        self.task_type = TaskType::ANY;
+        self.task_type = TaskType::MAP;
     }
 
     // Param is passed by value, moved
@@ -527,7 +496,7 @@ impl ::protobuf::Message for JobGetResponse {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if self.task_type != TaskType::ANY {
+        if self.task_type != TaskType::MAP {
             my_size += ::protobuf::rt::enum_size(1, self.task_type);
         }
         if let Some(ref v) = self.file_location.as_ref() {
@@ -540,7 +509,7 @@ impl ::protobuf::Message for JobGetResponse {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if self.task_type != TaskType::ANY {
+        if self.task_type != TaskType::MAP {
             os.write_enum(1, self.task_type.value())?;
         }
         if let Some(ref v) = self.file_location.as_ref() {
@@ -616,7 +585,7 @@ impl ::protobuf::Message for JobGetResponse {
 
 impl ::protobuf::Clear for JobGetResponse {
     fn clear(&mut self) {
-        self.task_type = TaskType::ANY;
+        self.task_type = TaskType::MAP;
         self.file_location.clear();
         self.unknown_fields.clear();
     }
@@ -636,9 +605,8 @@ impl ::protobuf::reflect::ProtobufValue for JobGetResponse {
 
 #[derive(Clone,PartialEq,Eq,Debug,Hash)]
 pub enum TaskType {
-    ANY = 0,
-    MAP = 1,
-    REDUCE = 2,
+    MAP = 0,
+    REDUCE = 1,
 }
 
 impl ::protobuf::ProtobufEnum for TaskType {
@@ -648,16 +616,14 @@ impl ::protobuf::ProtobufEnum for TaskType {
 
     fn from_i32(value: i32) -> ::std::option::Option<TaskType> {
         match value {
-            0 => ::std::option::Option::Some(TaskType::ANY),
-            1 => ::std::option::Option::Some(TaskType::MAP),
-            2 => ::std::option::Option::Some(TaskType::REDUCE),
+            0 => ::std::option::Option::Some(TaskType::MAP),
+            1 => ::std::option::Option::Some(TaskType::REDUCE),
             _ => ::std::option::Option::None
         }
     }
 
     fn values() -> &'static [Self] {
         static values: &'static [TaskType] = &[
-            TaskType::ANY,
             TaskType::MAP,
             TaskType::REDUCE,
         ];
@@ -679,7 +645,7 @@ impl ::std::marker::Copy for TaskType {
 
 impl ::std::default::Default for TaskType {
     fn default() -> Self {
-        TaskType::ANY
+        TaskType::MAP
     }
 }
 
@@ -692,44 +658,42 @@ impl ::protobuf::reflect::ProtobufValue for TaskType {
 static file_descriptor_proto_data: &'static [u8] = b"\
     \n\x1aassets/pb/map_reduce.proto\"6\n\x0cFileLocation\x12\x12\n\x04host\
     \x18\x01\x20\x01(\tR\x04host\x12\x12\n\x04path\x18\x02\x20\x01(\tR\x04pa\
-    th\"K\n\rJobGetRequest\x12&\n\ttask_type\x18\x01\x20\x01(\x0e2\t.TaskTyp\
-    eR\x08taskType\x12\x12\n\x04host\x18\x02\x20\x01(\tR\x04host\"l\n\x0eJob\
-    GetResponse\x12&\n\ttask_type\x18\x01\x20\x01(\x0e2\t.TaskTypeR\x08taskT\
-    ype\x122\n\rfile_location\x18\x02\x20\x01(\x0b2\r.FileLocationR\x0cfileL\
-    ocation*(\n\x08TaskType\x12\x07\n\x03ANY\x10\0\x12\x07\n\x03MAP\x10\x01\
-    \x12\n\n\x06REDUCE\x10\x0229\n\nMasterGRPC\x12+\n\x06JobGet\x12\x0e.JobG\
-    etRequest\x1a\x0f.JobGetResponse\"\0J\x86\x05\n\x06\x12\x04\0\0\x19\x01\
-    \n\x08\n\x01\x0c\x12\x03\0\0\x12\n\n\n\x02\x05\0\x12\x04\x02\0\x06\x01\n\
-    \n\n\x03\x05\0\x01\x12\x03\x02\x05\r\n\x0b\n\x04\x05\0\x02\0\x12\x03\x03\
-    \x04\x0c\n\x0c\n\x05\x05\0\x02\0\x01\x12\x03\x03\x04\x07\n\x0c\n\x05\x05\
-    \0\x02\0\x02\x12\x03\x03\n\x0b\n\x0b\n\x04\x05\0\x02\x01\x12\x03\x04\x04\
-    \x0c\n\x0c\n\x05\x05\0\x02\x01\x01\x12\x03\x04\x04\x07\n\x0c\n\x05\x05\0\
-    \x02\x01\x02\x12\x03\x04\n\x0b\n\x0b\n\x04\x05\0\x02\x02\x12\x03\x05\x04\
-    \x0f\n\x0c\n\x05\x05\0\x02\x02\x01\x12\x03\x05\x04\n\n\x0c\n\x05\x05\0\
-    \x02\x02\x02\x12\x03\x05\r\x0e\n\n\n\x02\x04\0\x12\x04\x08\0\x0b\x01\n\n\
-    \n\x03\x04\0\x01\x12\x03\x08\x08\x14\n\x0b\n\x04\x04\0\x02\0\x12\x03\t\
-    \x04\x14\n\x0c\n\x05\x04\0\x02\0\x05\x12\x03\t\x04\n\n\x0c\n\x05\x04\0\
-    \x02\0\x01\x12\x03\t\x0b\x0f\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\t\x12\
-    \x13\n\x0b\n\x04\x04\0\x02\x01\x12\x03\n\x04\x14\n\x0c\n\x05\x04\0\x02\
-    \x01\x05\x12\x03\n\x04\n\n\x0c\n\x05\x04\0\x02\x01\x01\x12\x03\n\x0b\x0f\
-    \n\x0c\n\x05\x04\0\x02\x01\x03\x12\x03\n\x12\x13\n\n\n\x02\x04\x01\x12\
-    \x04\r\0\x10\x01\n\n\n\x03\x04\x01\x01\x12\x03\r\x08\x15\n\x0b\n\x04\x04\
-    \x01\x02\0\x12\x03\x0e\x04\x1b\n\x0c\n\x05\x04\x01\x02\0\x06\x12\x03\x0e\
-    \x04\x0c\n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03\x0e\r\x16\n\x0c\n\x05\x04\
-    \x01\x02\0\x03\x12\x03\x0e\x19\x1a\n\x0b\n\x04\x04\x01\x02\x01\x12\x03\
-    \x0f\x04\x14\n\x0c\n\x05\x04\x01\x02\x01\x05\x12\x03\x0f\x04\n\n\x0c\n\
-    \x05\x04\x01\x02\x01\x01\x12\x03\x0f\x0b\x0f\n\x0c\n\x05\x04\x01\x02\x01\
-    \x03\x12\x03\x0f\x12\x13\n\n\n\x02\x04\x02\x12\x04\x12\0\x15\x01\n\n\n\
-    \x03\x04\x02\x01\x12\x03\x12\x08\x16\n\x0b\n\x04\x04\x02\x02\0\x12\x03\
-    \x13\x04\x1b\n\x0c\n\x05\x04\x02\x02\0\x06\x12\x03\x13\x04\x0c\n\x0c\n\
-    \x05\x04\x02\x02\0\x01\x12\x03\x13\r\x16\n\x0c\n\x05\x04\x02\x02\0\x03\
-    \x12\x03\x13\x19\x1a\n\x0b\n\x04\x04\x02\x02\x01\x12\x03\x14\x04#\n\x0c\
-    \n\x05\x04\x02\x02\x01\x06\x12\x03\x14\x04\x10\n\x0c\n\x05\x04\x02\x02\
-    \x01\x01\x12\x03\x14\x11\x1e\n\x0c\n\x05\x04\x02\x02\x01\x03\x12\x03\x14\
-    !\"\n\n\n\x02\x06\0\x12\x04\x17\0\x19\x01\n\n\n\x03\x06\0\x01\x12\x03\
-    \x17\x08\x12\n\x0b\n\x04\x06\0\x02\0\x12\x03\x18\x049\n\x0c\n\x05\x06\0\
-    \x02\0\x01\x12\x03\x18\x08\x0e\n\x0c\n\x05\x06\0\x02\0\x02\x12\x03\x18\
-    \x0f\x1c\n\x0c\n\x05\x06\0\x02\0\x03\x12\x03\x18'5b\x06proto3\
+    th\"#\n\rJobGetRequest\x12\x12\n\x04host\x18\x01\x20\x01(\tR\x04host\"l\
+    \n\x0eJobGetResponse\x12&\n\ttask_type\x18\x01\x20\x01(\x0e2\t.TaskTypeR\
+    \x08taskType\x122\n\rfile_location\x18\x02\x20\x01(\x0b2\r.FileLocationR\
+    \x0cfileLocation*\x1f\n\x08TaskType\x12\x07\n\x03MAP\x10\0\x12\n\n\x06RE\
+    DUCE\x10\x0129\n\nMasterGRPC\x12+\n\x06JobGet\x12\x0e.JobGetRequest\x1a\
+    \x0f.JobGetResponse\"\0J\xf1\x04\n\x06\x12\x04\0\0\x17\x01\n\x08\n\x01\
+    \x0c\x12\x03\0\0\x12\n\n\n\x02\x05\0\x12\x04\x02\0\x05\x01\n\n\n\x03\x05\
+    \0\x01\x12\x03\x02\x05\r\n\x0b\n\x04\x05\0\x02\0\x12\x03\x03\x04\x0c\n\
+    \x0c\n\x05\x05\0\x02\0\x01\x12\x03\x03\x04\x07\n\x0c\n\x05\x05\0\x02\0\
+    \x02\x12\x03\x03\n\x0b\n\x0b\n\x04\x05\0\x02\x01\x12\x03\x04\x04\x0f\n\
+    \x0c\n\x05\x05\0\x02\x01\x01\x12\x03\x04\x04\n\n\x0c\n\x05\x05\0\x02\x01\
+    \x02\x12\x03\x04\r\x0e\n\n\n\x02\x04\0\x12\x04\x07\0\n\x01\n\n\n\x03\x04\
+    \0\x01\x12\x03\x07\x08\x14\n\x0b\n\x04\x04\0\x02\0\x12\x03\x08\x04\x14\n\
+    \r\n\x05\x04\0\x02\0\x04\x12\x04\x08\x04\x07\x16\n\x0c\n\x05\x04\0\x02\0\
+    \x05\x12\x03\x08\x04\n\n\x0c\n\x05\x04\0\x02\0\x01\x12\x03\x08\x0b\x0f\n\
+    \x0c\n\x05\x04\0\x02\0\x03\x12\x03\x08\x12\x13\n\x0b\n\x04\x04\0\x02\x01\
+    \x12\x03\t\x04\x14\n\r\n\x05\x04\0\x02\x01\x04\x12\x04\t\x04\x08\x14\n\
+    \x0c\n\x05\x04\0\x02\x01\x05\x12\x03\t\x04\n\n\x0c\n\x05\x04\0\x02\x01\
+    \x01\x12\x03\t\x0b\x0f\n\x0c\n\x05\x04\0\x02\x01\x03\x12\x03\t\x12\x13\n\
+    \n\n\x02\x04\x01\x12\x04\x0c\0\x0e\x01\n\n\n\x03\x04\x01\x01\x12\x03\x0c\
+    \x08\x15\n\x0b\n\x04\x04\x01\x02\0\x12\x03\r\x04\x14\n\r\n\x05\x04\x01\
+    \x02\0\x04\x12\x04\r\x04\x0c\x17\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03\r\
+    \x04\n\n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03\r\x0b\x0f\n\x0c\n\x05\x04\
+    \x01\x02\0\x03\x12\x03\r\x12\x13\n\n\n\x02\x04\x02\x12\x04\x10\0\x13\x01\
+    \n\n\n\x03\x04\x02\x01\x12\x03\x10\x08\x16\n\x0b\n\x04\x04\x02\x02\0\x12\
+    \x03\x11\x04\x1b\n\r\n\x05\x04\x02\x02\0\x04\x12\x04\x11\x04\x10\x18\n\
+    \x0c\n\x05\x04\x02\x02\0\x06\x12\x03\x11\x04\x0c\n\x0c\n\x05\x04\x02\x02\
+    \0\x01\x12\x03\x11\r\x16\n\x0c\n\x05\x04\x02\x02\0\x03\x12\x03\x11\x19\
+    \x1a\n\x0b\n\x04\x04\x02\x02\x01\x12\x03\x12\x04#\n\r\n\x05\x04\x02\x02\
+    \x01\x04\x12\x04\x12\x04\x11\x1b\n\x0c\n\x05\x04\x02\x02\x01\x06\x12\x03\
+    \x12\x04\x10\n\x0c\n\x05\x04\x02\x02\x01\x01\x12\x03\x12\x11\x1e\n\x0c\n\
+    \x05\x04\x02\x02\x01\x03\x12\x03\x12!\"\n\n\n\x02\x06\0\x12\x04\x15\0\
+    \x17\x01\n\n\n\x03\x06\0\x01\x12\x03\x15\x08\x12\n\x0b\n\x04\x06\0\x02\0\
+    \x12\x03\x16\x049\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03\x16\x08\x0e\n\x0c\
+    \n\x05\x06\0\x02\0\x02\x12\x03\x16\x0f\x1c\n\x0c\n\x05\x06\0\x02\0\x03\
+    \x12\x03\x16'5b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy::INIT;
