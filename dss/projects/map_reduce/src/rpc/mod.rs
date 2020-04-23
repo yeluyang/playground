@@ -74,7 +74,7 @@ impl MasterServer {
         })
     }
 
-    pub fn run(&mut self, time: Option<Duration>) -> Result<()> {
+    pub fn run(&mut self, time: Option<Duration>) {
         debug!("server running: time={:?}", time);
 
         self.inner.start();
@@ -84,7 +84,6 @@ impl MasterServer {
         };
 
         trace!("server exit");
-        Ok(())
     }
 }
 
@@ -159,7 +158,7 @@ mod test {
                 let mut server =
                     MasterServer::new(&c.host, c.port, c.dataset.tasks.clone()).unwrap();
                 let serve_time = c.serve_time.serve;
-                thread::spawn(move || server.run(Some(serve_time)).unwrap());
+                thread::spawn(move || server.run(Some(serve_time)));
                 c.serve_time.wait_init();
 
                 for t in &c.dataset.tasks {
