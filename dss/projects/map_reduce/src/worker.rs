@@ -1,14 +1,29 @@
+use std::{collections::HashMap, error, result};
+
 use crate::{rpc::MasterClient, Job, Result};
 
-struct Worker {
+pub trait Map {
+    type Error: error::Error;
+    fn mapping(&self, path: String) -> result::Result<HashMap<String, String>, Self::Error>;
+}
+
+pub trait Reduce {
+    type Error: error::Error;
+    fn reducing(&self, path: String) -> result::Result<String, Self::Error>;
+}
+
+struct Worker<M: Map, R: Reduce> {
     host: String,
     job: Option<Job>,
 
     master_client: MasterClient,
+
+    mapper: M,
+    reducer: R,
 }
 
-impl Worker {
-    fn new(host: String, master_host: &str, master_port: u16) -> Self {
+impl<M: Map, R: Reduce> Worker<M, R> {
+    fn new(host: String, master_host: &str, master_port: u16, mapper: M, reducer: R) -> Self {
         debug!(
             "creating worker connected to {}:{}",
             master_host, master_port
@@ -19,8 +34,9 @@ impl Worker {
         Self {
             host,
             job: None,
-
             master_client,
+            mapper,
+            reducer,
         }
     }
 
@@ -33,9 +49,26 @@ impl Worker {
         Ok(())
     }
 
+    fn work(&self) {
+        if let Some(job) = self.job.clone() {
+            // TODO handling when host is not local
+            match job {
+                Job::Map { host, path } => {
+                    self.mapper.mapping(path.to_owned());
+                }
+                Job::Reduce { host, path } => {
+                    self.reducer.reducing(path.to_owned());
+                }
+            };
+        };
+    }
+
     fn run(&mut self) {
         debug!("worker running");
-        unimplemented!()
+        loop {
+            self.get_job().unwrap();
+            self.work();
+        }
     }
 }
 
@@ -47,7 +80,7 @@ mod test {
 
     use crate::{
         rpc::MasterServer,
-        test::{self, Dataset, ServeTime},
+        test::{self, Dataset, ServeTimer, TestMapper, TestReducer},
     };
 
     #[test]
@@ -59,7 +92,7 @@ mod test {
             master_host: &'static str,
             master_port: u16,
             dataset: Dataset,
-            serve_time: ServeTime,
+            serve_time: ServeTimer,
         }
         let cases = [TestCase {
             host: "172.20.25.184".to_owned(),
@@ -71,12 +104,12 @@ mod test {
                 2,
                 2,
             ),
-            serve_time: ServeTime::new(4, 1),
+            serve_time: ServeTimer::new(4, 1),
         }];
 
         for c in &cases {
             {
-                let mut worker = Worker::new(c.host.clone(), c.master_host, c.master_port);
+                let mut worker = Worker::new(c.host.clone(), c.master_host, c.master_port, TestMapper{},TestReducer{});
 
                 let mut server =
                     MasterServer::new(&c.master_host, c.master_port, c.dataset.tasks.clone())

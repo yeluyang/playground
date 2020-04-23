@@ -133,7 +133,7 @@ impl MasterClient {
 mod test {
     use super::*;
 
-    use crate::test::{self, Dataset, ServeTime};
+    use crate::test::{self, Dataset, ServeTimer};
 
     #[test]
     fn test_job_get() {
@@ -142,13 +142,13 @@ mod test {
             host: String,
             port: u16,
             dataset: Dataset,
-            serve_time: ServeTime,
+            serve_time: ServeTimer,
         }
         let cases = [TestCase {
             host: "127.0.0.1".to_owned(),
             port: 10086,
             dataset: Dataset::new(vec!["127.0.0.1".to_owned()], 4, 4, 1),
-            serve_time: ServeTime::new(4, 1),
+            serve_time: ServeTimer::new(4, 1),
         }];
 
         for c in &cases {

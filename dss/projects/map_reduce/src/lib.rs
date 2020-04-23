@@ -86,7 +86,7 @@ impl Task {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Job {
     Map { host: String, path: String },
     Reduce { host: String, path: String },

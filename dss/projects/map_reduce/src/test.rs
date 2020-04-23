@@ -1,9 +1,20 @@
-use std::{cmp, thread, time::Duration};
+use std::{
+    cmp,
+    collections::HashMap,
+    fs::OpenOptions,
+    io::{BufRead, BufReader, BufWriter, Write},
+    result, thread,
+    time::Duration,
+};
 
 extern crate env_logger;
 use env_logger::{Builder, Env};
 
-use crate::{Task, TaskType};
+use crate::{
+    error::Error,
+    worker::{Map, Reduce},
+    Task, TaskType,
+};
 
 static INIT: std::sync::Once = std::sync::Once::new();
 pub(crate) fn setup_logger() {
@@ -61,12 +72,12 @@ impl Dataset {
     }
 }
 
-pub(crate) struct ServeTime {
+pub(crate) struct ServeTimer {
     pub(crate) serve: Duration,
     wait_init: Duration,
 }
 
-impl ServeTime {
+impl ServeTimer {
     pub(crate) fn new(serve_time: u64, wait_init_time: u64) -> Self {
         assert!(serve_time > wait_init_time);
         Self {
@@ -84,5 +95,25 @@ impl ServeTime {
         let wait_exit = self.serve - self.wait_init;
         debug!("wait master server exit: {:?}", wait_exit);
         thread::sleep(wait_exit);
+    }
+}
+
+pub(crate) struct TestMapper {}
+
+impl Map for TestMapper {
+    type Error = Error;
+    fn mapping(&self, path: String) -> result::Result<HashMap<String, String>, Self::Error> {
+        let input = BufReader::new(OpenOptions::new().read(true).open(path)?);
+        unimplemented!()
+    }
+}
+
+pub(crate) struct TestReducer {}
+
+impl Reduce for TestReducer {
+    type Error = Error;
+    fn reducing(&self, path: String) -> result::Result<String, Self::Error> {
+        let input = BufReader::new(OpenOptions::new().read(true).open(path)?);
+        unimplemented!()
     }
 }
