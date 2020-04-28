@@ -232,6 +232,396 @@ impl ::protobuf::reflect::ProtobufValue for FileLocation {
 }
 
 #[derive(PartialEq,Clone,Default)]
+pub struct MapJob {
+    // message fields
+    pub file: ::protobuf::SingularPtrField<FileLocation>,
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a MapJob {
+    fn default() -> &'a MapJob {
+        <MapJob as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl MapJob {
+    pub fn new() -> MapJob {
+        ::std::default::Default::default()
+    }
+
+    // .FileLocation file = 1;
+
+
+    pub fn get_file(&self) -> &FileLocation {
+        self.file.as_ref().unwrap_or_else(|| FileLocation::default_instance())
+    }
+    pub fn clear_file(&mut self) {
+        self.file.clear();
+    }
+
+    pub fn has_file(&self) -> bool {
+        self.file.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_file(&mut self, v: FileLocation) {
+        self.file = ::protobuf::SingularPtrField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_file(&mut self) -> &mut FileLocation {
+        if self.file.is_none() {
+            self.file.set_default();
+        }
+        self.file.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_file(&mut self) -> FileLocation {
+        self.file.take().unwrap_or_else(|| FileLocation::new())
+    }
+}
+
+impl ::protobuf::Message for MapJob {
+    fn is_initialized(&self) -> bool {
+        for v in &self.file {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.file)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if let Some(ref v) = self.file.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if let Some(ref v) = self.file.as_ref() {
+            os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &dyn (::std::any::Any) {
+        self as &dyn (::std::any::Any)
+    }
+    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
+        self as &mut dyn (::std::any::Any)
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> MapJob {
+        MapJob::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(
+                    "file",
+                    |m: &MapJob| { &m.file },
+                    |m: &mut MapJob| { &mut m.file },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new_pb_name::<MapJob>(
+                    "MapJob",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static MapJob {
+        static mut instance: ::protobuf::lazy::Lazy<MapJob> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            instance.get(MapJob::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for MapJob {
+    fn clear(&mut self) {
+        self.file.clear();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for MapJob {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for MapJob {
+    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
+        ::protobuf::reflect::ReflectValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
+pub struct ReduceJob {
+    // message fields
+    pub key: ::std::string::String,
+    pub files: ::protobuf::RepeatedField<FileLocation>,
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a ReduceJob {
+    fn default() -> &'a ReduceJob {
+        <ReduceJob as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl ReduceJob {
+    pub fn new() -> ReduceJob {
+        ::std::default::Default::default()
+    }
+
+    // string key = 1;
+
+
+    pub fn get_key(&self) -> &str {
+        &self.key
+    }
+    pub fn clear_key(&mut self) {
+        self.key.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_key(&mut self, v: ::std::string::String) {
+        self.key = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_key(&mut self) -> &mut ::std::string::String {
+        &mut self.key
+    }
+
+    // Take field
+    pub fn take_key(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.key, ::std::string::String::new())
+    }
+
+    // repeated .FileLocation files = 2;
+
+
+    pub fn get_files(&self) -> &[FileLocation] {
+        &self.files
+    }
+    pub fn clear_files(&mut self) {
+        self.files.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_files(&mut self, v: ::protobuf::RepeatedField<FileLocation>) {
+        self.files = v;
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_files(&mut self) -> &mut ::protobuf::RepeatedField<FileLocation> {
+        &mut self.files
+    }
+
+    // Take field
+    pub fn take_files(&mut self) -> ::protobuf::RepeatedField<FileLocation> {
+        ::std::mem::replace(&mut self.files, ::protobuf::RepeatedField::new())
+    }
+}
+
+impl ::protobuf::Message for ReduceJob {
+    fn is_initialized(&self) -> bool {
+        for v in &self.files {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.key)?;
+                },
+                2 => {
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.files)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if !self.key.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.key);
+        }
+        for value in &self.files {
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+        };
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if !self.key.is_empty() {
+            os.write_string(1, &self.key)?;
+        }
+        for v in &self.files {
+            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
+        };
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &dyn (::std::any::Any) {
+        self as &dyn (::std::any::Any)
+    }
+    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
+        self as &mut dyn (::std::any::Any)
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> ReduceJob {
+        ReduceJob::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "key",
+                    |m: &ReduceJob| { &m.key },
+                    |m: &mut ReduceJob| { &mut m.key },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(
+                    "files",
+                    |m: &ReduceJob| { &m.files },
+                    |m: &mut ReduceJob| { &mut m.files },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new_pb_name::<ReduceJob>(
+                    "ReduceJob",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static ReduceJob {
+        static mut instance: ::protobuf::lazy::Lazy<ReduceJob> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            instance.get(ReduceJob::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for ReduceJob {
+    fn clear(&mut self) {
+        self.key.clear();
+        self.files.clear();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for ReduceJob {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for ReduceJob {
+    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
+        ::protobuf::reflect::ReflectValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct JobGetRequest {
     // message fields
     pub host: ::std::string::String,
@@ -396,9 +786,8 @@ impl ::protobuf::reflect::ProtobufValue for JobGetRequest {
 
 #[derive(PartialEq,Clone,Default)]
 pub struct JobGetResponse {
-    // message fields
-    pub task_type: TaskType,
-    pub file_location: ::protobuf::SingularPtrField<FileLocation>,
+    // message oneof groups
+    pub job: ::std::option::Option<JobGetResponse_oneof_job>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -410,67 +799,128 @@ impl<'a> ::std::default::Default for &'a JobGetResponse {
     }
 }
 
+#[derive(Clone,PartialEq,Debug)]
+pub enum JobGetResponse_oneof_job {
+    map_job(MapJob),
+    reduce_job(ReduceJob),
+}
+
 impl JobGetResponse {
     pub fn new() -> JobGetResponse {
         ::std::default::Default::default()
     }
 
-    // .TaskType task_type = 1;
+    // .MapJob map_job = 1;
 
 
-    pub fn get_task_type(&self) -> TaskType {
-        self.task_type
+    pub fn get_map_job(&self) -> &MapJob {
+        match self.job {
+            ::std::option::Option::Some(JobGetResponse_oneof_job::map_job(ref v)) => v,
+            _ => MapJob::default_instance(),
+        }
     }
-    pub fn clear_task_type(&mut self) {
-        self.task_type = TaskType::MAP;
-    }
-
-    // Param is passed by value, moved
-    pub fn set_task_type(&mut self, v: TaskType) {
-        self.task_type = v;
+    pub fn clear_map_job(&mut self) {
+        self.job = ::std::option::Option::None;
     }
 
-    // .FileLocation file_location = 2;
-
-
-    pub fn get_file_location(&self) -> &FileLocation {
-        self.file_location.as_ref().unwrap_or_else(|| FileLocation::default_instance())
-    }
-    pub fn clear_file_location(&mut self) {
-        self.file_location.clear();
-    }
-
-    pub fn has_file_location(&self) -> bool {
-        self.file_location.is_some()
+    pub fn has_map_job(&self) -> bool {
+        match self.job {
+            ::std::option::Option::Some(JobGetResponse_oneof_job::map_job(..)) => true,
+            _ => false,
+        }
     }
 
     // Param is passed by value, moved
-    pub fn set_file_location(&mut self, v: FileLocation) {
-        self.file_location = ::protobuf::SingularPtrField::some(v);
+    pub fn set_map_job(&mut self, v: MapJob) {
+        self.job = ::std::option::Option::Some(JobGetResponse_oneof_job::map_job(v))
     }
 
     // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_file_location(&mut self) -> &mut FileLocation {
-        if self.file_location.is_none() {
-            self.file_location.set_default();
+    pub fn mut_map_job(&mut self) -> &mut MapJob {
+        if let ::std::option::Option::Some(JobGetResponse_oneof_job::map_job(_)) = self.job {
+        } else {
+            self.job = ::std::option::Option::Some(JobGetResponse_oneof_job::map_job(MapJob::new()));
         }
-        self.file_location.as_mut().unwrap()
+        match self.job {
+            ::std::option::Option::Some(JobGetResponse_oneof_job::map_job(ref mut v)) => v,
+            _ => panic!(),
+        }
     }
 
     // Take field
-    pub fn take_file_location(&mut self) -> FileLocation {
-        self.file_location.take().unwrap_or_else(|| FileLocation::new())
+    pub fn take_map_job(&mut self) -> MapJob {
+        if self.has_map_job() {
+            match self.job.take() {
+                ::std::option::Option::Some(JobGetResponse_oneof_job::map_job(v)) => v,
+                _ => panic!(),
+            }
+        } else {
+            MapJob::new()
+        }
+    }
+
+    // .ReduceJob reduce_job = 2;
+
+
+    pub fn get_reduce_job(&self) -> &ReduceJob {
+        match self.job {
+            ::std::option::Option::Some(JobGetResponse_oneof_job::reduce_job(ref v)) => v,
+            _ => ReduceJob::default_instance(),
+        }
+    }
+    pub fn clear_reduce_job(&mut self) {
+        self.job = ::std::option::Option::None;
+    }
+
+    pub fn has_reduce_job(&self) -> bool {
+        match self.job {
+            ::std::option::Option::Some(JobGetResponse_oneof_job::reduce_job(..)) => true,
+            _ => false,
+        }
+    }
+
+    // Param is passed by value, moved
+    pub fn set_reduce_job(&mut self, v: ReduceJob) {
+        self.job = ::std::option::Option::Some(JobGetResponse_oneof_job::reduce_job(v))
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_reduce_job(&mut self) -> &mut ReduceJob {
+        if let ::std::option::Option::Some(JobGetResponse_oneof_job::reduce_job(_)) = self.job {
+        } else {
+            self.job = ::std::option::Option::Some(JobGetResponse_oneof_job::reduce_job(ReduceJob::new()));
+        }
+        match self.job {
+            ::std::option::Option::Some(JobGetResponse_oneof_job::reduce_job(ref mut v)) => v,
+            _ => panic!(),
+        }
+    }
+
+    // Take field
+    pub fn take_reduce_job(&mut self) -> ReduceJob {
+        if self.has_reduce_job() {
+            match self.job.take() {
+                ::std::option::Option::Some(JobGetResponse_oneof_job::reduce_job(v)) => v,
+                _ => panic!(),
+            }
+        } else {
+            ReduceJob::new()
+        }
     }
 }
 
 impl ::protobuf::Message for JobGetResponse {
     fn is_initialized(&self) -> bool {
-        for v in &self.file_location {
+        if let Some(JobGetResponse_oneof_job::map_job(ref v)) = self.job {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
+        if let Some(JobGetResponse_oneof_job::reduce_job(ref v)) = self.job {
+            if !v.is_initialized() {
+                return false;
+            }
+        }
         true
     }
 
@@ -479,10 +929,16 @@ impl ::protobuf::Message for JobGetResponse {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.task_type, 1, &mut self.unknown_fields)?
+                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    self.job = ::std::option::Option::Some(JobGetResponse_oneof_job::map_job(is.read_message()?));
                 },
                 2 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.file_location)?;
+                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    self.job = ::std::option::Option::Some(JobGetResponse_oneof_job::reduce_job(is.read_message()?));
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -496,12 +952,17 @@ impl ::protobuf::Message for JobGetResponse {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if self.task_type != TaskType::MAP {
-            my_size += ::protobuf::rt::enum_size(1, self.task_type);
-        }
-        if let Some(ref v) = self.file_location.as_ref() {
-            let len = v.compute_size();
-            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+        if let ::std::option::Option::Some(ref v) = self.job {
+            match v {
+                &JobGetResponse_oneof_job::map_job(ref v) => {
+                    let len = v.compute_size();
+                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+                },
+                &JobGetResponse_oneof_job::reduce_job(ref v) => {
+                    let len = v.compute_size();
+                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+                },
+            };
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -509,13 +970,19 @@ impl ::protobuf::Message for JobGetResponse {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if self.task_type != TaskType::MAP {
-            os.write_enum(1, self.task_type.value())?;
-        }
-        if let Some(ref v) = self.file_location.as_ref() {
-            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-            os.write_raw_varint32(v.get_cached_size())?;
-            v.write_to_with_cached_sizes(os)?;
+        if let ::std::option::Option::Some(ref v) = self.job {
+            match v {
+                &JobGetResponse_oneof_job::map_job(ref v) => {
+                    os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+                    os.write_raw_varint32(v.get_cached_size())?;
+                    v.write_to_with_cached_sizes(os)?;
+                },
+                &JobGetResponse_oneof_job::reduce_job(ref v) => {
+                    os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+                    os.write_raw_varint32(v.get_cached_size())?;
+                    v.write_to_with_cached_sizes(os)?;
+                },
+            };
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -556,15 +1023,15 @@ impl ::protobuf::Message for JobGetResponse {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeEnum<TaskType>>(
-                    "task_type",
-                    |m: &JobGetResponse| { &m.task_type },
-                    |m: &mut JobGetResponse| { &mut m.task_type },
+                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, MapJob>(
+                    "map_job",
+                    JobGetResponse::has_map_job,
+                    JobGetResponse::get_map_job,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(
-                    "file_location",
-                    |m: &JobGetResponse| { &m.file_location },
-                    |m: &mut JobGetResponse| { &mut m.file_location },
+                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, ReduceJob>(
+                    "reduce_job",
+                    JobGetResponse::has_reduce_job,
+                    JobGetResponse::get_reduce_job,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new_pb_name::<JobGetResponse>(
                     "JobGetResponse",
@@ -585,8 +1052,8 @@ impl ::protobuf::Message for JobGetResponse {
 
 impl ::protobuf::Clear for JobGetResponse {
     fn clear(&mut self) {
-        self.task_type = TaskType::MAP;
-        self.file_location.clear();
+        self.job = ::std::option::Option::None;
+        self.job = ::std::option::Option::None;
         self.unknown_fields.clear();
     }
 }
@@ -603,97 +1070,55 @@ impl ::protobuf::reflect::ProtobufValue for JobGetResponse {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
-pub enum TaskType {
-    MAP = 0,
-    REDUCE = 1,
-}
-
-impl ::protobuf::ProtobufEnum for TaskType {
-    fn value(&self) -> i32 {
-        *self as i32
-    }
-
-    fn from_i32(value: i32) -> ::std::option::Option<TaskType> {
-        match value {
-            0 => ::std::option::Option::Some(TaskType::MAP),
-            1 => ::std::option::Option::Some(TaskType::REDUCE),
-            _ => ::std::option::Option::None
-        }
-    }
-
-    fn values() -> &'static [Self] {
-        static values: &'static [TaskType] = &[
-            TaskType::MAP,
-            TaskType::REDUCE,
-        ];
-        values
-    }
-
-    fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy::INIT;
-        unsafe {
-            descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new_pb_name::<TaskType>("TaskType", file_descriptor_proto())
-            })
-        }
-    }
-}
-
-impl ::std::marker::Copy for TaskType {
-}
-
-impl ::std::default::Default for TaskType {
-    fn default() -> Self {
-        TaskType::MAP
-    }
-}
-
-impl ::protobuf::reflect::ProtobufValue for TaskType {
-    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
-        ::protobuf::reflect::ReflectValueRef::Enum(self.descriptor())
-    }
-}
-
 static file_descriptor_proto_data: &'static [u8] = b"\
     \n\x1aassets/pb/map_reduce.proto\"6\n\x0cFileLocation\x12\x12\n\x04host\
     \x18\x01\x20\x01(\tR\x04host\x12\x12\n\x04path\x18\x02\x20\x01(\tR\x04pa\
-    th\"#\n\rJobGetRequest\x12\x12\n\x04host\x18\x01\x20\x01(\tR\x04host\"l\
-    \n\x0eJobGetResponse\x12&\n\ttask_type\x18\x01\x20\x01(\x0e2\t.TaskTypeR\
-    \x08taskType\x122\n\rfile_location\x18\x02\x20\x01(\x0b2\r.FileLocationR\
-    \x0cfileLocation*\x1f\n\x08TaskType\x12\x07\n\x03MAP\x10\0\x12\n\n\x06RE\
-    DUCE\x10\x0129\n\nMasterGRPC\x12+\n\x06JobGet\x12\x0e.JobGetRequest\x1a\
-    \x0f.JobGetResponse\"\0J\xf1\x04\n\x06\x12\x04\0\0\x17\x01\n\x08\n\x01\
-    \x0c\x12\x03\0\0\x12\n\n\n\x02\x05\0\x12\x04\x02\0\x05\x01\n\n\n\x03\x05\
-    \0\x01\x12\x03\x02\x05\r\n\x0b\n\x04\x05\0\x02\0\x12\x03\x03\x04\x0c\n\
-    \x0c\n\x05\x05\0\x02\0\x01\x12\x03\x03\x04\x07\n\x0c\n\x05\x05\0\x02\0\
-    \x02\x12\x03\x03\n\x0b\n\x0b\n\x04\x05\0\x02\x01\x12\x03\x04\x04\x0f\n\
-    \x0c\n\x05\x05\0\x02\x01\x01\x12\x03\x04\x04\n\n\x0c\n\x05\x05\0\x02\x01\
-    \x02\x12\x03\x04\r\x0e\n\n\n\x02\x04\0\x12\x04\x07\0\n\x01\n\n\n\x03\x04\
-    \0\x01\x12\x03\x07\x08\x14\n\x0b\n\x04\x04\0\x02\0\x12\x03\x08\x04\x14\n\
-    \r\n\x05\x04\0\x02\0\x04\x12\x04\x08\x04\x07\x16\n\x0c\n\x05\x04\0\x02\0\
-    \x05\x12\x03\x08\x04\n\n\x0c\n\x05\x04\0\x02\0\x01\x12\x03\x08\x0b\x0f\n\
-    \x0c\n\x05\x04\0\x02\0\x03\x12\x03\x08\x12\x13\n\x0b\n\x04\x04\0\x02\x01\
-    \x12\x03\t\x04\x14\n\r\n\x05\x04\0\x02\x01\x04\x12\x04\t\x04\x08\x14\n\
-    \x0c\n\x05\x04\0\x02\x01\x05\x12\x03\t\x04\n\n\x0c\n\x05\x04\0\x02\x01\
-    \x01\x12\x03\t\x0b\x0f\n\x0c\n\x05\x04\0\x02\x01\x03\x12\x03\t\x12\x13\n\
-    \n\n\x02\x04\x01\x12\x04\x0c\0\x0e\x01\n\n\n\x03\x04\x01\x01\x12\x03\x0c\
-    \x08\x15\n\x0b\n\x04\x04\x01\x02\0\x12\x03\r\x04\x14\n\r\n\x05\x04\x01\
-    \x02\0\x04\x12\x04\r\x04\x0c\x17\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03\r\
-    \x04\n\n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03\r\x0b\x0f\n\x0c\n\x05\x04\
-    \x01\x02\0\x03\x12\x03\r\x12\x13\n\n\n\x02\x04\x02\x12\x04\x10\0\x13\x01\
-    \n\n\n\x03\x04\x02\x01\x12\x03\x10\x08\x16\n\x0b\n\x04\x04\x02\x02\0\x12\
-    \x03\x11\x04\x1b\n\r\n\x05\x04\x02\x02\0\x04\x12\x04\x11\x04\x10\x18\n\
-    \x0c\n\x05\x04\x02\x02\0\x06\x12\x03\x11\x04\x0c\n\x0c\n\x05\x04\x02\x02\
-    \0\x01\x12\x03\x11\r\x16\n\x0c\n\x05\x04\x02\x02\0\x03\x12\x03\x11\x19\
-    \x1a\n\x0b\n\x04\x04\x02\x02\x01\x12\x03\x12\x04#\n\r\n\x05\x04\x02\x02\
-    \x01\x04\x12\x04\x12\x04\x11\x1b\n\x0c\n\x05\x04\x02\x02\x01\x06\x12\x03\
-    \x12\x04\x10\n\x0c\n\x05\x04\x02\x02\x01\x01\x12\x03\x12\x11\x1e\n\x0c\n\
-    \x05\x04\x02\x02\x01\x03\x12\x03\x12!\"\n\n\n\x02\x06\0\x12\x04\x15\0\
-    \x17\x01\n\n\n\x03\x06\0\x01\x12\x03\x15\x08\x12\n\x0b\n\x04\x06\0\x02\0\
-    \x12\x03\x16\x049\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03\x16\x08\x0e\n\x0c\
-    \n\x05\x06\0\x02\0\x02\x12\x03\x16\x0f\x1c\n\x0c\n\x05\x06\0\x02\0\x03\
-    \x12\x03\x16'5b\x06proto3\
+    th\"+\n\x06MapJob\x12!\n\x04file\x18\x01\x20\x01(\x0b2\r.FileLocationR\
+    \x04file\"B\n\tReduceJob\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12\
+    #\n\x05files\x18\x02\x20\x03(\x0b2\r.FileLocationR\x05files\"#\n\rJobGet\
+    Request\x12\x12\n\x04host\x18\x01\x20\x01(\tR\x04host\"h\n\x0eJobGetResp\
+    onse\x12\"\n\x07map_job\x18\x01\x20\x01(\x0b2\x07.MapJobH\0R\x06mapJob\
+    \x12+\n\nreduce_job\x18\x02\x20\x01(\x0b2\n.ReduceJobH\0R\treduceJobB\
+    \x05\n\x03job29\n\nMasterGRPC\x12+\n\x06JobGet\x12\x0e.JobGetRequest\x1a\
+    \x0f.JobGetResponse\"\0J\x86\x06\n\x06\x12\x04\0\0\x1d\x01\n\x08\n\x01\
+    \x0c\x12\x03\0\0\x12\n\n\n\x02\x04\0\x12\x04\x02\0\x05\x01\n\n\n\x03\x04\
+    \0\x01\x12\x03\x02\x08\x14\n\x0b\n\x04\x04\0\x02\0\x12\x03\x03\x04\x14\n\
+    \r\n\x05\x04\0\x02\0\x04\x12\x04\x03\x04\x02\x16\n\x0c\n\x05\x04\0\x02\0\
+    \x05\x12\x03\x03\x04\n\n\x0c\n\x05\x04\0\x02\0\x01\x12\x03\x03\x0b\x0f\n\
+    \x0c\n\x05\x04\0\x02\0\x03\x12\x03\x03\x12\x13\n\x0b\n\x04\x04\0\x02\x01\
+    \x12\x03\x04\x04\x14\n\r\n\x05\x04\0\x02\x01\x04\x12\x04\x04\x04\x03\x14\
+    \n\x0c\n\x05\x04\0\x02\x01\x05\x12\x03\x04\x04\n\n\x0c\n\x05\x04\0\x02\
+    \x01\x01\x12\x03\x04\x0b\x0f\n\x0c\n\x05\x04\0\x02\x01\x03\x12\x03\x04\
+    \x12\x13\n\n\n\x02\x04\x01\x12\x04\x07\0\t\x01\n\n\n\x03\x04\x01\x01\x12\
+    \x03\x07\x08\x0e\n\x0b\n\x04\x04\x01\x02\0\x12\x03\x08\x04\x1a\n\r\n\x05\
+    \x04\x01\x02\0\x04\x12\x04\x08\x04\x07\x10\n\x0c\n\x05\x04\x01\x02\0\x06\
+    \x12\x03\x08\x04\x10\n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03\x08\x11\x15\n\
+    \x0c\n\x05\x04\x01\x02\0\x03\x12\x03\x08\x18\x19\n\n\n\x02\x04\x02\x12\
+    \x04\x0b\0\x0e\x01\n\n\n\x03\x04\x02\x01\x12\x03\x0b\x08\x11\n\x0b\n\x04\
+    \x04\x02\x02\0\x12\x03\x0c\x04\x13\n\r\n\x05\x04\x02\x02\0\x04\x12\x04\
+    \x0c\x04\x0b\x13\n\x0c\n\x05\x04\x02\x02\0\x05\x12\x03\x0c\x04\n\n\x0c\n\
+    \x05\x04\x02\x02\0\x01\x12\x03\x0c\x0b\x0e\n\x0c\n\x05\x04\x02\x02\0\x03\
+    \x12\x03\x0c\x11\x12\n\x0b\n\x04\x04\x02\x02\x01\x12\x03\r\x04$\n\x0c\n\
+    \x05\x04\x02\x02\x01\x04\x12\x03\r\x04\x0c\n\x0c\n\x05\x04\x02\x02\x01\
+    \x06\x12\x03\r\r\x19\n\x0c\n\x05\x04\x02\x02\x01\x01\x12\x03\r\x1a\x1f\n\
+    \x0c\n\x05\x04\x02\x02\x01\x03\x12\x03\r\"#\n\n\n\x02\x04\x03\x12\x04\
+    \x10\0\x12\x01\n\n\n\x03\x04\x03\x01\x12\x03\x10\x08\x15\n\x0b\n\x04\x04\
+    \x03\x02\0\x12\x03\x11\x04\x14\n\r\n\x05\x04\x03\x02\0\x04\x12\x04\x11\
+    \x04\x10\x17\n\x0c\n\x05\x04\x03\x02\0\x05\x12\x03\x11\x04\n\n\x0c\n\x05\
+    \x04\x03\x02\0\x01\x12\x03\x11\x0b\x0f\n\x0c\n\x05\x04\x03\x02\0\x03\x12\
+    \x03\x11\x12\x13\n\n\n\x02\x04\x04\x12\x04\x14\0\x19\x01\n\n\n\x03\x04\
+    \x04\x01\x12\x03\x14\x08\x16\n\x0c\n\x04\x04\x04\x08\0\x12\x04\x15\x04\
+    \x18\x05\n\x0c\n\x05\x04\x04\x08\0\x01\x12\x03\x15\n\r\n\x0b\n\x04\x04\
+    \x04\x02\0\x12\x03\x16\x08\x1b\n\x0c\n\x05\x04\x04\x02\0\x06\x12\x03\x16\
+    \x08\x0e\n\x0c\n\x05\x04\x04\x02\0\x01\x12\x03\x16\x0f\x16\n\x0c\n\x05\
+    \x04\x04\x02\0\x03\x12\x03\x16\x19\x1a\n\x0b\n\x04\x04\x04\x02\x01\x12\
+    \x03\x17\x08!\n\x0c\n\x05\x04\x04\x02\x01\x06\x12\x03\x17\x08\x11\n\x0c\
+    \n\x05\x04\x04\x02\x01\x01\x12\x03\x17\x12\x1c\n\x0c\n\x05\x04\x04\x02\
+    \x01\x03\x12\x03\x17\x1f\x20\n\n\n\x02\x06\0\x12\x04\x1b\0\x1d\x01\n\n\n\
+    \x03\x06\0\x01\x12\x03\x1b\x08\x12\n\x0b\n\x04\x06\0\x02\0\x12\x03\x1c\
+    \x049\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03\x1c\x08\x0e\n\x0c\n\x05\x06\0\
+    \x02\0\x02\x12\x03\x1c\x0f\x1c\n\x0c\n\x05\x06\0\x02\0\x03\x12\x03\x1c'5\
+    b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy::INIT;

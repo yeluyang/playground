@@ -3,11 +3,12 @@ use std::{
     sync::{atomic::Ordering, Arc},
 };
 
-use crate::{Job, Task, TaskType};
+use crate::{Job, Task};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct Master {
     map_tasks: HashMap<String, Vec<Arc<Task>>>,
+    // TODO: should hold only one task for every key
     reduce_tasks: HashMap<String, Vec<Arc<Task>>>,
     allocated: Vec<Arc<Task>>,
 }
@@ -26,90 +27,120 @@ impl Master {
             trace!("inserting task into master: task={{ {} }}", task);
             let task = Arc::new(task);
 
-            let type_tasks = match task.task_type {
-                TaskType::Map => &mut m.map_tasks,
-                TaskType::Reduce => &mut m.reduce_tasks,
+            match task.as_ref() {
+                Task::Map { path_on_hosts, .. } => {
+                    for host in path_on_hosts.keys() {
+                        match m.map_tasks.get_mut(host) {
+                            None => {
+                                m.map_tasks.insert(host.clone(), vec![task.clone()]);
+                            }
+                            Some(tasks) => {
+                                tasks.push(task.clone());
+                            }
+                        };
+                    }
+                }
+                Task::Reduce { key, .. } => {
+                    match m.reduce_tasks.get_mut(key) {
+                        None => {
+                            m.reduce_tasks.insert(key.clone(), vec![task.clone()]);
+                        }
+                        Some(tasks) => {
+                            // TODO use Task::concat to merge two task in one
+                            tasks.push(task.clone());
+                        }
+                    };
+                }
             };
-
-            for (host, path) in &task.task_files {
-                trace!(
-                    "inserting replicated files of task: type={}, file={{ host={}, path={} }}",
-                    task.task_type,
-                    host,
-                    path
-                );
-                match type_tasks.get_mut(host) {
-                    None => {
-                        type_tasks.insert(host.clone(), vec![task.clone()]);
-                    }
-                    Some(tasks) => {
-                        tasks.push(task.clone());
-                    }
-                };
-            }
         }
 
-        trace!(
-            "created master: {} map tasks, {} reduce tasks",
-            m.map_tasks.len(),
-            m.reduce_tasks.len()
-        );
+        trace!("created successfully: master={:?}", m);
 
         m
     }
 
     pub fn alloc_job(&mut self, host: &str) -> Option<Job> {
-        debug!("allocating task: host={}", host);
+        if !self.map_tasks.is_empty() {
+            if let Some(host_tasks) = self.map_tasks.get_mut(host) {
+                debug!(
+                    "allocating MAP task on host={} which has {} tasks",
+                    host,
+                    host_tasks.len()
+                );
+                while let Some(task) = host_tasks.pop() {
+                    trace!("found task={{ {} }}", task);
+                    if let Task::Map {
+                        allocated,
+                        path_on_hosts,
+                    } = task.as_ref()
+                    {
+                        let job = if !allocated.compare_and_swap(false, true, Ordering::SeqCst) {
+                            let job = Some(Job::Map {
+                                host: host.to_owned(),
+                                path: path_on_hosts[host].clone(),
+                            });
+                            trace!("allocating job={{ {:?} }}", job);
+                            self.allocated.push(task);
 
-        let (task_type, type_tasks) = if self.map_tasks.len() > self.reduce_tasks.len() {
-            (TaskType::Map, &mut self.map_tasks)
-        } else {
-            (TaskType::Reduce, &mut self.reduce_tasks)
-        };
-
-        if let Some(host_tasks) = type_tasks.get_mut(host) {
-            trace!("get {} tasks on {}", host_tasks.len(), host);
-            while let Some(task) = host_tasks.pop() {
-                trace!("handling task={{ {} }}", task);
-                let job = if !task
-                    .is_allocated
-                    .compare_and_swap(false, true, Ordering::SeqCst)
-                {
-                    let job = match task.task_type {
-                        TaskType::Map => Some(Job::Map {
-                            host: host.to_owned(),
-                            path: task.task_files[host].clone(),
-                        }),
-                        TaskType::Reduce => Some(Job::Reduce {
-                            host: host.to_owned(),
-                            path: task.task_files[host].clone(),
-                        }),
+                            job
+                        } else {
+                            trace!("met allocated task or other thread took it before this thread");
+                            continue;
+                        };
+                        if host_tasks.is_empty() {
+                            trace!(
+                                "no more MAP tasks on host={}, remove its place from master",
+                                host
+                            );
+                            self.map_tasks.remove(host);
+                        }
+                        return job;
+                    } else {
+                        panic!("mismatch type task in master.map_tasks: task={}", task);
                     };
-                    trace!("allocating job={{ {:?} }}", job);
-                    self.allocated.push(task);
-
-                    job
-                } else {
-                    trace!("met allocated task or other thread took it before this thread");
-                    continue;
-                };
-                if host_tasks.is_empty() {
-                    trace!(
-                        "no more {} tasks on host={}, remove its place from master",
-                        task_type,
-                        host
-                    );
-                    type_tasks.remove(host);
                 }
-                return job;
-            }
 
-            unreachable!();
+                unreachable!();
+            } else {
+                // TODO when no MAP task on specified host
+                unimplemented!();
+            };
+        } else {
+            for (key, tasks) in &mut self.reduce_tasks {
+                trace!(
+                    "finding REDUCE task in {} tasks which has key={}",
+                    tasks.len(),
+                    key,
+                );
+                while let Some(task) = tasks.pop() {
+                    trace!("found task={{ {} }}", task);
+                    if let Task::Reduce {
+                        allocated,
+                        key,
+                        paths_with_hosts,
+                    } = task.as_ref()
+                    {
+                        if !allocated.compare_and_swap(false, true, Ordering::SeqCst) {
+                            let job = Some(Job::Reduce {
+                                key: key.clone(),
+                                paths: paths_with_hosts.clone(),
+                            });
+                            trace!("allocating job={{ {:?} }}", job);
+                            self.allocated.push(task);
+
+                            return job;
+                        } else {
+                            trace!("met allocated task or other thread took it before this thread");
+                            continue;
+                        };
+                    } else {
+                        panic!("mismatch type task in master.reduce_tasks: task={}", task);
+                    }
+                }
+            }
         };
 
-        // TODO: when no task of specified type on host
-        // TODO: when no task of any type on host
-        trace!("task not found on specified host");
+        trace!("task not found");
         None
     }
 }
@@ -118,10 +149,12 @@ impl Master {
 mod test {
     use super::*;
 
-    use crate::test::Dataset;
+    use crate::test::{self, Dataset};
 
     #[test]
     fn test_alloc_job() {
+        test::setup_logger();
+
         struct TestCase {
             dataset: Dataset,
         }
@@ -142,17 +175,17 @@ mod test {
             for _ in 0..c.dataset.tasks.len() {
                 let job = m.alloc_job("127.0.0.1").unwrap();
                 match job {
-                    Job::Map { .. } => map_count += 1,
-                    Job::Reduce { .. } => reduce_count += 1,
+                    Job::Map { host, path } => {
+                        map_count += 1;
+                        assert_eq!(host, "127.0.0.1");
+                        assert!(!path.is_empty());
+                    }
+                    Job::Reduce { key, paths } => reduce_count += 1,
                 };
-                let (host, path) = job.get_file_location();
-                assert_eq!(host, "127.0.0.1");
-                assert!(!path.is_empty());
             }
             assert_eq!(map_count, c.dataset.map_tasks_num);
-            assert_eq!(reduce_count, c.dataset.reduce_tasks_num);
+            assert_eq!(reduce_count, c.dataset.keys_max * c.dataset.replicated_num);
             assert!(m.map_tasks.is_empty());
-            assert!(m.reduce_tasks.is_empty());
             assert_eq!(m.allocated.len(), c.dataset.tasks.len());
         }
     }

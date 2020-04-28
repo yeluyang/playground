@@ -1,20 +1,15 @@
-use std::{
-    cmp,
-    collections::HashMap,
-    fs::OpenOptions,
-    io::{BufRead, BufReader, BufWriter, Write},
-    result, thread,
-    time::Duration,
-};
+use std::{cmp, collections::HashMap, fs::OpenOptions, result, thread, time::Duration};
 
 extern crate env_logger;
 use env_logger::{Builder, Env};
 
 use crate::{
-    error::Error,
     worker::{Map, Reduce},
-    Task, TaskType,
+    Error, Task,
 };
+
+pub(crate) static MAP_OUTPUT_DIR: &str = "/path/to/map/files";
+pub(crate) static REDUCE_OUTPUT_DIR: &str = "/path/to/reduce/files";
 
 static INIT: std::sync::Once = std::sync::Once::new();
 pub(crate) fn setup_logger() {
@@ -29,46 +24,60 @@ pub(crate) struct Dataset {
     pub(crate) tasks: Vec<Task>,
     pub(crate) hosts: Vec<String>,
     pub(crate) map_tasks_num: usize,
-    pub(crate) reduce_tasks_num: usize,
     pub(crate) replicated_num: usize,
+    pub(crate) keys_max: usize,
 }
 
 impl Dataset {
     pub(crate) fn new(
         hosts: Vec<String>,
         map_tasks_num: usize,
-        reduce_tasks_num: usize,
+        keys_max: usize,
         replicated_num: usize,
     ) -> Self {
         let mut dataset = Self {
             hosts,
             map_tasks_num,
-            reduce_tasks_num,
             replicated_num,
+            keys_max,
             tasks: Vec::new(),
         };
-        dataset.setup_type_dataset(TaskType::Map, map_tasks_num);
-        dataset.setup_type_dataset(TaskType::Reduce, reduce_tasks_num);
+
+        // setup map dataset
+        {
+            let mut host_index = 0usize;
+            for i in 0..dataset.map_tasks_num {
+                let mut files: Vec<(String, String)> = Vec::with_capacity(dataset.replicated_num);
+                for _ in 0..cmp::min(dataset.replicated_num, dataset.hosts.len()) {
+                    files.push((
+                        dataset.hosts[host_index].clone(),
+                        format!("{}/{}", MAP_OUTPUT_DIR, i),
+                    ));
+                    host_index = (host_index + 1) % dataset.hosts.len();
+                }
+                dataset.tasks.push(Task::new(None, files));
+            }
+        }
+
+        // setup reduce dataset
+        {
+            let mut host_index = 0usize;
+            for i in 0..dataset.keys_max {
+                let mut files: Vec<(String, String)> = Vec::with_capacity(dataset.replicated_num);
+                for _ in 0..cmp::min(dataset.replicated_num, dataset.hosts.len()) {
+                    files.push((
+                        dataset.hosts[host_index].clone(),
+                        format!("{}/key_{}", REDUCE_OUTPUT_DIR, i),
+                    ));
+                    host_index = (host_index + 1) % dataset.hosts.len();
+                }
+                dataset
+                    .tasks
+                    .push(Task::new(Some(format!("key_{}", i)), files));
+            }
+        }
 
         dataset
-    }
-
-    fn setup_type_dataset(&mut self, task_type: TaskType, tasks_num: usize) {
-        let mut host_index = 0usize;
-        for i in 0..tasks_num {
-            let mut files: Vec<(String, String)> = Vec::with_capacity(self.replicated_num);
-            for _ in 0..cmp::min(self.replicated_num, self.hosts.len()) {
-                files.push((
-                    self.hosts[host_index].clone(),
-                    match task_type {
-                        TaskType::Map => format!("/path/to/map/files/{}", i),
-                        TaskType::Reduce => format!("/path/to/reduce/files/{}", i),
-                    },
-                ));
-                host_index = (host_index + 1) % self.hosts.len();
-            }
-            self.tasks.push(Task::new(task_type.clone(), files));
-        }
     }
 }
 
@@ -101,9 +110,7 @@ impl ServeTimer {
 pub(crate) struct TestMapper {}
 
 impl Map for TestMapper {
-    type Error = Error;
-    fn mapping(&self, path: String) -> result::Result<HashMap<String, String>, Self::Error> {
-        let input = BufReader::new(OpenOptions::new().read(true).open(path)?);
+    fn mapping(&self, input: String) -> HashMap<String, String> {
         unimplemented!()
     }
 }
@@ -111,9 +118,7 @@ impl Map for TestMapper {
 pub(crate) struct TestReducer {}
 
 impl Reduce for TestReducer {
-    type Error = Error;
-    fn reducing(&self, path: String) -> result::Result<String, Self::Error> {
-        let input = BufReader::new(OpenOptions::new().read(true).open(path)?);
+    fn reducing(&self, inputs: Vec<String>) -> String {
         unimplemented!()
     }
 }

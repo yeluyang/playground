@@ -19,84 +19,117 @@ mod worker;
 
 pub use error::{Error, Result};
 
-#[derive(Debug, Clone, PartialEq)]
-enum TaskType {
-    Map,
-    Reduce,
-}
-
-impl Display for TaskType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Map => "MAP",
-                Self::Reduce => "REDUCE",
-            }
-        )
-    }
-}
-
 #[derive(Debug)]
-struct Task {
-    is_allocated: AtomicBool,
-    task_type: TaskType,
-    task_files: HashMap<String, String>,
+enum Task {
+    Map {
+        allocated: AtomicBool,
+        path_on_hosts: HashMap<String, String>,
+    },
+    Reduce {
+        allocated: AtomicBool,
+        key: String,
+        paths_with_hosts: Vec<(String, String)>,
+    },
 }
 
 impl Display for Task {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "allocated={:?}, type={}, files.num={}",
-            self.is_allocated,
-            self.task_type,
-            self.task_files.len()
+            "{}",
+            match self {
+                Self::Map {
+                    allocated,
+                    path_on_hosts,
+                } => format!(
+                    "type=MAP, allocated={}, replicated in {} hosts",
+                    allocated.load(Ordering::SeqCst),
+                    path_on_hosts.len()
+                ),
+                Self::Reduce {
+                    allocated,
+                    key,
+                    paths_with_hosts,
+                } => format!(
+                    "type=REDUCE, allocated={}, key={}, responding {} files",
+                    allocated.load(Ordering::SeqCst),
+                    key,
+                    paths_with_hosts.len()
+                ),
+            }
         )
     }
 }
 
 impl Clone for Task {
     fn clone(&self) -> Self {
-        Self {
-            is_allocated: AtomicBool::new(self.is_allocated.load(Ordering::SeqCst)),
-            task_type: self.task_type.clone(),
-            task_files: self.task_files.clone(),
+        match self {
+            Self::Map {
+                allocated,
+                path_on_hosts,
+            } => Self::Map {
+                allocated: AtomicBool::new(allocated.load(Ordering::SeqCst)),
+                path_on_hosts: path_on_hosts.clone(),
+            },
+            Self::Reduce {
+                allocated,
+                key,
+                paths_with_hosts,
+            } => Self::Reduce {
+                allocated: AtomicBool::new(allocated.load(Ordering::SeqCst)),
+                key: key.clone(),
+                paths_with_hosts: paths_with_hosts.clone(),
+            },
         }
     }
 }
 
 impl Task {
-    fn new(task_type: TaskType, files: Vec<(String, String)>) -> Self {
-        debug!("create a {} task with {} files", task_type, files.len());
+    fn new(key: Option<String>, files: Vec<(String, String)>) -> Self {
+        match key {
+            None => {
+                debug!("creating MAP task with {} replicated files", files.len());
+                let mut path_on_hosts: HashMap<String, String> = HashMap::new();
+                for (host, path) in files {
+                    trace!("inserting replicated file={{ {}:{} }}", host, path);
+                    path_on_hosts.insert(host, path).unwrap_none();
+                }
 
-        let mut task_files = HashMap::new();
-        for (host, path) in files {
-            trace!("insert files {{ {}:{} }} into task", host, path);
-            task_files.insert(host, path).unwrap_none();
+                Self::Map {
+                    allocated: AtomicBool::new(false),
+                    path_on_hosts,
+                }
+            }
+            Some(key) => {
+                debug!(
+                    "creating REDUCE task with {} files of key={}",
+                    files.len(),
+                    key
+                );
+
+                Self::Reduce {
+                    allocated: AtomicBool::new(false),
+                    key,
+                    paths_with_hosts: files,
+                }
+            }
         }
+    }
 
-        Self {
-            is_allocated: AtomicBool::new(false),
-
-            task_type,
-            task_files,
-        }
+    // TODO: merge two task in one
+    fn concat(&mut self, other: &Self) {
+        unimplemented!()
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Job {
-    Map { host: String, path: String },
-    Reduce { host: String, path: String },
-}
-
-impl<'a> Job {
-    fn get_file_location(&'a self) -> (&'a str, &'a str) {
-        match self {
-            Job::Map { host, path } => (host, path),
-            Job::Reduce { host, path } => (host, path),
-        }
-    }
+    Map {
+        host: String,
+        path: String,
+    },
+    Reduce {
+        key: String,
+        paths: Vec<(String, String)>,
+    },
 }

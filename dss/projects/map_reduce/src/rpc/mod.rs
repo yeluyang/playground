@@ -7,7 +7,8 @@ use crate::{master::Master, Job, Result, Task};
 
 mod grpc;
 use grpc::{
-    create_master_grpc, FileLocation, JobGetRequest, JobGetResponse, MasterGrpc, MasterGrpcClient,
+    crate_job_from, create_master_grpc, grpc_job_from, FileLocation, JobGetRequest, JobGetResponse,
+    JobGetResponse_oneof_job, MasterGrpc, MasterGrpcClient,
 };
 
 #[derive(Clone)]
@@ -29,23 +30,17 @@ impl MasterGrpc for MasterGrpcServer {
 
         let job = self.master.alloc_job(req.get_host());
 
-        trace!("get job={:?}", job);
+        trace!("job allocated from master storage: {:?}", job);
         let rsp = match job {
             None => JobGetResponse::new(),
             Some(job) => {
-                let (task_type, host, path) = match job {
-                    Job::Map { host, path } => (grpc::TaskType::MAP, host, path),
-                    Job::Reduce { host, path } => (grpc::TaskType::REDUCE, host, path),
-                };
-
                 let mut rsp = JobGetResponse::new();
-                rsp.task_type = task_type;
-
-                let mut file_loc = FileLocation::new();
-                file_loc.host = host;
-                file_loc.path = path;
-                rsp.set_file_location(file_loc);
-
+                match grpc_job_from(job) {
+                    JobGetResponse_oneof_job::map_job(map_job) => rsp.set_map_job(map_job),
+                    JobGetResponse_oneof_job::reduce_job(reduce_job) => {
+                        rsp.set_reduce_job(reduce_job)
+                    }
+                };
                 rsp
             }
         };
@@ -103,29 +98,19 @@ impl MasterClient {
     }
 
     pub fn get_job(&self, host: String) -> Result<Option<Job>> {
-        debug!("getting job, expected on host={}", host);
+        debug!("sending JobGetRequest to MasterServer from host={}", host);
 
         let mut req = JobGetRequest::new();
         req.host = host;
 
-        let mut rsp = self.inner.job_get(&req)?;
-        trace!("got response={:?}", rsp);
+        let rsp = self.inner.job_get(&req)?;
+        trace!("response from Masterserver: {:?}", rsp);
 
-        let file = rsp.take_file_location();
-        if file.path.is_empty() {
-            Ok(None)
+        Ok(if rsp.has_map_job() || rsp.has_reduce_job() {
+            Some(crate_job_from(rsp.job.unwrap()))
         } else {
-            match rsp.get_task_type() {
-                grpc::TaskType::MAP => Ok(Some(Job::Map {
-                    host: file.host,
-                    path: file.path,
-                })),
-                grpc::TaskType::REDUCE => Ok(Some(Job::Reduce {
-                    host: file.host,
-                    path: file.path,
-                })),
-            }
-        }
+            None
+        })
     }
 }
 
@@ -162,18 +147,20 @@ mod test {
                 c.serve_time.wait_init();
 
                 for t in &c.dataset.tasks {
-                    for (host, _) in &t.task_files {
-                        let job = client
-                            .get_job(host.clone())
-                            .expect("get Err from `get_job`, expect Ok")
-                            .expect("get None from `get_job`, expect Some");
-                        let (job_host, job_path) = &match job {
-                            Job::Map { host, path } => (host, path),
-                            Job::Reduce { host, path } => (host, path),
-                        };
-                        assert!(c.dataset.hosts.contains(job_host));
-                        assert!(!job_path.is_empty());
-                    }
+                    let job = client
+                        .get_job(c.host.clone())
+                        .expect("get Err from `get_job`, expect Ok")
+                        .expect("get None from `get_job`, expect Some");
+                    match job {
+                        Job::Map { host, path } => {
+                            assert!(c.dataset.hosts.contains(&host));
+                            assert!(!path.is_empty());
+                        }
+                        Job::Reduce { key, paths } => {
+                            assert!(!key.is_empty());
+                            assert!(!paths.is_empty());
+                        }
+                    };
                 }
 
                 c.serve_time.wait_exit();
