@@ -101,44 +101,41 @@ impl Master {
                 }
 
                 unreachable!();
-            } else {
-                // TODO when no MAP task on specified host
-                unimplemented!();
             };
-        } else {
-            for (key, tasks) in &mut self.reduce_tasks {
-                trace!(
-                    "finding REDUCE task in {} tasks which has key={}",
-                    tasks.len(),
-                    key,
-                );
-                while let Some(task) = tasks.pop() {
-                    trace!("found task={{ {} }}", task);
-                    if let Task::Reduce {
-                        allocated,
-                        key,
-                        paths_with_hosts,
-                    } = task.as_ref()
-                    {
-                        if !allocated.compare_and_swap(false, true, Ordering::SeqCst) {
-                            let job = Some(Job::Reduce {
-                                key: key.clone(),
-                                paths: paths_with_hosts.clone(),
-                            });
-                            trace!("allocating job={{ {:?} }}", job);
-                            self.allocated.push(task);
+        }
 
-                            return job;
-                        } else {
-                            trace!("met allocated task or other thread took it before this thread");
-                            continue;
-                        };
+        for (key, tasks) in &mut self.reduce_tasks {
+            trace!(
+                "finding REDUCE task in {} tasks which has key={}",
+                tasks.len(),
+                key,
+            );
+            while let Some(task) = tasks.pop() {
+                trace!("found task={{ {} }}", task);
+                if let Task::Reduce {
+                    allocated,
+                    key,
+                    paths_with_hosts,
+                } = task.as_ref()
+                {
+                    if !allocated.compare_and_swap(false, true, Ordering::SeqCst) {
+                        let job = Some(Job::Reduce {
+                            key: key.clone(),
+                            paths: paths_with_hosts.clone(),
+                        });
+                        trace!("allocating job={{ {:?} }}", job);
+                        self.allocated.push(task);
+
+                        return job;
                     } else {
-                        panic!("mismatch type task in master.reduce_tasks: task={}", task);
-                    }
+                        trace!("met allocated task or other thread took it before this thread");
+                        continue;
+                    };
+                } else {
+                    panic!("mismatch type task in master.reduce_tasks: task={}", task);
                 }
             }
-        };
+        }
 
         trace!("task not found");
         None
