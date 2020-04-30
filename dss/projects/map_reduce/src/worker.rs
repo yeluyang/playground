@@ -157,6 +157,7 @@ mod test {
         test::{
             self, Dataset, ServeTimer, TestMapper, TestReducer, MAP_OUTPUT_DIR, REDUCE_OUTPUT_DIR,
         },
+        Task,
     };
 
     #[test]
@@ -175,8 +176,8 @@ mod test {
                 master_host: "127.0.0.1".to_owned(),
                 master_port: 10087,
                 region_num: 4,
-                map_output_dir: MAP_OUTPUT_DIR.to_owned(),
-                reduce_output_dir: REDUCE_OUTPUT_DIR.to_owned(),
+                map_output_dir: "tmp/test/worker/test_get_job/map".to_owned(),
+                reduce_output_dir: "tmp/test/worker/test_get_job/reduce".to_owned(),
                 flush_interval: Duration::from_secs(1),
             },
             dataset: Dataset::new(
@@ -223,6 +224,73 @@ mod test {
                             assert_eq!(host, worker.host);
                         }
                     }
+                }
+
+                c.serve_time.wait_exit();
+            }
+        }
+    }
+
+    #[test]
+    fn test_work() {
+        self::test::setup_logger();
+
+        struct TestCase {
+            host: String,
+            config: WorkerConfig,
+            tasks: Vec<Task>,
+            serve_time: ServeTimer,
+        }
+        let cases = [TestCase {
+            host: "127.0.0.1".to_owned(),
+            config: WorkerConfig {
+                master_host: "127.0.0.1".to_owned(),
+                master_port: 10087,
+                region_num: 4,
+                map_output_dir: "tmp/test/worker/test_work/map".to_owned(),
+                reduce_output_dir: "tmp/test/worker/test_work/map".to_owned(),
+                flush_interval: Duration::from_secs(1),
+            },
+            tasks: vec![
+                Task::new(
+                    None,
+                    vec![(
+                        "127.0.0.1".to_owned(),
+                        "assets/test/pg-being_ernest.txt".to_owned(),
+                    )],
+                ),
+                Task::new(
+                    None,
+                    vec![(
+                        "127.0.0.1".to_owned(),
+                        "assets/test/pg-metamorphosis.txt".to_owned(),
+                    )],
+                ),
+            ],
+            serve_time: ServeTimer::new(4, 1),
+        }];
+
+        for c in &cases {
+            {
+                let mut worker = Worker::new(
+                    c.host.clone(),
+                    c.config.clone(),
+                    TestMapper {},
+                    TestReducer {},
+                );
+
+                let mut server =
+                    MasterServer::new(&c.config.master_host, c.config.master_port, c.tasks.clone())
+                        .unwrap();
+                let serve_time = c.serve_time.serve;
+                thread::spawn(move || server.run(Some(serve_time)));
+                c.serve_time.wait_init();
+
+                for _ in 0..c.tasks.len() {
+                    worker.get_job().unwrap();
+                    assert!(worker.job.is_some());
+
+                    worker.work().unwrap();
                 }
 
                 c.serve_time.wait_exit();
