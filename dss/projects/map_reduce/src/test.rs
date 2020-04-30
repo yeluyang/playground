@@ -8,8 +8,8 @@ use crate::{
     Error, Task,
 };
 
-pub(crate) static MAP_OUTPUT_DIR: &str = "/path/to/map/files";
-pub(crate) static REDUCE_OUTPUT_DIR: &str = "/path/to/reduce/files";
+pub(crate) static MAP_OUTPUT_DIR: &str = "tmp/path/to/map/files";
+pub(crate) static REDUCE_OUTPUT_DIR: &str = "tmp/path/to/reduce/files";
 
 static INIT: std::sync::Once = std::sync::Once::new();
 pub(crate) fn setup_logger() {
@@ -111,7 +111,11 @@ pub(crate) struct TestMapper {}
 
 impl Map for TestMapper {
     fn mapping(&self, input: String) -> HashMap<String, String> {
-        unimplemented!()
+        let mut m = HashMap::new();
+
+        m.insert(input.len().to_string(), input.len().to_string());
+
+        m
     }
 }
 
@@ -119,6 +123,12 @@ pub(crate) struct TestReducer {}
 
 impl Reduce for TestReducer {
     fn reducing(&self, inputs: Vec<String>) -> String {
-        unimplemented!()
+        let mut count = 0usize;
+        for input in inputs {
+            let len = input.parse::<usize>().expect("expected usize");
+            count += len;
+        }
+
+        count.to_string()
     }
 }
