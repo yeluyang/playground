@@ -1,9 +1,15 @@
 use std::{
-    collections::HashMap,
+    collections::{hash_map::DefaultHasher, HashMap},
+    fs,
     fs::OpenOptions,
+    hash::Hasher,
     io::{BufWriter, Read, Write},
+    path::PathBuf,
     time::Duration,
 };
+
+extern crate uuid;
+use uuid::Uuid;
 
 use crate::{rpc::MasterClient, Job, Result};
 
@@ -19,6 +25,8 @@ pub trait Reduce {
 pub struct WorkerConfig {
     master_host: String,
     master_port: u16,
+
+    region_num: u64,
 
     flush_interval: Duration,
     map_output_dir: String,
@@ -89,7 +97,29 @@ impl<M: Map, R: Reduce> Worker<M, R> {
                     .read_to_string(&mut input)?
                     != 0
                 {
-                    self.mapper.mapping(input);
+                    let dir =
+                        PathBuf::from(&self.config.map_output_dir).join(Uuid::new_v4().to_string());
+                    if !dir.exists() {
+                        fs::create_dir_all(&dir)?;
+                    }
+
+                    for (k, v) in self.mapper.mapping(input) {
+                        trace!("handling result from user mapping: {}:{}", k, v);
+
+                        let region_id = {
+                            let mut hasher = DefaultHasher::new();
+                            hasher.write(k.as_bytes());
+                            hasher.finish() % self.config.region_num
+                        };
+
+                        let path = dir.join(format!("{}.txt", region_id));
+                        let mut output = BufWriter::new(
+                            OpenOptions::new().create(true).append(true).open(&path)?,
+                        );
+
+                        trace!("write result into file: {:?}", path);
+                        output.write_all(v.as_bytes())?;
+                    }
                 };
             }
             Job::Reduce { key, paths } => {
@@ -144,6 +174,7 @@ mod test {
             config: WorkerConfig {
                 master_host: "127.0.0.1".to_owned(),
                 master_port: 10087,
+                region_num: 4,
                 map_output_dir: MAP_OUTPUT_DIR.to_owned(),
                 reduce_output_dir: REDUCE_OUTPUT_DIR.to_owned(),
                 flush_interval: Duration::from_secs(1),
