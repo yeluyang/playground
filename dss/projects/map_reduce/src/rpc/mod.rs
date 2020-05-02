@@ -7,7 +7,8 @@ use crate::{master::Master, Job, Result, Task};
 
 mod grpc;
 use grpc::{
-    crate_job_from, create_master_grpc, grpc_job_from, FileLocation, JobGetRequest, JobGetResponse,
+    crate_job_from, create_master_grpc, grpc_job_from, FileLocation, JobDoneRequest,
+    JobDoneRequest_oneof_result, JobDoneResponse, JobGetRequest, JobGetResponse,
     JobGetResponse_oneof_job, MasterGrpc, MasterGrpcClient,
 };
 
@@ -46,6 +47,10 @@ impl MasterGrpc for MasterGrpcServer {
         };
 
         sink.success(rsp);
+    }
+
+    fn job_done(&mut self, ctx: RpcContext, req: JobDoneRequest, sink: UnarySink<JobDoneResponse>) {
+        unimplemented!()
     }
 }
 
@@ -111,6 +116,10 @@ impl MasterClient {
         } else {
             None
         })
+    }
+
+    pub fn done_job(&self) {
+        unimplemented!()
     }
 }
 

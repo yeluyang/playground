@@ -25,6 +25,25 @@ message JobGetResponse {
     }
 }
 
+message MapResult {
+    map<string, FileLocation> key_results = 1;
+}
+
+message ReduceResult {
+    string key = 1;
+    FileLocation result = 2;
+}
+
+message JobDoneRequest {
+    oneof result {
+        MapResult map_result = 1;
+        ReduceResult reduce_result = 2;
+    }
+}
+
+message JobDoneResponse {}
+
 service MasterGRPC {
     rpc JobGet(JobGetRequest) returns (JobGetResponse) {}
+    rpc JobDone(JobDoneRequest) returns (JobDoneResponse) {}
 }

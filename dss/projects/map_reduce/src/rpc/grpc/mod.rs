@@ -5,7 +5,8 @@ use protobuf::{RepeatedField, SingularPtrField};
 
 mod map_reduce;
 pub(crate) use self::map_reduce::{
-    FileLocation, JobGetRequest, JobGetResponse, JobGetResponse_oneof_job,
+    FileLocation, JobDoneRequest, JobDoneRequest_oneof_result, JobDoneResponse, JobGetRequest,
+    JobGetResponse, JobGetResponse_oneof_job,
 };
 use self::map_reduce::{MapJob, ReduceJob};
 
