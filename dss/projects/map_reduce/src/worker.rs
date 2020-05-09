@@ -26,11 +26,8 @@ pub struct WorkerConfig {
     master_host: String,
     master_port: u16,
 
-    region_num: u64,
-
     flush_interval: Duration,
     map_output_dir: String,
-    reduce_output_dir: String,
 }
 
 pub struct Worker<M: Map, R: Reduce> {
@@ -89,7 +86,11 @@ impl<M: Map, R: Reduce> Worker<M, R> {
 
         match job {
             // TODO handling when host is not local
-            Job::Map { host, path } => {
+            Job::Map {
+                reducers,
+                host,
+                path,
+            } => {
                 let mut input = String::new();
                 if OpenOptions::new()
                     .read(true)
@@ -109,7 +110,7 @@ impl<M: Map, R: Reduce> Worker<M, R> {
                         let region_id = {
                             let mut hasher = DefaultHasher::new();
                             hasher.write(k.as_bytes());
-                            hasher.finish() % self.config.region_num
+                            hasher.finish() as usize % reducers
                         };
 
                         let path = dir.join(format!("{}.txt", region_id));
@@ -118,11 +119,15 @@ impl<M: Map, R: Reduce> Worker<M, R> {
                         );
 
                         trace!("write result into file: {:?}", path);
-                        output.write_all(v.as_bytes())?;
+                        output.write_all(format!("{} {}\n", k, v).as_bytes())?;
                     }
                 };
             }
-            Job::Reduce { key, paths } => {
+            Job::Reduce {
+                output_dir,
+                internal_key,
+                paths,
+            } => {
                 let mut inputs = Vec::with_capacity(paths.len());
                 // TODO handling when host is not local
                 for (host, path) in &paths {
@@ -153,10 +158,8 @@ mod test {
     use super::*;
 
     use crate::{
-        rpc::MasterServer,
-        test::{
-            self, Dataset, ServeTimer, TestMapper, TestReducer, MAP_OUTPUT_DIR, REDUCE_OUTPUT_DIR,
-        },
+        rpc::{MasterServer, ServerConfig},
+        test::{self, Dataset, ServeTimer, TestMapper, TestReducer},
         Task,
     };
 
@@ -175,9 +178,7 @@ mod test {
             config: WorkerConfig {
                 master_host: "127.0.0.1".to_owned(),
                 master_port: 10087,
-                region_num: 4,
                 map_output_dir: "tmp/test/worker/test_get_job/map".to_owned(),
-                reduce_output_dir: "tmp/test/worker/test_get_job/reduce".to_owned(),
                 flush_interval: Duration::from_secs(1),
             },
             dataset: Dataset::new(
@@ -199,8 +200,12 @@ mod test {
                 );
 
                 let mut server = MasterServer::new(
-                    &c.config.master_host,
-                    c.config.master_port,
+                    ServerConfig {
+                        host: c.config.master_host.clone(),
+                        port: c.config.master_port,
+                        reducers: 4,
+                        output_dir: "tmp/test/worker/get_job/reduce".to_owned(),
+                    },
                     c.dataset.tasks.clone(),
                 )
                 .unwrap();
@@ -213,12 +218,20 @@ mod test {
 
                 let job = worker.job.unwrap();
                 match job {
-                    Job::Map { host, path } => {
+                    Job::Map {
+                        reducers,
+                        host,
+                        path,
+                    } => {
                         assert!(!path.is_empty());
                         assert_eq!(host, worker.host);
                     }
-                    Job::Reduce { key, paths } => {
-                        assert!(!key.is_empty());
+                    Job::Reduce {
+                        output_dir,
+                        internal_key,
+                        paths,
+                    } => {
+                        assert!(!internal_key.is_empty());
                         for (host, path) in paths {
                             assert!(!path.is_empty());
                             assert_eq!(host, worker.host);
@@ -246,9 +259,7 @@ mod test {
             config: WorkerConfig {
                 master_host: "127.0.0.1".to_owned(),
                 master_port: 10087,
-                region_num: 4,
-                map_output_dir: "tmp/test/worker/test_work/map".to_owned(),
-                reduce_output_dir: "tmp/test/worker/test_work/map".to_owned(),
+                map_output_dir: "tmp/test/worker/work/map".to_owned(),
                 flush_interval: Duration::from_secs(1),
             },
             tasks: vec![
@@ -279,9 +290,16 @@ mod test {
                     TestReducer {},
                 );
 
-                let mut server =
-                    MasterServer::new(&c.config.master_host, c.config.master_port, c.tasks.clone())
-                        .unwrap();
+                let mut server = MasterServer::new(
+                    ServerConfig {
+                        host: c.config.master_host.clone(),
+                        port: c.config.master_port,
+                        reducers: 4,
+                        output_dir: "tmp/test/worker/work/reduce".to_owned(),
+                    },
+                    c.tasks.clone(),
+                )
+                .unwrap();
                 let serve_time = c.serve_time.serve;
                 thread::spawn(move || server.run(Some(serve_time)));
                 c.serve_time.wait_init();

@@ -27,7 +27,7 @@ enum Task {
     },
     Reduce {
         allocated: AtomicBool,
-        key: String,
+        internal_key: String,
         paths_with_hosts: Vec<(String, String)>,
     },
 }
@@ -48,12 +48,12 @@ impl Display for Task {
                 ),
                 Self::Reduce {
                     allocated,
-                    key,
+                    internal_key,
                     paths_with_hosts,
                 } => format!(
                     "type=REDUCE, allocated={}, key={}, responding {} files",
                     allocated.load(Ordering::SeqCst),
-                    key,
+                    internal_key,
                     paths_with_hosts.len()
                 ),
             }
@@ -73,11 +73,11 @@ impl Clone for Task {
             },
             Self::Reduce {
                 allocated,
-                key,
+                internal_key,
                 paths_with_hosts,
             } => Self::Reduce {
                 allocated: AtomicBool::new(allocated.load(Ordering::SeqCst)),
-                key: key.clone(),
+                internal_key: internal_key.clone(),
                 paths_with_hosts: paths_with_hosts.clone(),
             },
         }
@@ -85,8 +85,8 @@ impl Clone for Task {
 }
 
 impl Task {
-    fn new(key: Option<String>, files: Vec<(String, String)>) -> Self {
-        match key {
+    fn new(internal_key: Option<String>, files: Vec<(String, String)>) -> Self {
+        match internal_key {
             None => {
                 debug!("creating MAP task with {} replicated files", files.len());
                 let mut path_on_hosts: HashMap<String, String> = HashMap::new();
@@ -100,16 +100,16 @@ impl Task {
                     path_on_hosts,
                 }
             }
-            Some(key) => {
+            Some(internal_key) => {
                 debug!(
                     "creating REDUCE task with {} files of key={}",
                     files.len(),
-                    key
+                    internal_key
                 );
 
                 Self::Reduce {
                     allocated: AtomicBool::new(false),
-                    key,
+                    internal_key,
                     paths_with_hosts: files,
                 }
             }
@@ -125,11 +125,13 @@ impl Task {
 #[derive(Debug, Clone, PartialEq)]
 enum Job {
     Map {
+        reducers: usize,
         host: String,
         path: String,
     },
     Reduce {
-        key: String,
+        output_dir: String,
+        internal_key: String,
         paths: Vec<(String, String)>,
     },
 }

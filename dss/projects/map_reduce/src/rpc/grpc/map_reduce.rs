@@ -234,6 +234,7 @@ impl ::protobuf::reflect::ProtobufValue for FileLocation {
 #[derive(PartialEq,Clone,Default)]
 pub struct MapJob {
     // message fields
+    pub reducers: i64,
     pub file: ::protobuf::SingularPtrField<FileLocation>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
@@ -251,7 +252,22 @@ impl MapJob {
         ::std::default::Default::default()
     }
 
-    // .FileLocation file = 1;
+    // int64 reducers = 1;
+
+
+    pub fn get_reducers(&self) -> i64 {
+        self.reducers
+    }
+    pub fn clear_reducers(&mut self) {
+        self.reducers = 0;
+    }
+
+    // Param is passed by value, moved
+    pub fn set_reducers(&mut self, v: i64) {
+        self.reducers = v;
+    }
+
+    // .FileLocation file = 2;
 
 
     pub fn get_file(&self) -> &FileLocation {
@@ -300,6 +316,13 @@ impl ::protobuf::Message for MapJob {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_int64()?;
+                    self.reducers = tmp;
+                },
+                2 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.file)?;
                 },
                 _ => {
@@ -314,6 +337,9 @@ impl ::protobuf::Message for MapJob {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
+        if self.reducers != 0 {
+            my_size += ::protobuf::rt::value_size(1, self.reducers, ::protobuf::wire_format::WireTypeVarint);
+        }
         if let Some(ref v) = self.file.as_ref() {
             let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
@@ -324,8 +350,11 @@ impl ::protobuf::Message for MapJob {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if self.reducers != 0 {
+            os.write_int64(1, self.reducers)?;
+        }
         if let Some(ref v) = self.file.as_ref() {
-            os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
         }
@@ -368,6 +397,11 @@ impl ::protobuf::Message for MapJob {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeInt64>(
+                    "reducers",
+                    |m: &MapJob| { &m.reducers },
+                    |m: &mut MapJob| { &mut m.reducers },
+                ));
                 fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(
                     "file",
                     |m: &MapJob| { &m.file },
@@ -392,6 +426,7 @@ impl ::protobuf::Message for MapJob {
 
 impl ::protobuf::Clear for MapJob {
     fn clear(&mut self) {
+        self.reducers = 0;
         self.file.clear();
         self.unknown_fields.clear();
     }
@@ -412,7 +447,8 @@ impl ::protobuf::reflect::ProtobufValue for MapJob {
 #[derive(PartialEq,Clone,Default)]
 pub struct ReduceJob {
     // message fields
-    pub key: ::std::string::String,
+    pub output_dir: ::std::string::String,
+    pub internal_key: ::std::string::String,
     pub files: ::protobuf::RepeatedField<FileLocation>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
@@ -430,33 +466,59 @@ impl ReduceJob {
         ::std::default::Default::default()
     }
 
-    // string key = 1;
+    // string output_dir = 1;
 
 
-    pub fn get_key(&self) -> &str {
-        &self.key
+    pub fn get_output_dir(&self) -> &str {
+        &self.output_dir
     }
-    pub fn clear_key(&mut self) {
-        self.key.clear();
+    pub fn clear_output_dir(&mut self) {
+        self.output_dir.clear();
     }
 
     // Param is passed by value, moved
-    pub fn set_key(&mut self, v: ::std::string::String) {
-        self.key = v;
+    pub fn set_output_dir(&mut self, v: ::std::string::String) {
+        self.output_dir = v;
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_key(&mut self) -> &mut ::std::string::String {
-        &mut self.key
+    pub fn mut_output_dir(&mut self) -> &mut ::std::string::String {
+        &mut self.output_dir
     }
 
     // Take field
-    pub fn take_key(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.key, ::std::string::String::new())
+    pub fn take_output_dir(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.output_dir, ::std::string::String::new())
     }
 
-    // repeated .FileLocation files = 2;
+    // string internal_key = 2;
+
+
+    pub fn get_internal_key(&self) -> &str {
+        &self.internal_key
+    }
+    pub fn clear_internal_key(&mut self) {
+        self.internal_key.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_internal_key(&mut self, v: ::std::string::String) {
+        self.internal_key = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_internal_key(&mut self) -> &mut ::std::string::String {
+        &mut self.internal_key
+    }
+
+    // Take field
+    pub fn take_internal_key(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.internal_key, ::std::string::String::new())
+    }
+
+    // repeated .FileLocation files = 3;
 
 
     pub fn get_files(&self) -> &[FileLocation] {
@@ -497,9 +559,12 @@ impl ::protobuf::Message for ReduceJob {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.key)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.output_dir)?;
                 },
                 2 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.internal_key)?;
+                },
+                3 => {
                     ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.files)?;
                 },
                 _ => {
@@ -514,8 +579,11 @@ impl ::protobuf::Message for ReduceJob {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if !self.key.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.key);
+        if !self.output_dir.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.output_dir);
+        }
+        if !self.internal_key.is_empty() {
+            my_size += ::protobuf::rt::string_size(2, &self.internal_key);
         }
         for value in &self.files {
             let len = value.compute_size();
@@ -527,11 +595,14 @@ impl ::protobuf::Message for ReduceJob {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if !self.key.is_empty() {
-            os.write_string(1, &self.key)?;
+        if !self.output_dir.is_empty() {
+            os.write_string(1, &self.output_dir)?;
+        }
+        if !self.internal_key.is_empty() {
+            os.write_string(2, &self.internal_key)?;
         }
         for v in &self.files {
-            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
         };
@@ -575,9 +646,14 @@ impl ::protobuf::Message for ReduceJob {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "key",
-                    |m: &ReduceJob| { &m.key },
-                    |m: &mut ReduceJob| { &mut m.key },
+                    "output_dir",
+                    |m: &ReduceJob| { &m.output_dir },
+                    |m: &mut ReduceJob| { &mut m.output_dir },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "internal_key",
+                    |m: &ReduceJob| { &m.internal_key },
+                    |m: &mut ReduceJob| { &mut m.internal_key },
                 ));
                 fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(
                     "files",
@@ -603,7 +679,8 @@ impl ::protobuf::Message for ReduceJob {
 
 impl ::protobuf::Clear for ReduceJob {
     fn clear(&mut self) {
-        self.key.clear();
+        self.output_dir.clear();
+        self.internal_key.clear();
         self.files.clear();
         self.unknown_fields.clear();
     }
@@ -1073,7 +1150,7 @@ impl ::protobuf::reflect::ProtobufValue for JobGetResponse {
 #[derive(PartialEq,Clone,Default)]
 pub struct MapResult {
     // message fields
-    pub key_results: ::std::collections::HashMap<::std::string::String, FileLocation>,
+    pub internal_key_results: ::std::collections::HashMap<::std::string::String, FileLocation>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -1090,29 +1167,29 @@ impl MapResult {
         ::std::default::Default::default()
     }
 
-    // repeated .MapResult.KeyResultsEntry key_results = 1;
+    // repeated .MapResult.InternalKeyResultsEntry internal_key_results = 1;
 
 
-    pub fn get_key_results(&self) -> &::std::collections::HashMap<::std::string::String, FileLocation> {
-        &self.key_results
+    pub fn get_internal_key_results(&self) -> &::std::collections::HashMap<::std::string::String, FileLocation> {
+        &self.internal_key_results
     }
-    pub fn clear_key_results(&mut self) {
-        self.key_results.clear();
+    pub fn clear_internal_key_results(&mut self) {
+        self.internal_key_results.clear();
     }
 
     // Param is passed by value, moved
-    pub fn set_key_results(&mut self, v: ::std::collections::HashMap<::std::string::String, FileLocation>) {
-        self.key_results = v;
+    pub fn set_internal_key_results(&mut self, v: ::std::collections::HashMap<::std::string::String, FileLocation>) {
+        self.internal_key_results = v;
     }
 
     // Mutable pointer to the field.
-    pub fn mut_key_results(&mut self) -> &mut ::std::collections::HashMap<::std::string::String, FileLocation> {
-        &mut self.key_results
+    pub fn mut_internal_key_results(&mut self) -> &mut ::std::collections::HashMap<::std::string::String, FileLocation> {
+        &mut self.internal_key_results
     }
 
     // Take field
-    pub fn take_key_results(&mut self) -> ::std::collections::HashMap<::std::string::String, FileLocation> {
-        ::std::mem::replace(&mut self.key_results, ::std::collections::HashMap::new())
+    pub fn take_internal_key_results(&mut self) -> ::std::collections::HashMap<::std::string::String, FileLocation> {
+        ::std::mem::replace(&mut self.internal_key_results, ::std::collections::HashMap::new())
     }
 }
 
@@ -1126,7 +1203,7 @@ impl ::protobuf::Message for MapResult {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_map_into::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(wire_type, is, &mut self.key_results)?;
+                    ::protobuf::rt::read_map_into::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(wire_type, is, &mut self.internal_key_results)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -1140,14 +1217,14 @@ impl ::protobuf::Message for MapResult {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        my_size += ::protobuf::rt::compute_map_size::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(1, &self.key_results);
+        my_size += ::protobuf::rt::compute_map_size::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(1, &self.internal_key_results);
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        ::protobuf::rt::write_map_with_cached_sizes::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(1, &self.key_results, os)?;
+        ::protobuf::rt::write_map_with_cached_sizes::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(1, &self.internal_key_results, os)?;
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -1188,9 +1265,9 @@ impl ::protobuf::Message for MapResult {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_map_accessor::<_, ::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(
-                    "key_results",
-                    |m: &MapResult| { &m.key_results },
-                    |m: &mut MapResult| { &mut m.key_results },
+                    "internal_key_results",
+                    |m: &MapResult| { &m.internal_key_results },
+                    |m: &mut MapResult| { &mut m.internal_key_results },
                 ));
                 ::protobuf::reflect::MessageDescriptor::new_pb_name::<MapResult>(
                     "MapResult",
@@ -1211,7 +1288,7 @@ impl ::protobuf::Message for MapResult {
 
 impl ::protobuf::Clear for MapResult {
     fn clear(&mut self) {
-        self.key_results.clear();
+        self.internal_key_results.clear();
         self.unknown_fields.clear();
     }
 }
@@ -1231,7 +1308,7 @@ impl ::protobuf::reflect::ProtobufValue for MapResult {
 #[derive(PartialEq,Clone,Default)]
 pub struct ReduceResult {
     // message fields
-    pub key: ::std::string::String,
+    pub internal_key: ::std::string::String,
     pub result: ::protobuf::SingularPtrField<FileLocation>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
@@ -1249,30 +1326,30 @@ impl ReduceResult {
         ::std::default::Default::default()
     }
 
-    // string key = 1;
+    // string internal_key = 1;
 
 
-    pub fn get_key(&self) -> &str {
-        &self.key
+    pub fn get_internal_key(&self) -> &str {
+        &self.internal_key
     }
-    pub fn clear_key(&mut self) {
-        self.key.clear();
+    pub fn clear_internal_key(&mut self) {
+        self.internal_key.clear();
     }
 
     // Param is passed by value, moved
-    pub fn set_key(&mut self, v: ::std::string::String) {
-        self.key = v;
+    pub fn set_internal_key(&mut self, v: ::std::string::String) {
+        self.internal_key = v;
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_key(&mut self) -> &mut ::std::string::String {
-        &mut self.key
+    pub fn mut_internal_key(&mut self) -> &mut ::std::string::String {
+        &mut self.internal_key
     }
 
     // Take field
-    pub fn take_key(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.key, ::std::string::String::new())
+    pub fn take_internal_key(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.internal_key, ::std::string::String::new())
     }
 
     // .FileLocation result = 2;
@@ -1324,7 +1401,7 @@ impl ::protobuf::Message for ReduceResult {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.key)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.internal_key)?;
                 },
                 2 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.result)?;
@@ -1341,8 +1418,8 @@ impl ::protobuf::Message for ReduceResult {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if !self.key.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.key);
+        if !self.internal_key.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.internal_key);
         }
         if let Some(ref v) = self.result.as_ref() {
             let len = v.compute_size();
@@ -1354,8 +1431,8 @@ impl ::protobuf::Message for ReduceResult {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if !self.key.is_empty() {
-            os.write_string(1, &self.key)?;
+        if !self.internal_key.is_empty() {
+            os.write_string(1, &self.internal_key)?;
         }
         if let Some(ref v) = self.result.as_ref() {
             os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
@@ -1402,9 +1479,9 @@ impl ::protobuf::Message for ReduceResult {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "key",
-                    |m: &ReduceResult| { &m.key },
-                    |m: &mut ReduceResult| { &mut m.key },
+                    "internal_key",
+                    |m: &ReduceResult| { &m.internal_key },
+                    |m: &mut ReduceResult| { &mut m.internal_key },
                 ));
                 fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FileLocation>>(
                     "result",
@@ -1430,7 +1507,7 @@ impl ::protobuf::Message for ReduceResult {
 
 impl ::protobuf::Clear for ReduceResult {
     fn clear(&mut self) {
-        self.key.clear();
+        self.internal_key.clear();
         self.result.clear();
         self.unknown_fields.clear();
     }
@@ -1857,78 +1934,93 @@ impl ::protobuf::reflect::ProtobufValue for JobDoneResponse {
 static file_descriptor_proto_data: &'static [u8] = b"\
     \n\x1aassets/pb/map_reduce.proto\"6\n\x0cFileLocation\x12\x12\n\x04host\
     \x18\x01\x20\x01(\tR\x04host\x12\x12\n\x04path\x18\x02\x20\x01(\tR\x04pa\
-    th\"+\n\x06MapJob\x12!\n\x04file\x18\x01\x20\x01(\x0b2\r.FileLocationR\
-    \x04file\"B\n\tReduceJob\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12\
-    #\n\x05files\x18\x02\x20\x03(\x0b2\r.FileLocationR\x05files\"#\n\rJobGet\
-    Request\x12\x12\n\x04host\x18\x01\x20\x01(\tR\x04host\"h\n\x0eJobGetResp\
-    onse\x12\"\n\x07map_job\x18\x01\x20\x01(\x0b2\x07.MapJobH\0R\x06mapJob\
-    \x12+\n\nreduce_job\x18\x02\x20\x01(\x0b2\n.ReduceJobH\0R\treduceJobB\
-    \x05\n\x03job\"\x96\x01\n\tMapResult\x12;\n\x0bkey_results\x18\x01\x20\
-    \x03(\x0b2\x1a.MapResult.KeyResultsEntryR\nkeyResults\x1aL\n\x0fKeyResul\
-    tsEntry\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12#\n\x05value\x18\
-    \x02\x20\x01(\x0b2\r.FileLocationR\x05value:\x028\x01\"G\n\x0cReduceResu\
-    lt\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12%\n\x06result\x18\x02\
-    \x20\x01(\x0b2\r.FileLocationR\x06result\"}\n\x0eJobDoneRequest\x12+\n\n\
-    map_result\x18\x01\x20\x01(\x0b2\n.MapResultH\0R\tmapResult\x124\n\rredu\
-    ce_result\x18\x02\x20\x01(\x0b2\r.ReduceResultH\0R\x0creduceResultB\x08\
-    \n\x06result\"\x11\n\x0fJobDoneResponse2i\n\nMasterGRPC\x12+\n\x06JobGet\
-    \x12\x0e.JobGetRequest\x1a\x0f.JobGetResponse\"\0\x12.\n\x07JobDone\x12\
-    \x0f.JobDoneRequest\x1a\x10.JobDoneResponse\"\0J\x80\t\n\x06\x12\x04\0\0\
-    0\x01\n\x08\n\x01\x0c\x12\x03\0\0\x12\n\n\n\x02\x04\0\x12\x04\x02\0\x05\
-    \x01\n\n\n\x03\x04\0\x01\x12\x03\x02\x08\x14\n\x0b\n\x04\x04\0\x02\0\x12\
-    \x03\x03\x04\x14\n\x0c\n\x05\x04\0\x02\0\x05\x12\x03\x03\x04\n\n\x0c\n\
-    \x05\x04\0\x02\0\x01\x12\x03\x03\x0b\x0f\n\x0c\n\x05\x04\0\x02\0\x03\x12\
-    \x03\x03\x12\x13\n\x0b\n\x04\x04\0\x02\x01\x12\x03\x04\x04\x14\n\x0c\n\
-    \x05\x04\0\x02\x01\x05\x12\x03\x04\x04\n\n\x0c\n\x05\x04\0\x02\x01\x01\
-    \x12\x03\x04\x0b\x0f\n\x0c\n\x05\x04\0\x02\x01\x03\x12\x03\x04\x12\x13\n\
-    \n\n\x02\x04\x01\x12\x04\x07\0\t\x01\n\n\n\x03\x04\x01\x01\x12\x03\x07\
-    \x08\x0e\n\x0b\n\x04\x04\x01\x02\0\x12\x03\x08\x04\x1a\n\x0c\n\x05\x04\
-    \x01\x02\0\x06\x12\x03\x08\x04\x10\n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03\
-    \x08\x11\x15\n\x0c\n\x05\x04\x01\x02\0\x03\x12\x03\x08\x18\x19\n\n\n\x02\
-    \x04\x02\x12\x04\x0b\0\x0e\x01\n\n\n\x03\x04\x02\x01\x12\x03\x0b\x08\x11\
-    \n\x0b\n\x04\x04\x02\x02\0\x12\x03\x0c\x04\x13\n\x0c\n\x05\x04\x02\x02\0\
-    \x05\x12\x03\x0c\x04\n\n\x0c\n\x05\x04\x02\x02\0\x01\x12\x03\x0c\x0b\x0e\
-    \n\x0c\n\x05\x04\x02\x02\0\x03\x12\x03\x0c\x11\x12\n\x0b\n\x04\x04\x02\
-    \x02\x01\x12\x03\r\x04$\n\x0c\n\x05\x04\x02\x02\x01\x04\x12\x03\r\x04\
-    \x0c\n\x0c\n\x05\x04\x02\x02\x01\x06\x12\x03\r\r\x19\n\x0c\n\x05\x04\x02\
-    \x02\x01\x01\x12\x03\r\x1a\x1f\n\x0c\n\x05\x04\x02\x02\x01\x03\x12\x03\r\
-    \"#\n\n\n\x02\x04\x03\x12\x04\x10\0\x12\x01\n\n\n\x03\x04\x03\x01\x12\
-    \x03\x10\x08\x15\n\x0b\n\x04\x04\x03\x02\0\x12\x03\x11\x04\x14\n\x0c\n\
-    \x05\x04\x03\x02\0\x05\x12\x03\x11\x04\n\n\x0c\n\x05\x04\x03\x02\0\x01\
-    \x12\x03\x11\x0b\x0f\n\x0c\n\x05\x04\x03\x02\0\x03\x12\x03\x11\x12\x13\n\
-    \n\n\x02\x04\x04\x12\x04\x14\0\x19\x01\n\n\n\x03\x04\x04\x01\x12\x03\x14\
-    \x08\x16\n\x0c\n\x04\x04\x04\x08\0\x12\x04\x15\x04\x18\x05\n\x0c\n\x05\
-    \x04\x04\x08\0\x01\x12\x03\x15\n\r\n\x0b\n\x04\x04\x04\x02\0\x12\x03\x16\
-    \x08\x1b\n\x0c\n\x05\x04\x04\x02\0\x06\x12\x03\x16\x08\x0e\n\x0c\n\x05\
-    \x04\x04\x02\0\x01\x12\x03\x16\x0f\x16\n\x0c\n\x05\x04\x04\x02\0\x03\x12\
-    \x03\x16\x19\x1a\n\x0b\n\x04\x04\x04\x02\x01\x12\x03\x17\x08!\n\x0c\n\
-    \x05\x04\x04\x02\x01\x06\x12\x03\x17\x08\x11\n\x0c\n\x05\x04\x04\x02\x01\
-    \x01\x12\x03\x17\x12\x1c\n\x0c\n\x05\x04\x04\x02\x01\x03\x12\x03\x17\x1f\
-    \x20\n\n\n\x02\x04\x05\x12\x04\x1b\0\x1d\x01\n\n\n\x03\x04\x05\x01\x12\
-    \x03\x1b\x08\x11\n\x0b\n\x04\x04\x05\x02\0\x12\x03\x1c\x04.\n\x0c\n\x05\
-    \x04\x05\x02\0\x06\x12\x03\x1c\x04\x1d\n\x0c\n\x05\x04\x05\x02\0\x01\x12\
-    \x03\x1c\x1e)\n\x0c\n\x05\x04\x05\x02\0\x03\x12\x03\x1c,-\n\n\n\x02\x04\
-    \x06\x12\x04\x1f\0\"\x01\n\n\n\x03\x04\x06\x01\x12\x03\x1f\x08\x14\n\x0b\
-    \n\x04\x04\x06\x02\0\x12\x03\x20\x04\x13\n\x0c\n\x05\x04\x06\x02\0\x05\
-    \x12\x03\x20\x04\n\n\x0c\n\x05\x04\x06\x02\0\x01\x12\x03\x20\x0b\x0e\n\
-    \x0c\n\x05\x04\x06\x02\0\x03\x12\x03\x20\x11\x12\n\x0b\n\x04\x04\x06\x02\
-    \x01\x12\x03!\x04\x1c\n\x0c\n\x05\x04\x06\x02\x01\x06\x12\x03!\x04\x10\n\
-    \x0c\n\x05\x04\x06\x02\x01\x01\x12\x03!\x11\x17\n\x0c\n\x05\x04\x06\x02\
-    \x01\x03\x12\x03!\x1a\x1b\n\n\n\x02\x04\x07\x12\x04$\0)\x01\n\n\n\x03\
-    \x04\x07\x01\x12\x03$\x08\x16\n\x0c\n\x04\x04\x07\x08\0\x12\x04%\x04(\
-    \x05\n\x0c\n\x05\x04\x07\x08\0\x01\x12\x03%\n\x10\n\x0b\n\x04\x04\x07\
-    \x02\0\x12\x03&\x08!\n\x0c\n\x05\x04\x07\x02\0\x06\x12\x03&\x08\x11\n\
-    \x0c\n\x05\x04\x07\x02\0\x01\x12\x03&\x12\x1c\n\x0c\n\x05\x04\x07\x02\0\
-    \x03\x12\x03&\x1f\x20\n\x0b\n\x04\x04\x07\x02\x01\x12\x03'\x08'\n\x0c\n\
-    \x05\x04\x07\x02\x01\x06\x12\x03'\x08\x14\n\x0c\n\x05\x04\x07\x02\x01\
-    \x01\x12\x03'\x15\"\n\x0c\n\x05\x04\x07\x02\x01\x03\x12\x03'%&\n\t\n\x02\
-    \x04\x08\x12\x03+\0\x1a\n\n\n\x03\x04\x08\x01\x12\x03+\x08\x17\n\n\n\x02\
-    \x06\0\x12\x04-\00\x01\n\n\n\x03\x06\0\x01\x12\x03-\x08\x12\n\x0b\n\x04\
-    \x06\0\x02\0\x12\x03.\x049\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03.\x08\x0e\
-    \n\x0c\n\x05\x06\0\x02\0\x02\x12\x03.\x0f\x1c\n\x0c\n\x05\x06\0\x02\0\
-    \x03\x12\x03.'5\n\x0b\n\x04\x06\0\x02\x01\x12\x03/\x04<\n\x0c\n\x05\x06\
-    \0\x02\x01\x01\x12\x03/\x08\x0f\n\x0c\n\x05\x06\0\x02\x01\x02\x12\x03/\
-    \x10\x1e\n\x0c\n\x05\x06\0\x02\x01\x03\x12\x03/)8b\x06proto3\
+    th\"G\n\x06MapJob\x12\x1a\n\x08reducers\x18\x01\x20\x01(\x03R\x08reducer\
+    s\x12!\n\x04file\x18\x02\x20\x01(\x0b2\r.FileLocationR\x04file\"r\n\tRed\
+    uceJob\x12\x1d\n\noutput_dir\x18\x01\x20\x01(\tR\toutputDir\x12!\n\x0cin\
+    ternal_key\x18\x02\x20\x01(\tR\x0binternalKey\x12#\n\x05files\x18\x03\
+    \x20\x03(\x0b2\r.FileLocationR\x05files\"#\n\rJobGetRequest\x12\x12\n\
+    \x04host\x18\x01\x20\x01(\tR\x04host\"h\n\x0eJobGetResponse\x12\"\n\x07m\
+    ap_job\x18\x01\x20\x01(\x0b2\x07.MapJobH\0R\x06mapJob\x12+\n\nreduce_job\
+    \x18\x02\x20\x01(\x0b2\n.ReduceJobH\0R\treduceJobB\x05\n\x03job\"\xb7\
+    \x01\n\tMapResult\x12T\n\x14internal_key_results\x18\x01\x20\x03(\x0b2\"\
+    .MapResult.InternalKeyResultsEntryR\x12internalKeyResults\x1aT\n\x17Inte\
+    rnalKeyResultsEntry\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12#\n\
+    \x05value\x18\x02\x20\x01(\x0b2\r.FileLocationR\x05value:\x028\x01\"X\n\
+    \x0cReduceResult\x12!\n\x0cinternal_key\x18\x01\x20\x01(\tR\x0binternalK\
+    ey\x12%\n\x06result\x18\x02\x20\x01(\x0b2\r.FileLocationR\x06result\"}\n\
+    \x0eJobDoneRequest\x12+\n\nmap_result\x18\x01\x20\x01(\x0b2\n.MapResultH\
+    \0R\tmapResult\x124\n\rreduce_result\x18\x02\x20\x01(\x0b2\r.ReduceResul\
+    tH\0R\x0creduceResultB\x08\n\x06result\"\x11\n\x0fJobDoneResponse2i\n\nM\
+    asterGRPC\x12+\n\x06JobGet\x12\x0e.JobGetRequest\x1a\x0f.JobGetResponse\
+    \"\0\x12.\n\x07JobDone\x12\x0f.JobDoneRequest\x1a\x10.JobDoneResponse\"\
+    \0J\x84\x0b\n\x06\x12\x04\0\02\x01\n\x08\n\x01\x0c\x12\x03\0\0\x12\n\n\n\
+    \x02\x04\0\x12\x04\x02\0\x05\x01\n\n\n\x03\x04\0\x01\x12\x03\x02\x08\x14\
+    \n\x0b\n\x04\x04\0\x02\0\x12\x03\x03\x04\x14\n\r\n\x05\x04\0\x02\0\x04\
+    \x12\x04\x03\x04\x02\x16\n\x0c\n\x05\x04\0\x02\0\x05\x12\x03\x03\x04\n\n\
+    \x0c\n\x05\x04\0\x02\0\x01\x12\x03\x03\x0b\x0f\n\x0c\n\x05\x04\0\x02\0\
+    \x03\x12\x03\x03\x12\x13\n\x0b\n\x04\x04\0\x02\x01\x12\x03\x04\x04\x14\n\
+    \r\n\x05\x04\0\x02\x01\x04\x12\x04\x04\x04\x03\x14\n\x0c\n\x05\x04\0\x02\
+    \x01\x05\x12\x03\x04\x04\n\n\x0c\n\x05\x04\0\x02\x01\x01\x12\x03\x04\x0b\
+    \x0f\n\x0c\n\x05\x04\0\x02\x01\x03\x12\x03\x04\x12\x13\n\n\n\x02\x04\x01\
+    \x12\x04\x07\0\n\x01\n\n\n\x03\x04\x01\x01\x12\x03\x07\x08\x0e\n\x0b\n\
+    \x04\x04\x01\x02\0\x12\x03\x08\x04\x17\n\r\n\x05\x04\x01\x02\0\x04\x12\
+    \x04\x08\x04\x07\x10\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03\x08\x04\t\n\
+    \x0c\n\x05\x04\x01\x02\0\x01\x12\x03\x08\n\x12\n\x0c\n\x05\x04\x01\x02\0\
+    \x03\x12\x03\x08\x15\x16\n\x0b\n\x04\x04\x01\x02\x01\x12\x03\t\x04\x1a\n\
+    \r\n\x05\x04\x01\x02\x01\x04\x12\x04\t\x04\x08\x17\n\x0c\n\x05\x04\x01\
+    \x02\x01\x06\x12\x03\t\x04\x10\n\x0c\n\x05\x04\x01\x02\x01\x01\x12\x03\t\
+    \x11\x15\n\x0c\n\x05\x04\x01\x02\x01\x03\x12\x03\t\x18\x19\n\n\n\x02\x04\
+    \x02\x12\x04\x0c\0\x10\x01\n\n\n\x03\x04\x02\x01\x12\x03\x0c\x08\x11\n\
+    \x0b\n\x04\x04\x02\x02\0\x12\x03\r\x04\x1a\n\r\n\x05\x04\x02\x02\0\x04\
+    \x12\x04\r\x04\x0c\x13\n\x0c\n\x05\x04\x02\x02\0\x05\x12\x03\r\x04\n\n\
+    \x0c\n\x05\x04\x02\x02\0\x01\x12\x03\r\x0b\x15\n\x0c\n\x05\x04\x02\x02\0\
+    \x03\x12\x03\r\x18\x19\n\x0b\n\x04\x04\x02\x02\x01\x12\x03\x0e\x04\x1c\n\
+    \r\n\x05\x04\x02\x02\x01\x04\x12\x04\x0e\x04\r\x1a\n\x0c\n\x05\x04\x02\
+    \x02\x01\x05\x12\x03\x0e\x04\n\n\x0c\n\x05\x04\x02\x02\x01\x01\x12\x03\
+    \x0e\x0b\x17\n\x0c\n\x05\x04\x02\x02\x01\x03\x12\x03\x0e\x1a\x1b\n\x0b\n\
+    \x04\x04\x02\x02\x02\x12\x03\x0f\x04$\n\x0c\n\x05\x04\x02\x02\x02\x04\
+    \x12\x03\x0f\x04\x0c\n\x0c\n\x05\x04\x02\x02\x02\x06\x12\x03\x0f\r\x19\n\
+    \x0c\n\x05\x04\x02\x02\x02\x01\x12\x03\x0f\x1a\x1f\n\x0c\n\x05\x04\x02\
+    \x02\x02\x03\x12\x03\x0f\"#\n\n\n\x02\x04\x03\x12\x04\x12\0\x14\x01\n\n\
+    \n\x03\x04\x03\x01\x12\x03\x12\x08\x15\n\x0b\n\x04\x04\x03\x02\0\x12\x03\
+    \x13\x04\x14\n\r\n\x05\x04\x03\x02\0\x04\x12\x04\x13\x04\x12\x17\n\x0c\n\
+    \x05\x04\x03\x02\0\x05\x12\x03\x13\x04\n\n\x0c\n\x05\x04\x03\x02\0\x01\
+    \x12\x03\x13\x0b\x0f\n\x0c\n\x05\x04\x03\x02\0\x03\x12\x03\x13\x12\x13\n\
+    \n\n\x02\x04\x04\x12\x04\x16\0\x1b\x01\n\n\n\x03\x04\x04\x01\x12\x03\x16\
+    \x08\x16\n\x0c\n\x04\x04\x04\x08\0\x12\x04\x17\x04\x1a\x05\n\x0c\n\x05\
+    \x04\x04\x08\0\x01\x12\x03\x17\n\r\n\x0b\n\x04\x04\x04\x02\0\x12\x03\x18\
+    \x08\x1b\n\x0c\n\x05\x04\x04\x02\0\x06\x12\x03\x18\x08\x0e\n\x0c\n\x05\
+    \x04\x04\x02\0\x01\x12\x03\x18\x0f\x16\n\x0c\n\x05\x04\x04\x02\0\x03\x12\
+    \x03\x18\x19\x1a\n\x0b\n\x04\x04\x04\x02\x01\x12\x03\x19\x08!\n\x0c\n\
+    \x05\x04\x04\x02\x01\x06\x12\x03\x19\x08\x11\n\x0c\n\x05\x04\x04\x02\x01\
+    \x01\x12\x03\x19\x12\x1c\n\x0c\n\x05\x04\x04\x02\x01\x03\x12\x03\x19\x1f\
+    \x20\n\n\n\x02\x04\x05\x12\x04\x1d\0\x1f\x01\n\n\n\x03\x04\x05\x01\x12\
+    \x03\x1d\x08\x11\n\x0b\n\x04\x04\x05\x02\0\x12\x03\x1e\x047\n\r\n\x05\
+    \x04\x05\x02\0\x04\x12\x04\x1e\x04\x1d\x13\n\x0c\n\x05\x04\x05\x02\0\x06\
+    \x12\x03\x1e\x04\x1d\n\x0c\n\x05\x04\x05\x02\0\x01\x12\x03\x1e\x1e2\n\
+    \x0c\n\x05\x04\x05\x02\0\x03\x12\x03\x1e56\n\n\n\x02\x04\x06\x12\x04!\0$\
+    \x01\n\n\n\x03\x04\x06\x01\x12\x03!\x08\x14\n\x0b\n\x04\x04\x06\x02\0\
+    \x12\x03\"\x04\x1c\n\r\n\x05\x04\x06\x02\0\x04\x12\x04\"\x04!\x16\n\x0c\
+    \n\x05\x04\x06\x02\0\x05\x12\x03\"\x04\n\n\x0c\n\x05\x04\x06\x02\0\x01\
+    \x12\x03\"\x0b\x17\n\x0c\n\x05\x04\x06\x02\0\x03\x12\x03\"\x1a\x1b\n\x0b\
+    \n\x04\x04\x06\x02\x01\x12\x03#\x04\x1c\n\r\n\x05\x04\x06\x02\x01\x04\
+    \x12\x04#\x04\"\x1c\n\x0c\n\x05\x04\x06\x02\x01\x06\x12\x03#\x04\x10\n\
+    \x0c\n\x05\x04\x06\x02\x01\x01\x12\x03#\x11\x17\n\x0c\n\x05\x04\x06\x02\
+    \x01\x03\x12\x03#\x1a\x1b\n\n\n\x02\x04\x07\x12\x04&\0+\x01\n\n\n\x03\
+    \x04\x07\x01\x12\x03&\x08\x16\n\x0c\n\x04\x04\x07\x08\0\x12\x04'\x04*\
+    \x05\n\x0c\n\x05\x04\x07\x08\0\x01\x12\x03'\n\x10\n\x0b\n\x04\x04\x07\
+    \x02\0\x12\x03(\x08!\n\x0c\n\x05\x04\x07\x02\0\x06\x12\x03(\x08\x11\n\
+    \x0c\n\x05\x04\x07\x02\0\x01\x12\x03(\x12\x1c\n\x0c\n\x05\x04\x07\x02\0\
+    \x03\x12\x03(\x1f\x20\n\x0b\n\x04\x04\x07\x02\x01\x12\x03)\x08'\n\x0c\n\
+    \x05\x04\x07\x02\x01\x06\x12\x03)\x08\x14\n\x0c\n\x05\x04\x07\x02\x01\
+    \x01\x12\x03)\x15\"\n\x0c\n\x05\x04\x07\x02\x01\x03\x12\x03)%&\n\t\n\x02\
+    \x04\x08\x12\x03-\0\x1a\n\n\n\x03\x04\x08\x01\x12\x03-\x08\x17\n\n\n\x02\
+    \x06\0\x12\x04/\02\x01\n\n\n\x03\x06\0\x01\x12\x03/\x08\x12\n\x0b\n\x04\
+    \x06\0\x02\0\x12\x030\x049\n\x0c\n\x05\x06\0\x02\0\x01\x12\x030\x08\x0e\
+    \n\x0c\n\x05\x06\0\x02\0\x02\x12\x030\x0f\x1c\n\x0c\n\x05\x06\0\x02\0\
+    \x03\x12\x030'5\n\x0b\n\x04\x06\0\x02\x01\x12\x031\x04<\n\x0c\n\x05\x06\
+    \0\x02\x01\x01\x12\x031\x08\x0f\n\x0c\n\x05\x06\0\x02\x01\x02\x12\x031\
+    \x10\x1e\n\x0c\n\x05\x06\0\x02\x01\x03\x12\x031)8b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy::INIT;

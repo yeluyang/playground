@@ -6,7 +6,14 @@ use std::{
 use crate::{Job, Task};
 
 #[derive(Debug, Clone)]
+pub(crate) struct MasterConfig {
+    pub reducers: usize,
+    pub output_dir: String,
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct Master {
+    config: MasterConfig,
     map_tasks: HashMap<String, Vec<Arc<Task>>>,
     // TODO: should hold only one task for every key
     reduce_tasks: HashMap<String, Vec<Arc<Task>>>,
@@ -14,10 +21,11 @@ pub(crate) struct Master {
 }
 
 impl Master {
-    pub(crate) fn new(tasks: Vec<Task>) -> Self {
+    pub(crate) fn new(config: MasterConfig, tasks: Vec<Task>) -> Self {
         debug!("creating master storage with {} tasks", tasks.len());
 
         let mut m = Self {
+            config,
             map_tasks: HashMap::new(),
             reduce_tasks: HashMap::new(),
             allocated: Vec::new(),
@@ -40,10 +48,11 @@ impl Master {
                         };
                     }
                 }
-                Task::Reduce { key, .. } => {
-                    match m.reduce_tasks.get_mut(key) {
+                Task::Reduce { internal_key, .. } => {
+                    match m.reduce_tasks.get_mut(internal_key) {
                         None => {
-                            m.reduce_tasks.insert(key.clone(), vec![task.clone()]);
+                            m.reduce_tasks
+                                .insert(internal_key.clone(), vec![task.clone()]);
                         }
                         Some(tasks) => {
                             // TODO use Task::concat to merge two task in one
@@ -76,6 +85,7 @@ impl Master {
                     {
                         let job = if !allocated.compare_and_swap(false, true, Ordering::SeqCst) {
                             let job = Some(Job::Map {
+                                reducers: self.config.reducers,
                                 host: host.to_owned(),
                                 path: path_on_hosts[host].clone(),
                             });
@@ -104,23 +114,24 @@ impl Master {
             };
         }
 
-        for (key, tasks) in &mut self.reduce_tasks {
+        for (internal_key, tasks) in &mut self.reduce_tasks {
             trace!(
-                "finding REDUCE task in {} tasks which has key={}",
+                "finding REDUCE task in {} tasks which has internal_key={}",
                 tasks.len(),
-                key,
+                internal_key,
             );
             while let Some(task) = tasks.pop() {
                 trace!("found task={{ {} }}", task);
                 if let Task::Reduce {
                     allocated,
-                    key,
+                    internal_key,
                     paths_with_hosts,
                 } = task.as_ref()
                 {
                     if !allocated.compare_and_swap(false, true, Ordering::SeqCst) {
                         let job = Some(Job::Reduce {
-                            key: key.clone(),
+                            output_dir: self.config.output_dir.clone(),
+                            internal_key: internal_key.clone(),
                             paths: paths_with_hosts.clone(),
                         });
                         trace!("allocating job={{ {:?} }}", job);
@@ -153,31 +164,48 @@ mod test {
         test::setup_logger();
 
         struct TestCase {
+            master_config: MasterConfig,
             dataset: Dataset,
         }
         let cases = &[
             TestCase {
+                master_config: MasterConfig {
+                    reducers: 4,
+                    output_dir: "tmp/test/master/test_alloc_job/reduce".to_owned(),
+                },
                 dataset: Dataset::new(vec![], 0, 0, 0),
             },
             TestCase {
+                master_config: MasterConfig {
+                    reducers: 4,
+                    output_dir: "tmp/test/master/test_alloc_job/reduce".to_owned(),
+                },
                 dataset: Dataset::new(vec!["127.0.0.1".to_owned()], 4, 4, 1),
             },
         ];
 
         for c in cases {
-            let mut m = Master::new(c.dataset.tasks.clone());
+            let mut m = Master::new(c.master_config.clone(), c.dataset.tasks.clone());
 
             let mut map_count = 0usize;
             let mut reduce_count = 0usize;
             for _ in 0..c.dataset.tasks.len() {
                 let job = m.alloc_job("127.0.0.1").unwrap();
                 match job {
-                    Job::Map { host, path } => {
+                    Job::Map {
+                        reducers,
+                        host,
+                        path,
+                    } => {
                         map_count += 1;
                         assert_eq!(host, "127.0.0.1");
                         assert!(!path.is_empty());
                     }
-                    Job::Reduce { key, paths } => reduce_count += 1,
+                    Job::Reduce {
+                        output_dir,
+                        internal_key,
+                        paths,
+                    } => reduce_count += 1,
                 };
             }
             assert_eq!(map_count, c.dataset.map_tasks_num);

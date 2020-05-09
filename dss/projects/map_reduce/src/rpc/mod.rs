@@ -1,9 +1,14 @@
 use std::{sync::Arc, thread, time::Duration};
 
+extern crate uuid;
+
 extern crate grpcio;
 use grpcio::{ChannelBuilder, EnvBuilder, RpcContext, UnarySink};
 
-use crate::{master::Master, Job, Result, Task};
+use crate::{
+    master::{Master, MasterConfig},
+    Job, Result, Task,
+};
 
 mod grpc;
 use grpc::{
@@ -18,10 +23,8 @@ struct MasterGrpcServer {
 }
 
 impl MasterGrpcServer {
-    pub(crate) fn new(tasks: Vec<Task>) -> Self {
-        Self {
-            master: Master::new(tasks),
-        }
+    pub(crate) fn new(master: Master) -> Self {
+        Self { master }
     }
 }
 
@@ -54,24 +57,40 @@ impl MasterGrpc for MasterGrpcServer {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct ServerConfig {
+    pub host: String,
+    pub port: u16,
+    pub reducers: usize,
+    pub output_dir: String,
+}
+
 pub(crate) struct MasterServer {
+    config: ServerConfig,
     inner: grpcio::Server,
 }
 
 impl MasterServer {
-    pub(crate) fn new(host: &str, port: u16, tasks: Vec<Task>) -> Result<Self> {
+    pub(crate) fn new(config: ServerConfig, tasks: Vec<Task>) -> Result<Self> {
         debug!(
             "creating server on {}:{} with {} tasks",
-            host,
-            port,
+            config.host,
+            config.port,
             tasks.len()
         );
-        Ok(Self {
-            inner: grpcio::ServerBuilder::new(Arc::new(EnvBuilder::new().build()))
-                .register_service(create_master_grpc(MasterGrpcServer::new(tasks)))
-                .bind(host, port)
-                .build()?,
-        })
+
+        let inner = grpcio::ServerBuilder::new(Arc::new(EnvBuilder::new().build()))
+            .register_service(create_master_grpc(MasterGrpcServer::new(Master::new(
+                MasterConfig {
+                    reducers: config.reducers,
+                    output_dir: config.output_dir.clone(),
+                },
+                tasks,
+            ))))
+            .bind(config.host.clone(), config.port)
+            .build()?;
+
+        Ok(Self { config, inner })
     }
 
     pub fn run(&mut self, time: Option<Duration>) {
@@ -133,40 +152,52 @@ mod test {
     fn test_job_get() {
         self::test::setup_logger();
         struct TestCase {
-            host: String,
-            port: u16,
+            config: ServerConfig,
             dataset: Dataset,
             serve_time: ServeTimer,
         }
         let cases = [TestCase {
-            host: "127.0.0.1".to_owned(),
-            port: 10086,
+            config: ServerConfig {
+                host: "127.0.0.1".to_owned(),
+                port: 10086,
+                reducers: 4,
+                output_dir: format!("tmp/test/rpc/job_get/reducer"),
+            },
             dataset: Dataset::new(vec!["127.0.0.1".to_owned()], 4, 4, 1),
             serve_time: ServeTimer::new(4, 1),
         }];
 
         for c in &cases {
             {
-                let client = MasterClient::new(&c.host, c.port);
+                let client = MasterClient::new(&c.config.host, c.config.port);
 
                 let mut server =
-                    MasterServer::new(&c.host, c.port, c.dataset.tasks.clone()).unwrap();
+                    MasterServer::new(c.config.clone(), c.dataset.tasks.clone()).unwrap();
                 let serve_time = c.serve_time.serve;
                 thread::spawn(move || server.run(Some(serve_time)));
                 c.serve_time.wait_init();
 
                 for t in &c.dataset.tasks {
                     let job = client
-                        .get_job(c.host.clone())
+                        .get_job(c.config.host.clone())
                         .expect("get Err from `get_job`, expect Ok")
                         .expect("get None from `get_job`, expect Some");
                     match job {
-                        Job::Map { host, path } => {
+                        Job::Map {
+                            reducers,
+                            host,
+                            path,
+                        } => {
+                            assert_eq!(reducers, c.config.reducers);
                             assert!(c.dataset.hosts.contains(&host));
                             assert!(!path.is_empty());
                         }
-                        Job::Reduce { key, paths } => {
-                            assert!(!key.is_empty());
+                        Job::Reduce {
+                            output_dir,
+                            internal_key,
+                            paths,
+                        } => {
+                            assert!(!internal_key.is_empty());
                             assert!(!paths.is_empty());
                         }
                     };

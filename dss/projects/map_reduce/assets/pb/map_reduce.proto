@@ -6,12 +6,14 @@ message FileLocation {
 }
 
 message MapJob {
-    FileLocation file = 1;
+    int64 reducers = 1;
+    FileLocation file = 2;
 }
 
 message ReduceJob {
-    string key = 1;
-    repeated FileLocation files = 2;
+    string output_dir = 1;
+    string internal_key = 2;
+    repeated FileLocation files = 3;
 }
 
 message JobGetRequest {
@@ -26,11 +28,11 @@ message JobGetResponse {
 }
 
 message MapResult {
-    map<string, FileLocation> key_results = 1;
+    map<string, FileLocation> internal_key_results = 1;
 }
 
 message ReduceResult {
-    string key = 1;
+    string internal_key = 1;
     FileLocation result = 2;
 }
 

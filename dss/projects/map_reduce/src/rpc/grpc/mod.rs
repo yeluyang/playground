@@ -16,6 +16,7 @@ pub(crate) use self::map_reduce_grpc::{create_master_grpc, MasterGrpc, MasterGrp
 pub(crate) fn crate_job_from(job: JobGetResponse_oneof_job) -> crate::Job {
     match job {
         JobGetResponse_oneof_job::map_job(mut map_job) => crate::Job::Map {
+            reducers: map_job.reducers as usize,
             host: map_job.mut_file().take_host(),
             path: map_job.mut_file().take_path(),
         },
@@ -26,7 +27,8 @@ pub(crate) fn crate_job_from(job: JobGetResponse_oneof_job) -> crate::Job {
             }
 
             crate::Job::Reduce {
-                key: reduce_job.take_key(),
+                output_dir: reduce_job.take_output_dir(),
+                internal_key: reduce_job.take_internal_key(),
                 paths,
             }
         }
@@ -35,7 +37,12 @@ pub(crate) fn crate_job_from(job: JobGetResponse_oneof_job) -> crate::Job {
 
 pub(crate) fn grpc_job_from(job: crate::Job) -> JobGetResponse_oneof_job {
     match job {
-        crate::Job::Map { host, path } => JobGetResponse_oneof_job::map_job(MapJob {
+        crate::Job::Map {
+            reducers,
+            host,
+            path,
+        } => JobGetResponse_oneof_job::map_job(MapJob {
+            reducers: reducers as i64,
             file: SingularPtrField::from_option(Some(FileLocation {
                 host,
                 path,
@@ -45,7 +52,11 @@ pub(crate) fn grpc_job_from(job: crate::Job) -> JobGetResponse_oneof_job {
             unknown_fields: Default::default(),
             cached_size: Default::default(),
         }),
-        crate::Job::Reduce { key, paths } => {
+        crate::Job::Reduce {
+            output_dir,
+            internal_key,
+            paths,
+        } => {
             let mut files = RepeatedField::new();
             for (host, path) in paths {
                 files.push(FileLocation {
@@ -57,7 +68,8 @@ pub(crate) fn grpc_job_from(job: crate::Job) -> JobGetResponse_oneof_job {
             }
 
             JobGetResponse_oneof_job::reduce_job(ReduceJob {
-                key,
+                output_dir,
+                internal_key,
                 files,
                 unknown_fields: Default::default(),
                 cached_size: Default::default(),
@@ -79,10 +91,12 @@ mod test {
         let cases = &[
             TestCase {
                 crate_job: crate::Job::Map {
+                    reducers: 4,
                     host: "127.0.0.1".to_owned(),
                     path: "/path/to/map/file".to_owned(),
                 },
                 self_job: self::JobGetResponse_oneof_job::map_job(MapJob {
+                    reducers: 4,
                     file: SingularPtrField::from_option(Some(FileLocation {
                         host: "127.0.0.1".to_owned(),
                         path: "/path/to/map/file".to_owned(),
@@ -95,11 +109,13 @@ mod test {
             },
             TestCase {
                 crate_job: crate::Job::Reduce {
-                    key: "1".to_owned(),
+                    output_dir: "/path/to/reduce/files".to_owned(),
+                    internal_key: "1".to_owned(),
                     paths: vec![("127.0.0.1".to_owned(), "/path/to/reduce/file".to_owned())],
                 },
                 self_job: self::JobGetResponse_oneof_job::reduce_job(ReduceJob {
-                    key: "1".to_owned(),
+                    output_dir: "/path/to/reduce/files".to_owned(),
+                    internal_key: "1".to_owned(),
                     files: RepeatedField::from_vec(vec![FileLocation {
                         host: "127.0.0.1".to_owned(),
                         path: "/path/to/reduce/file".to_owned(),

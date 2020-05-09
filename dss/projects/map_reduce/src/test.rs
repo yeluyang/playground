@@ -111,9 +111,19 @@ pub(crate) struct TestMapper {}
 
 impl Map for TestMapper {
     fn mapping(&self, input: String) -> HashMap<String, String> {
-        let mut m = HashMap::new();
+        let mut tmp = HashMap::new();
+        for word in input.split_whitespace() {
+            if let Some(count) = tmp.get_mut(word) {
+                *count += 1usize;
+            } else {
+                tmp.insert(word, 1usize);
+            }
+        }
 
-        m.insert(input.len().to_string(), input.len().to_string());
+        let mut m = HashMap::new();
+        for (word, count) in tmp {
+            m.insert(word.to_owned(), count.to_string());
+        }
 
         m
     }
@@ -123,12 +133,23 @@ pub(crate) struct TestReducer {}
 
 impl Reduce for TestReducer {
     fn reducing(&self, inputs: Vec<String>) -> String {
-        let mut count = 0usize;
-        for input in inputs {
-            let len = input.parse::<usize>().expect("expected usize");
-            count += len;
+        let mut tmp = HashMap::new();
+        for input in &inputs {
+            for line in input.split('\n') {
+                let (word, count) = line.split_at(line.rfind(' ').expect("format mismatch"));
+                let count = count.parse::<usize>().expect("expect integer");
+                if let Some(c) = tmp.get_mut(word) {
+                    *c += count;
+                } else {
+                    tmp.insert(word, count);
+                }
+            }
         }
 
-        count.to_string()
+        let mut result = String::new();
+        for (word, count) in tmp {
+            result.push_str(&format!("{} {}\n", word, count));
+        }
+        result
     }
 }
