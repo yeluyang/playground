@@ -1,4 +1,4 @@
-use std::default::Default;
+use std::{collections::HashMap, default::Default};
 
 extern crate protobuf;
 use protobuf::{RepeatedField, SingularPtrField};
@@ -6,12 +6,21 @@ use protobuf::{RepeatedField, SingularPtrField};
 mod map_reduce;
 pub(crate) use self::map_reduce::{
     FileLocation, JobDoneRequest, JobDoneRequest_oneof_result, JobDoneResponse, JobGetRequest,
-    JobGetResponse, JobGetResponse_oneof_job,
+    JobGetResponse, JobGetResponse_oneof_job, MapResult, ReduceResult,
 };
 use self::map_reduce::{MapJob, ReduceJob};
 
 mod map_reduce_grpc;
 pub(crate) use self::map_reduce_grpc::{create_master_grpc, MasterGrpc, MasterGrpcClient};
+
+fn file_location_from(host: String, path: String) -> FileLocation {
+    FileLocation {
+        host,
+        path,
+        unknown_fields: Default::default(),
+        cached_size: Default::default(),
+    }
+}
 
 pub(crate) fn crate_job_from(job: JobGetResponse_oneof_job) -> crate::Job {
     match job {
@@ -43,12 +52,7 @@ pub(crate) fn grpc_job_from(job: crate::Job) -> JobGetResponse_oneof_job {
             path,
         } => JobGetResponse_oneof_job::map_job(MapJob {
             reducers: reducers as i64,
-            file: SingularPtrField::from_option(Some(FileLocation {
-                host,
-                path,
-                unknown_fields: Default::default(),
-                cached_size: Default::default(),
-            })),
+            file: SingularPtrField::from_option(Some(file_location_from(host, path))),
             unknown_fields: Default::default(),
             cached_size: Default::default(),
         }),
@@ -59,12 +63,7 @@ pub(crate) fn grpc_job_from(job: crate::Job) -> JobGetResponse_oneof_job {
         } => {
             let mut files = RepeatedField::new();
             for (host, path) in paths {
-                files.push(FileLocation {
-                    host,
-                    path,
-                    unknown_fields: Default::default(),
-                    cached_size: Default::default(),
-                });
+                files.push(file_location_from(host, path));
             }
 
             JobGetResponse_oneof_job::reduce_job(ReduceJob {
@@ -78,15 +77,73 @@ pub(crate) fn grpc_job_from(job: crate::Job) -> JobGetResponse_oneof_job {
     }
 }
 
+pub(crate) fn crate_job_result_from(job_result: JobDoneRequest_oneof_result) -> crate::JobResult {
+    match job_result {
+        JobDoneRequest_oneof_result::map_result(mut map_result) => {
+            let mut host: Option<String> = None;
+            let mut paths = HashMap::new();
+            for (internal_key, mut file_location) in map_result.take_internal_key_results() {
+                if let Some(h) = &host {
+                    if file_location.get_host() != h {
+                        panic!("multi host from one MapResult");
+                    }
+                } else {
+                    host = Some(file_location.take_host());
+                }
+                paths
+                    .insert(internal_key, file_location.take_path())
+                    .expect_none("multi internal key from one MapResult");
+            }
+            crate::JobResult::Map {
+                host: host.unwrap(),
+                paths,
+            }
+        }
+        JobDoneRequest_oneof_result::reduce_result(mut reduce_result) => crate::JobResult::Reduce {
+            internal_key: reduce_result.take_internal_key(),
+            host: reduce_result.mut_result().take_host(),
+            path: reduce_result.mut_result().take_path(),
+        },
+    }
+}
+
+pub(crate) fn grpc_job_result_from(job_result: crate::JobResult) -> JobDoneRequest_oneof_result {
+    match job_result {
+        crate::JobResult::Map { host, paths } => {
+            let mut result = HashMap::new();
+            for (internal_key, path) in paths {
+                result
+                    .insert(internal_key, file_location_from(host.clone(), path))
+                    .expect_none("multi internal_key from one map job result");
+            }
+            JobDoneRequest_oneof_result::map_result(MapResult {
+                internal_key_results: result,
+                unknown_fields: Default::default(),
+                cached_size: Default::default(),
+            })
+        }
+        crate::JobResult::Reduce {
+            internal_key,
+            host,
+            path,
+        } => JobDoneRequest_oneof_result::reduce_result(ReduceResult {
+            internal_key,
+            result: SingularPtrField::from_option(Some(file_location_from(host, path))),
+            unknown_fields: Default::default(),
+            cached_size: Default::default(),
+        }),
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
-    fn test_task_type_convert() {
+    fn test_job_convert() {
         struct TestCase {
             crate_job: crate::Job,
-            self_job: self::JobGetResponse_oneof_job,
+            grpc_job: self::JobGetResponse_oneof_job,
         }
         let cases = &[
             TestCase {
@@ -95,14 +152,12 @@ mod test {
                     host: "127.0.0.1".to_owned(),
                     path: "/path/to/map/file".to_owned(),
                 },
-                self_job: self::JobGetResponse_oneof_job::map_job(MapJob {
+                grpc_job: self::JobGetResponse_oneof_job::map_job(MapJob {
                     reducers: 4,
-                    file: SingularPtrField::from_option(Some(FileLocation {
-                        host: "127.0.0.1".to_owned(),
-                        path: "/path/to/map/file".to_owned(),
-                        unknown_fields: Default::default(),
-                        cached_size: Default::default(),
-                    })),
+                    file: SingularPtrField::from_option(Some(file_location_from(
+                        "127.0.0.1".to_owned(),
+                        "/path/to/map/file".to_owned(),
+                    ))),
                     unknown_fields: Default::default(),
                     cached_size: Default::default(),
                 }),
@@ -113,23 +168,57 @@ mod test {
                     internal_key: "1".to_owned(),
                     paths: vec![("127.0.0.1".to_owned(), "/path/to/reduce/file".to_owned())],
                 },
-                self_job: self::JobGetResponse_oneof_job::reduce_job(ReduceJob {
+                grpc_job: self::JobGetResponse_oneof_job::reduce_job(ReduceJob {
                     output_dir: "/path/to/reduce/files".to_owned(),
                     internal_key: "1".to_owned(),
-                    files: RepeatedField::from_vec(vec![FileLocation {
-                        host: "127.0.0.1".to_owned(),
-                        path: "/path/to/reduce/file".to_owned(),
-                        unknown_fields: Default::default(),
-                        cached_size: Default::default(),
-                    }]),
+                    files: RepeatedField::from_vec(vec![file_location_from(
+                        "127.0.0.1".to_owned(),
+                        "/path/to/reduce/file".to_owned(),
+                    )]),
                     unknown_fields: Default::default(),
                     cached_size: Default::default(),
                 }),
             },
         ];
         for c in cases {
-            assert_eq!(crate_job_from(c.self_job.clone()), c.crate_job);
-            assert_eq!(grpc_job_from(c.crate_job.clone()), c.self_job);
+            assert_eq!(crate_job_from(c.grpc_job.clone()), c.crate_job);
+            assert_eq!(grpc_job_from(c.crate_job.clone()), c.grpc_job);
+        }
+    }
+
+    #[test]
+    fn test_job_result_convert() {
+        struct TestCase {
+            crate_job_result: crate::JobResult,
+            grpc_job_result: JobDoneRequest_oneof_result,
+        }
+        let cases = &[TestCase {
+            crate_job_result: crate::JobResult::Map {
+                host: "127.0.0.1".to_owned(),
+                paths: hashmap! {
+                    "0".to_owned() => "test/rpc/grpc/job_result_convert/map/0".to_owned(),
+                    "1".to_owned() => "test/rpc/grpc/job_result_convert/map/1".to_owned(),
+                },
+            },
+            grpc_job_result: JobDoneRequest_oneof_result::map_result(MapResult {
+                internal_key_results: hashmap! {
+                    "0".to_owned() => file_location_from("127.0.0.1".to_owned(),"test/rpc/grpc/job_result_convert/map/0".to_owned()),
+                    "1".to_owned() => file_location_from("127.0.0.1".to_owned(),"test/rpc/grpc/job_result_convert/map/1".to_owned()),
+                },
+                unknown_fields: Default::default(),
+                cached_size: Default::default(),
+            }),
+        }];
+
+        for c in cases {
+            assert_eq!(
+                crate_job_result_from(c.grpc_job_result.clone()),
+                c.crate_job_result
+            );
+            assert_eq!(
+                grpc_job_result_from(c.crate_job_result.clone()),
+                c.grpc_job_result
+            );
         }
     }
 }

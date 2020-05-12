@@ -1,5 +1,6 @@
 #![feature(get_mut_unchecked)]
 #![feature(option_unwrap_none)]
+#![feature(option_expect_none)]
 
 use std::{
     collections::HashMap,
@@ -9,6 +10,9 @@ use std::{
 
 #[macro_use]
 extern crate log;
+
+#[macro_use]
+extern crate maplit;
 
 mod error;
 mod master;
@@ -133,5 +137,18 @@ enum Job {
         output_dir: String,
         internal_key: String,
         paths: Vec<(String, String)>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum JobResult {
+    Map {
+        host: String,
+        paths: HashMap<String, String>,
+    },
+    Reduce {
+        internal_key: String,
+        host: String,
+        path: String,
     },
 }

@@ -10,6 +10,7 @@ edition = "2018"
 
 log = "0.4.8"
 env_logger = "0.7.1"
+maplit = "1.0.2"
 
 grpcio = "0.5.1"
 protobuf = "2.14.0"
