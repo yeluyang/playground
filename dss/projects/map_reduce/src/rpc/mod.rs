@@ -7,14 +7,14 @@ use grpcio::{ChannelBuilder, EnvBuilder, RpcContext, UnarySink};
 
 use crate::{
     master::{Master, MasterConfig},
-    Job, Result, Task,
+    Job, JobResult, Result, Task,
 };
 
 mod grpc;
 use grpc::{
-    crate_job_from, create_master_grpc, grpc_job_from, FileLocation, JobDoneRequest,
-    JobDoneRequest_oneof_result, JobDoneResponse, JobGetRequest, JobGetResponse,
-    JobGetResponse_oneof_job, MasterGrpc, MasterGrpcClient,
+    crate_job_from, crate_job_result_from, create_master_grpc, grpc_job_from, grpc_job_result_from,
+    FileLocation, JobDoneRequest, JobDoneRequest_oneof_result, JobDoneResponse, JobGetRequest,
+    JobGetResponse, JobGetResponse_oneof_job, MasterGrpc, MasterGrpcClient,
 };
 
 #[derive(Clone)]
@@ -137,8 +137,17 @@ impl MasterClient {
         })
     }
 
-    pub fn done_job(&self) {
-        unimplemented!()
+    pub fn done_job(&self, job_result: JobResult) -> Result<()> {
+        let mut req = JobDoneRequest::new();
+        match grpc_job_result_from(job_result) {
+            JobDoneRequest_oneof_result::map_result(map_result) => req.set_map_result(map_result),
+            JobDoneRequest_oneof_result::reduce_result(reduce_result) => {
+                req.set_reduce_result(reduce_result)
+            }
+        };
+
+        self.inner.job_done(&req)?;
+        Ok(())
     }
 }
 
