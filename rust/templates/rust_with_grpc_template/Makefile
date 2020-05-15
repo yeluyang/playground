@@ -6,9 +6,9 @@ ENV_IMAGE = yeluyang/rust_grpc
 ENV_GOPATH = /go
 ENV_WD = $(ENV_GOPATH)/src/$(AUTHOR)/$(PROJECT)
 
-GRPC_PROTO_FILES = assets/pb/rpc.proto
-GRPC_OUTPUT_DIR = src/rpc/grpc
-GRPC_OUTPUT_FILES = $(GRPC_OUTPUT_DIR)/rpc.rs $(GRPC_OUTPUT_DIR)/rpc_grpc.rs
+GRPC_DIR = src/rpc/grpc
+GRPC_PB = $(GRPC_DIR)/rpc.proto
+GRPC_GEN_FILES = $(GRPC_DIR)/rpc.rs $(GRPC_DIR)/rpc_grpc.rs
 
 .PHONY: all
 all: debug
@@ -23,16 +23,16 @@ env:
 	docker exec -it $(ENV_NAME) bash
 
 .PHONY: debug
-debug: $(GRPC_OUTPUT_FILES)
+debug: $(GRPC_GEN_FILES)
 	cargo build
 
 .PHONY: build
-build: $(GRPC_OUTPUT_FILES) check
+build: $(GRPC_GEN_FILES) check
 	cargo build --release
 
 .PHONY: rpc
-rpc $(GRPC_OUTPUT_FILES): $(GRPC_PROTO_FILES)
-	@-mkdir -p $(GRPC_OUTPUT_DIR)
-	protoc --rust_out=$(GRPC_OUTPUT_DIR) --grpc_out=$(GRPC_OUTPUT_DIR) \
+rpc $(GRPC_GEN_FILES): $(GRPC_PB)
+	@-mkdir -p $(GRPC_DIR)
+	protoc --rust_out=$(GRPC_DIR) --grpc_out=$(GRPC_DIR) \
 	--plugin=protoc-gen-grpc=$(shell which grpc_rust_plugin) \
-	$(GRPC_PROTO_FILES)
+	$(GRPC_PB)
