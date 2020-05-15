@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 mod rpc;
-use rpc::PeerRPC;
 
 enum Entry {}
 
