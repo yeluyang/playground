@@ -2,8 +2,10 @@ use std::collections::HashMap;
 
 mod rpc;
 
+#[derive(Clone)]
 enum Entry {}
 
+#[derive(Clone)]
 struct Logger {
     // persistent state
     term: usize,
@@ -14,16 +16,19 @@ struct Logger {
     applied: usize,
 }
 
+#[derive(Clone)]
 struct EndPoint {
     ip: String,
     port: usize,
 }
 
+#[derive(Clone)]
 struct FollowerState {
     next: usize,
     matched: usize,
 }
 
+#[derive(Clone)]
 enum Role {
     Leader {
         followers: HashMap<EndPoint, FollowerState>,
@@ -34,6 +39,7 @@ enum Role {
     },
 }
 
+#[derive(Clone)]
 struct Peer {
     role: Role,
     logs: Logger,
