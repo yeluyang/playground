@@ -5,7 +5,7 @@ mod rpc;
 #[derive(Clone)]
 enum Entry {}
 
-#[derive(Clone)]
+#[derive(Default, Clone)]
 struct Logger {
     // persistent state
     term: usize,
@@ -14,6 +14,17 @@ struct Logger {
     // volatile state
     committed: usize,
     applied: usize,
+}
+
+impl Logger {
+    fn new(term: usize, entries: Vec<Entry>) -> Self {
+        Self {
+            term,
+            entries,
+            committed: 0usize,
+            applied: 0usize,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -39,7 +50,13 @@ enum Role {
     },
 }
 
-#[derive(Clone)]
+impl Default for Role {
+    fn default() -> Self {
+        Self::Follower { voted: None }
+    }
+}
+
+#[derive(Default, Clone)]
 struct Peer {
     role: Role,
     logs: Logger,
