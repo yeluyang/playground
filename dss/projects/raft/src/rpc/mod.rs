@@ -6,9 +6,14 @@ use grpcio::{EnvBuilder, Server, ServerBuilder};
 mod grpc;
 use grpc::{PeerGrpcClient, PeerGrpcServer};
 
-struct Config {
+use crate::EndPoint;
+
+#[derive(Clone)]
+pub(crate) struct Config {
     ip: String,
     port: u16,
+    logs: String,
+    peers: Vec<EndPoint>,
 }
 
 struct PeerServer {
@@ -19,7 +24,7 @@ struct PeerServer {
 impl PeerServer {
     fn new(config: Config) -> Self {
         let inner = ServerBuilder::new(Arc::new(EnvBuilder::new().build()))
-            .register_service(grpc::create_peer_grpc(PeerGrpcServer::new()))
+            .register_service(grpc::create_peer_grpc(PeerGrpcServer::new(config.clone())))
             .bind(config.ip.clone(), config.port)
             .build()
             .unwrap();
@@ -37,7 +42,8 @@ impl PeerServer {
     }
 }
 
-struct PeerClient {
+#[derive(Clone)]
+pub(crate) struct PeerClient {
     inner: PeerGrpcClient,
 }
 

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 mod rpc;
+use rpc::PeerClient;
 
 #[derive(Clone)]
 enum Entry {}
@@ -27,10 +28,10 @@ impl Logger {
     }
 }
 
-#[derive(Clone)]
+#[derive(Default, Clone)]
 struct EndPoint {
     ip: String,
-    port: usize,
+    port: u16,
 }
 
 #[derive(Clone)]
@@ -60,4 +61,17 @@ impl Default for Role {
 struct Peer {
     role: Role,
     logs: Logger,
+
+    host: EndPoint,
+    peers: Vec<PeerClient>,
+}
+
+impl Peer {
+    fn new(logs: String, host: EndPoint, peers: Vec<EndPoint>) -> Self {
+        unimplemented!()
+    }
+
+    fn run(&mut self) {
+        unimplemented!()
+    }
 }

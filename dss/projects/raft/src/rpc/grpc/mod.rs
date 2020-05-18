@@ -1,7 +1,7 @@
 extern crate grpcio;
 use grpcio::{RpcContext, UnarySink};
 
-use crate::Peer;
+use crate::{rpc::Config, EndPoint, Peer};
 
 mod rpc;
 pub(crate) use rpc::{AppendRequest, AppendResponse, VoteRequest, VoteResponse};
@@ -16,8 +16,19 @@ pub(crate) struct PeerGrpcServer {
 }
 
 impl PeerGrpcServer {
-    pub fn new() -> Self {
-        unimplemented!()
+    pub fn new(config: Config) -> Self {
+        let mut inner = Peer::new(
+            config.logs,
+            EndPoint {
+                ip: config.ip,
+                port: config.port,
+            },
+            config.peers,
+        );
+
+        inner.run();
+
+        Self { inner }
     }
 }
 
