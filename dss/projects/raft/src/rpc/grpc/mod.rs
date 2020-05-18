@@ -16,14 +16,14 @@ pub(crate) struct PeerGrpcServer {
 }
 
 impl PeerGrpcServer {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: &Config) -> Self {
         let mut inner = Peer::new(
-            config.logs,
+            config.logs.as_str(),
             EndPoint {
-                ip: config.ip,
+                ip: config.ip.clone(),
                 port: config.port,
             },
-            config.peers,
+            config.peers.clone(),
         );
 
         inner.run();

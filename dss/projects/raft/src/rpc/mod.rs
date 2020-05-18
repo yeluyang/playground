@@ -1,7 +1,7 @@
 use std::{sync::Arc, thread, time::Duration};
 
 extern crate grpcio;
-use grpcio::{EnvBuilder, Server, ServerBuilder};
+use grpcio::{ChannelBuilder, EnvBuilder, Server, ServerBuilder};
 
 mod grpc;
 use grpc::{PeerGrpcClient, PeerGrpcServer};
@@ -24,7 +24,7 @@ struct PeerServer {
 impl PeerServer {
     fn new(config: Config) -> Self {
         let inner = ServerBuilder::new(Arc::new(EnvBuilder::new().build()))
-            .register_service(grpc::create_peer_grpc(PeerGrpcServer::new(config.clone())))
+            .register_service(grpc::create_peer_grpc(PeerGrpcServer::new(&config)))
             .bind(config.ip.clone(), config.port)
             .build()
             .unwrap();
@@ -48,7 +48,12 @@ pub(crate) struct PeerClient {
 }
 
 impl PeerClient {
-    fn connect() -> Self {
-        unimplemented!()
+    pub fn connect(host: &EndPoint) -> Self {
+        Self {
+            inner: PeerGrpcClient::new(
+                ChannelBuilder::new(Arc::new(EnvBuilder::new().build()))
+                    .connect(host.to_string().as_str()),
+            ),
+        }
     }
 }
