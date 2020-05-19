@@ -212,6 +212,7 @@ mod test {
             assert_eq!(reduce_count, c.dataset.keys_max * c.dataset.replicated_num);
             assert!(m.map_tasks.is_empty());
             assert_eq!(m.allocated.len(), c.dataset.tasks.len());
+            assert!(m.alloc_job("127.0.0.1").is_none());
         }
     }
 }

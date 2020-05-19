@@ -211,6 +211,10 @@ mod test {
                         }
                     };
                 }
+                assert!(client
+                    .get_job(c.config.host.clone())
+                    .expect("get Err from `get_job`, expect Ok")
+                    .is_none());
 
                 c.serve_time.wait_exit();
             }
