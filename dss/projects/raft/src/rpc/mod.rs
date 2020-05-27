@@ -9,30 +9,37 @@ use grpc::{PeerGrpcClient, PeerGrpcServer};
 use crate::EndPoint;
 
 #[derive(Clone)]
-pub(crate) struct Config {
+pub struct Config {
     ip: String,
     port: u16,
     logs: String,
     peers: Vec<EndPoint>,
 }
 
-struct PeerServer {
+pub struct PeerServer {
     config: Config,
     inner: Server,
+    runner: PeerGrpcServer,
 }
 
 impl PeerServer {
     fn new(config: Config) -> Self {
+        let runner = PeerGrpcServer::new(&config);
         let inner = ServerBuilder::new(Arc::new(EnvBuilder::new().build()))
-            .register_service(grpc::create_peer_grpc(PeerGrpcServer::new(&config)))
+            .register_service(grpc::create_peer_grpc(runner.clone()))
             .bind(config.ip.clone(), config.port)
             .build()
             .unwrap();
-        Self { config, inner }
+        Self {
+            config,
+            inner,
+            runner,
+        }
     }
 
     fn run(&mut self, time: Option<Duration>) {
         self.inner.start();
+        self.runner.run();
         match time {
             Some(time) => thread::sleep(time),
             None => loop {
@@ -43,7 +50,7 @@ impl PeerServer {
 }
 
 #[derive(Clone)]
-pub(crate) struct PeerClient {
+pub struct PeerClient {
     inner: PeerGrpcClient,
 }
 

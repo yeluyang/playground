@@ -1,17 +1,17 @@
 extern crate grpcio;
 use grpcio::{RpcContext, UnarySink};
 
-use crate::{rpc::Config, EndPoint, Peer};
+use crate::{peer::Peer, rpc::Config, EndPoint};
 
 mod rpc;
-pub(crate) use rpc::{AppendRequest, AppendResponse, VoteRequest, VoteResponse};
+pub use rpc::{AppendRequest, AppendResponse, VoteRequest, VoteResponse};
 
 mod rpc_grpc;
 use rpc_grpc::PeerGrpc;
-pub(crate) use rpc_grpc::{create_peer_grpc, PeerGrpcClient};
+pub use rpc_grpc::{create_peer_grpc, PeerGrpcClient};
 
 #[derive(Clone)]
-pub(crate) struct PeerGrpcServer {
+pub struct PeerGrpcServer {
     inner: Peer,
 }
 
@@ -29,6 +29,10 @@ impl PeerGrpcServer {
         inner.run();
 
         Self { inner }
+    }
+
+    pub fn run(&mut self) {
+        self.inner.run();
     }
 }
 
