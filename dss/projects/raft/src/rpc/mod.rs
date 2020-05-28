@@ -1,4 +1,4 @@
-use std::{sync::Arc, thread, time::Duration};
+use std::sync::Arc;
 
 extern crate grpcio;
 use grpcio::{ChannelBuilder, EnvBuilder, Server, ServerBuilder};
@@ -37,15 +37,9 @@ impl PeerServer {
         }
     }
 
-    fn run(&mut self, time: Option<Duration>) {
+    fn run(&mut self) {
         self.inner.start();
         self.runner.run();
-        match time {
-            Some(time) => thread::sleep(time),
-            None => loop {
-                thread::sleep(Duration::new(u64::MAX, u32::MAX))
-            },
-        };
     }
 }
 
@@ -62,5 +56,9 @@ impl PeerClient {
                     .connect(host.to_string().as_str()),
             ),
         }
+    }
+
+    pub fn heart_beat(&self) {
+        unimplemented!()
     }
 }

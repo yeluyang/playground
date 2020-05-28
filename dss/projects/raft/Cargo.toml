@@ -11,3 +11,5 @@ edition = "2018"
 grpcio = ""
 protobuf = ""
 futures = "0.1.29"
+
+rand = "0.7.3"

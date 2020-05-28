@@ -3,7 +3,12 @@ use std::{
     fs,
     path::Path,
     sync::{Arc, Mutex},
+    thread,
+    time::Duration,
 };
+
+extern crate rand;
+use rand::Rng;
 
 use crate::{rpc::PeerClient, EndPoint};
 
@@ -80,6 +85,7 @@ impl Default for Role {
 struct PeerState {
     role: Role,
     logs: Logger,
+    leader_alive: bool,
 }
 
 impl PeerState {
@@ -87,6 +93,7 @@ impl PeerState {
         Self {
             role: Role::Follower { voted: None },
             logs: Logger::load(logs),
+            leader_alive: false,
         }
     }
 }
@@ -94,6 +101,7 @@ impl PeerState {
 #[derive(Default, Clone)]
 pub struct Peer {
     state: Arc<Mutex<PeerState>>,
+    sleep_time: Duration,
     host: EndPoint,
     peers: HashMap<EndPoint, PeerClient>,
 }
@@ -108,12 +116,36 @@ impl Peer {
 
         Self {
             state: Arc::new(Mutex::new(PeerState::new(logs))),
+            sleep_time: Duration::from_millis(get_follower_deadline_rand()),
             host,
             peers,
         }
     }
 
     pub fn run(&mut self) {
-        unimplemented!()
+        loop {
+            thread::sleep(self.sleep_time);
+            {
+                let mut s = self.state.lock().unwrap();
+                match s.role {
+                    Role::Leader { .. } => {
+                        for (_, p) in &self.peers {
+                            p.heart_beat();
+                        }
+                    }
+                    Role::Candidate => unimplemented!(),
+                    Role::Follower { .. } => {
+                        if !s.leader_alive {
+                            s.role = Role::Candidate;
+                            self.sleep_time = Duration::from_millis(0);
+                        }
+                    }
+                }
+            }
+        }
     }
+}
+
+fn get_follower_deadline_rand() -> u64 {
+    rand::thread_rng().gen_range(100, 500 + 1)
 }

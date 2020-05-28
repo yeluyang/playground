@@ -26,8 +26,6 @@ impl PeerGrpcServer {
             config.peers.clone(),
         );
 
-        inner.run();
-
         Self { inner }
     }
 
