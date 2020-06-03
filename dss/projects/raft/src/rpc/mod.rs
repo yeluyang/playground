@@ -10,10 +10,10 @@ use crate::EndPoint;
 
 #[derive(Clone)]
 pub struct Config {
-    ip: String,
-    port: u16,
-    logs: String,
-    peers: Vec<EndPoint>,
+    pub ip: String,
+    pub port: u16,
+    pub logs: String,
+    pub peers: Vec<(String, u16)>,
 }
 
 pub struct PeerServer {
@@ -23,13 +23,17 @@ pub struct PeerServer {
 }
 
 impl PeerServer {
-    fn new(config: Config) -> Self {
-        let runner = PeerGrpcServer::new(&config);
+    pub fn new(config: Config) -> Self {
+        let host = EndPoint::from((config.ip.clone(), config.port));
+        let peers = EndPoint::from_hosts(&config.peers);
+        let runner = PeerGrpcServer::new(host, &config.logs, peers);
+
         let inner = ServerBuilder::new(Arc::new(EnvBuilder::new().build()))
             .register_service(grpc::create_peer_grpc(runner.clone()))
             .bind(config.ip.clone(), config.port)
             .build()
             .unwrap();
+
         Self {
             config,
             inner,
@@ -37,7 +41,7 @@ impl PeerServer {
         }
     }
 
-    fn run(&mut self) {
+    pub fn run(&mut self) {
         self.inner.start();
         self.runner.run();
     }

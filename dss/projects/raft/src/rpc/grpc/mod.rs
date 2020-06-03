@@ -16,15 +16,8 @@ pub struct PeerGrpcServer {
 }
 
 impl PeerGrpcServer {
-    pub fn new(config: &Config) -> Self {
-        let mut inner = Peer::new(
-            config.logs.as_str(),
-            EndPoint {
-                ip: config.ip.clone(),
-                port: config.port,
-            },
-            config.peers.clone(),
-        );
+    pub fn new(host: EndPoint, logs: &str, peers: Vec<EndPoint>) -> Self {
+        let mut inner = Peer::new(logs, host, peers);
 
         Self { inner }
     }
