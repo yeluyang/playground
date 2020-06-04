@@ -1,8 +1,5 @@
 use std::{
-    sync::{
-        mpsc::{self, Sender},
-        Arc,
-    },
+    sync::{mpsc::Sender, Arc},
     thread,
 };
 
@@ -10,12 +7,12 @@ extern crate futures;
 use futures::Future;
 
 extern crate grpcio;
-use grpcio::{ChannelBuilder, EnvBuilder, MessageReader, Server, ServerBuilder};
+use grpcio::{ChannelBuilder, EnvBuilder, Server, ServerBuilder};
 
 mod grpc;
 use grpc::{PeerGrpcClient, PeerGrpcServer, VoteRequest, VoteResponse};
 
-use crate::{EndPoint};
+use crate::{peer::LogSeq, EndPoint};
 
 #[derive(Clone)]
 pub struct Config {
@@ -75,12 +72,23 @@ impl PeerClient {
         unimplemented!()
     }
 
-    pub fn request_vote_async(&self, ch: Sender<(bool, usize)>) {
-        let req = VoteRequest::new();
+    pub fn request_vote_async(
+        &self,
+        host: EndPoint,
+        term: usize,
+        log_seq: LogSeq,
+        ch: Sender<(bool, usize)>,
+    ) {
+        let mut req = VoteRequest::new();
+        req.set_end_point(grpc::grpc_end_point_from(host));
+        req.set_term(term as i64);
+        req.set_log_seq(grpc::grpc_log_seq_from(log_seq));
+
         let grpc_ch = self.inner.vote_async(&req).unwrap();
         thread::spawn(move || {
             let rsp = grpc_ch.wait().unwrap();
-            ch.send((rsp.get_granted(), rsp.get_term() as usize));
+            ch.send((rsp.get_granted(), rsp.get_term() as usize))
+                .unwrap();
         });
     }
 }

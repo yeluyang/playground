@@ -227,8 +227,8 @@ impl ::protobuf::reflect::ProtobufValue for EndPoint {
 #[derive(PartialEq,Clone,Default)]
 pub struct LogSeq {
     // message fields
-    pub index: i64,
     pub term: i64,
+    pub index: i64,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -245,22 +245,7 @@ impl LogSeq {
         ::std::default::Default::default()
     }
 
-    // int64 index = 1;
-
-
-    pub fn get_index(&self) -> i64 {
-        self.index
-    }
-    pub fn clear_index(&mut self) {
-        self.index = 0;
-    }
-
-    // Param is passed by value, moved
-    pub fn set_index(&mut self, v: i64) {
-        self.index = v;
-    }
-
-    // int64 term = 2;
+    // int64 term = 1;
 
 
     pub fn get_term(&self) -> i64 {
@@ -273,6 +258,21 @@ impl LogSeq {
     // Param is passed by value, moved
     pub fn set_term(&mut self, v: i64) {
         self.term = v;
+    }
+
+    // int64 index = 2;
+
+
+    pub fn get_index(&self) -> i64 {
+        self.index
+    }
+    pub fn clear_index(&mut self) {
+        self.index = 0;
+    }
+
+    // Param is passed by value, moved
+    pub fn set_index(&mut self, v: i64) {
+        self.index = v;
     }
 }
 
@@ -290,14 +290,14 @@ impl ::protobuf::Message for LogSeq {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
                     let tmp = is.read_int64()?;
-                    self.index = tmp;
+                    self.term = tmp;
                 },
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
                     let tmp = is.read_int64()?;
-                    self.term = tmp;
+                    self.index = tmp;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -311,11 +311,11 @@ impl ::protobuf::Message for LogSeq {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if self.index != 0 {
-            my_size += ::protobuf::rt::value_size(1, self.index, ::protobuf::wire_format::WireTypeVarint);
-        }
         if self.term != 0 {
-            my_size += ::protobuf::rt::value_size(2, self.term, ::protobuf::wire_format::WireTypeVarint);
+            my_size += ::protobuf::rt::value_size(1, self.term, ::protobuf::wire_format::WireTypeVarint);
+        }
+        if self.index != 0 {
+            my_size += ::protobuf::rt::value_size(2, self.index, ::protobuf::wire_format::WireTypeVarint);
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -323,11 +323,11 @@ impl ::protobuf::Message for LogSeq {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if self.index != 0 {
-            os.write_int64(1, self.index)?;
-        }
         if self.term != 0 {
-            os.write_int64(2, self.term)?;
+            os.write_int64(1, self.term)?;
+        }
+        if self.index != 0 {
+            os.write_int64(2, self.index)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -369,14 +369,14 @@ impl ::protobuf::Message for LogSeq {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeInt64>(
-                    "index",
-                    |m: &LogSeq| { &m.index },
-                    |m: &mut LogSeq| { &mut m.index },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeInt64>(
                     "term",
                     |m: &LogSeq| { &m.term },
                     |m: &mut LogSeq| { &mut m.term },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeInt64>(
+                    "index",
+                    |m: &LogSeq| { &m.index },
+                    |m: &mut LogSeq| { &mut m.index },
                 ));
                 ::protobuf::reflect::MessageDescriptor::new_pb_name::<LogSeq>(
                     "LogSeq",
@@ -397,8 +397,8 @@ impl ::protobuf::Message for LogSeq {
 
 impl ::protobuf::Clear for LogSeq {
     fn clear(&mut self) {
-        self.index = 0;
         self.term = 0;
+        self.index = 0;
         self.unknown_fields.clear();
     }
 }
@@ -419,8 +419,8 @@ impl ::protobuf::reflect::ProtobufValue for LogSeq {
 pub struct VoteRequest {
     // message fields
     pub term: i64,
-    pub end_point: ::protobuf::SingularPtrField<EndPoint>,
     pub log_seq: ::protobuf::SingularPtrField<LogSeq>,
+    pub end_point: ::protobuf::SingularPtrField<EndPoint>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -452,40 +452,7 @@ impl VoteRequest {
         self.term = v;
     }
 
-    // .EndPoint end_point = 2;
-
-
-    pub fn get_end_point(&self) -> &EndPoint {
-        self.end_point.as_ref().unwrap_or_else(|| EndPoint::default_instance())
-    }
-    pub fn clear_end_point(&mut self) {
-        self.end_point.clear();
-    }
-
-    pub fn has_end_point(&self) -> bool {
-        self.end_point.is_some()
-    }
-
-    // Param is passed by value, moved
-    pub fn set_end_point(&mut self, v: EndPoint) {
-        self.end_point = ::protobuf::SingularPtrField::some(v);
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_end_point(&mut self) -> &mut EndPoint {
-        if self.end_point.is_none() {
-            self.end_point.set_default();
-        }
-        self.end_point.as_mut().unwrap()
-    }
-
-    // Take field
-    pub fn take_end_point(&mut self) -> EndPoint {
-        self.end_point.take().unwrap_or_else(|| EndPoint::new())
-    }
-
-    // .LogSeq log_seq = 3;
+    // .LogSeq log_seq = 2;
 
 
     pub fn get_log_seq(&self) -> &LogSeq {
@@ -517,16 +484,49 @@ impl VoteRequest {
     pub fn take_log_seq(&mut self) -> LogSeq {
         self.log_seq.take().unwrap_or_else(|| LogSeq::new())
     }
+
+    // .EndPoint end_point = 3;
+
+
+    pub fn get_end_point(&self) -> &EndPoint {
+        self.end_point.as_ref().unwrap_or_else(|| EndPoint::default_instance())
+    }
+    pub fn clear_end_point(&mut self) {
+        self.end_point.clear();
+    }
+
+    pub fn has_end_point(&self) -> bool {
+        self.end_point.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_end_point(&mut self, v: EndPoint) {
+        self.end_point = ::protobuf::SingularPtrField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_end_point(&mut self) -> &mut EndPoint {
+        if self.end_point.is_none() {
+            self.end_point.set_default();
+        }
+        self.end_point.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_end_point(&mut self) -> EndPoint {
+        self.end_point.take().unwrap_or_else(|| EndPoint::new())
+    }
 }
 
 impl ::protobuf::Message for VoteRequest {
     fn is_initialized(&self) -> bool {
-        for v in &self.end_point {
+        for v in &self.log_seq {
             if !v.is_initialized() {
                 return false;
             }
         };
-        for v in &self.log_seq {
+        for v in &self.end_point {
             if !v.is_initialized() {
                 return false;
             }
@@ -546,10 +546,10 @@ impl ::protobuf::Message for VoteRequest {
                     self.term = tmp;
                 },
                 2 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.end_point)?;
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.log_seq)?;
                 },
                 3 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.log_seq)?;
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.end_point)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -566,11 +566,11 @@ impl ::protobuf::Message for VoteRequest {
         if self.term != 0 {
             my_size += ::protobuf::rt::value_size(1, self.term, ::protobuf::wire_format::WireTypeVarint);
         }
-        if let Some(ref v) = self.end_point.as_ref() {
+        if let Some(ref v) = self.log_seq.as_ref() {
             let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         }
-        if let Some(ref v) = self.log_seq.as_ref() {
+        if let Some(ref v) = self.end_point.as_ref() {
             let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         }
@@ -583,12 +583,12 @@ impl ::protobuf::Message for VoteRequest {
         if self.term != 0 {
             os.write_int64(1, self.term)?;
         }
-        if let Some(ref v) = self.end_point.as_ref() {
+        if let Some(ref v) = self.log_seq.as_ref() {
             os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
         }
-        if let Some(ref v) = self.log_seq.as_ref() {
+        if let Some(ref v) = self.end_point.as_ref() {
             os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
@@ -637,15 +637,15 @@ impl ::protobuf::Message for VoteRequest {
                     |m: &VoteRequest| { &m.term },
                     |m: &mut VoteRequest| { &mut m.term },
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<EndPoint>>(
-                    "end_point",
-                    |m: &VoteRequest| { &m.end_point },
-                    |m: &mut VoteRequest| { &mut m.end_point },
-                ));
                 fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<LogSeq>>(
                     "log_seq",
                     |m: &VoteRequest| { &m.log_seq },
                     |m: &mut VoteRequest| { &mut m.log_seq },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<EndPoint>>(
+                    "end_point",
+                    |m: &VoteRequest| { &m.end_point },
+                    |m: &mut VoteRequest| { &mut m.end_point },
                 ));
                 ::protobuf::reflect::MessageDescriptor::new_pb_name::<VoteRequest>(
                     "VoteRequest",
@@ -667,8 +667,8 @@ impl ::protobuf::Message for VoteRequest {
 impl ::protobuf::Clear for VoteRequest {
     fn clear(&mut self) {
         self.term = 0;
-        self.end_point.clear();
         self.log_seq.clear();
+        self.end_point.clear();
         self.unknown_fields.clear();
     }
 }
@@ -1119,60 +1119,64 @@ impl ::protobuf::reflect::ProtobufValue for AppendResponse {
 static file_descriptor_proto_data: &'static [u8] = b"\
     \n\x16src/rpc/grpc/rpc.proto\".\n\x08EndPoint\x12\x0e\n\x02ip\x18\x01\
     \x20\x01(\tR\x02ip\x12\x12\n\x04port\x18\x02\x20\x01(\x03R\x04port\"2\n\
-    \x06LogSeq\x12\x14\n\x05index\x18\x01\x20\x01(\x03R\x05index\x12\x12\n\
-    \x04term\x18\x02\x20\x01(\x03R\x04term\"k\n\x0bVoteRequest\x12\x12\n\x04\
-    term\x18\x01\x20\x01(\x03R\x04term\x12&\n\tend_point\x18\x02\x20\x01(\
-    \x0b2\t.EndPointR\x08endPoint\x12\x20\n\x07log_seq\x18\x03\x20\x01(\x0b2\
-    \x07.LogSeqR\x06logSeq\"<\n\x0cVoteResponse\x12\x12\n\x04term\x18\x01\
-    \x20\x01(\x03R\x04term\x12\x18\n\x07granted\x18\x02\x20\x01(\x08R\x07gra\
-    nted\"\x0f\n\rAppendRequest\"\x10\n\x0eAppendResponse2^\n\x08PeerGRPC\
-    \x12%\n\x04Vote\x12\x0c.VoteRequest\x1a\r.VoteResponse\"\0\x12+\n\x06App\
-    end\x12\x0e.AppendRequest\x1a\x0f.AppendResponse\"\0J\x9e\x07\n\x06\x12\
-    \x04\0\0!\x01\n\x08\n\x01\x0c\x12\x03\0\0\x12\n\n\n\x02\x04\0\x12\x04\
-    \x02\0\x05\x01\n\n\n\x03\x04\0\x01\x12\x03\x02\x08\x10\n\x0b\n\x04\x04\0\
-    \x02\0\x12\x03\x03\x04\x12\n\r\n\x05\x04\0\x02\0\x04\x12\x04\x03\x04\x02\
-    \x12\n\x0c\n\x05\x04\0\x02\0\x05\x12\x03\x03\x04\n\n\x0c\n\x05\x04\0\x02\
-    \0\x01\x12\x03\x03\x0b\r\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\x03\x10\x11\
-    \n\x0b\n\x04\x04\0\x02\x01\x12\x03\x04\x04\x13\n\r\n\x05\x04\0\x02\x01\
-    \x04\x12\x04\x04\x04\x03\x12\n\x0c\n\x05\x04\0\x02\x01\x05\x12\x03\x04\
-    \x04\t\n\x0c\n\x05\x04\0\x02\x01\x01\x12\x03\x04\n\x0e\n\x0c\n\x05\x04\0\
-    \x02\x01\x03\x12\x03\x04\x11\x12\n\n\n\x02\x04\x01\x12\x04\x07\0\n\x01\n\
-    \n\n\x03\x04\x01\x01\x12\x03\x07\x08\x0e\n\x0b\n\x04\x04\x01\x02\0\x12\
-    \x03\x08\x04\x14\n\r\n\x05\x04\x01\x02\0\x04\x12\x04\x08\x04\x07\x10\n\
-    \x0c\n\x05\x04\x01\x02\0\x05\x12\x03\x08\x04\t\n\x0c\n\x05\x04\x01\x02\0\
-    \x01\x12\x03\x08\n\x0f\n\x0c\n\x05\x04\x01\x02\0\x03\x12\x03\x08\x12\x13\
-    \n\x0b\n\x04\x04\x01\x02\x01\x12\x03\t\x04\x13\n\r\n\x05\x04\x01\x02\x01\
-    \x04\x12\x04\t\x04\x08\x14\n\x0c\n\x05\x04\x01\x02\x01\x05\x12\x03\t\x04\
-    \t\n\x0c\n\x05\x04\x01\x02\x01\x01\x12\x03\t\n\x0e\n\x0c\n\x05\x04\x01\
-    \x02\x01\x03\x12\x03\t\x11\x12\n\n\n\x02\x04\x02\x12\x04\x0c\0\x10\x01\n\
-    \n\n\x03\x04\x02\x01\x12\x03\x0c\x08\x13\n\x0b\n\x04\x04\x02\x02\0\x12\
-    \x03\r\x04\x13\n\r\n\x05\x04\x02\x02\0\x04\x12\x04\r\x04\x0c\x15\n\x0c\n\
-    \x05\x04\x02\x02\0\x05\x12\x03\r\x04\t\n\x0c\n\x05\x04\x02\x02\0\x01\x12\
-    \x03\r\n\x0e\n\x0c\n\x05\x04\x02\x02\0\x03\x12\x03\r\x11\x12\n\x0b\n\x04\
-    \x04\x02\x02\x01\x12\x03\x0e\x04\x1b\n\r\n\x05\x04\x02\x02\x01\x04\x12\
-    \x04\x0e\x04\r\x13\n\x0c\n\x05\x04\x02\x02\x01\x06\x12\x03\x0e\x04\x0c\n\
-    \x0c\n\x05\x04\x02\x02\x01\x01\x12\x03\x0e\r\x16\n\x0c\n\x05\x04\x02\x02\
-    \x01\x03\x12\x03\x0e\x19\x1a\n\x0b\n\x04\x04\x02\x02\x02\x12\x03\x0f\x04\
-    \x17\n\r\n\x05\x04\x02\x02\x02\x04\x12\x04\x0f\x04\x0e\x1b\n\x0c\n\x05\
-    \x04\x02\x02\x02\x06\x12\x03\x0f\x04\n\n\x0c\n\x05\x04\x02\x02\x02\x01\
-    \x12\x03\x0f\x0b\x12\n\x0c\n\x05\x04\x02\x02\x02\x03\x12\x03\x0f\x15\x16\
-    \n\n\n\x02\x04\x03\x12\x04\x12\0\x15\x01\n\n\n\x03\x04\x03\x01\x12\x03\
-    \x12\x08\x14\n\x0b\n\x04\x04\x03\x02\0\x12\x03\x13\x04\x13\n\r\n\x05\x04\
-    \x03\x02\0\x04\x12\x04\x13\x04\x12\x16\n\x0c\n\x05\x04\x03\x02\0\x05\x12\
-    \x03\x13\x04\t\n\x0c\n\x05\x04\x03\x02\0\x01\x12\x03\x13\n\x0e\n\x0c\n\
-    \x05\x04\x03\x02\0\x03\x12\x03\x13\x11\x12\n\x0b\n\x04\x04\x03\x02\x01\
-    \x12\x03\x14\x04\x15\n\r\n\x05\x04\x03\x02\x01\x04\x12\x04\x14\x04\x13\
-    \x13\n\x0c\n\x05\x04\x03\x02\x01\x05\x12\x03\x14\x04\x08\n\x0c\n\x05\x04\
-    \x03\x02\x01\x01\x12\x03\x14\t\x10\n\x0c\n\x05\x04\x03\x02\x01\x03\x12\
-    \x03\x14\x13\x14\n\n\n\x02\x04\x04\x12\x04\x17\0\x18\x01\n\n\n\x03\x04\
-    \x04\x01\x12\x03\x17\x08\x15\n\n\n\x02\x04\x05\x12\x04\x1a\0\x1b\x01\n\n\
-    \n\x03\x04\x05\x01\x12\x03\x1a\x08\x16\n\n\n\x02\x06\0\x12\x04\x1d\0!\
-    \x01\n\n\n\x03\x06\0\x01\x12\x03\x1d\x08\x10\n\x0b\n\x04\x06\0\x02\0\x12\
-    \x03\x1e\x043\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03\x1e\x08\x0c\n\x0c\n\
-    \x05\x06\0\x02\0\x02\x12\x03\x1e\r\x18\n\x0c\n\x05\x06\0\x02\0\x03\x12\
-    \x03\x1e#/\n\x0b\n\x04\x06\0\x02\x01\x12\x03\x20\x049\n\x0c\n\x05\x06\0\
-    \x02\x01\x01\x12\x03\x20\x08\x0e\n\x0c\n\x05\x06\0\x02\x01\x02\x12\x03\
-    \x20\x0f\x1c\n\x0c\n\x05\x06\0\x02\x01\x03\x12\x03\x20'5b\x06proto3\
+    \x06LogSeq\x12\x12\n\x04term\x18\x01\x20\x01(\x03R\x04term\x12\x14\n\x05\
+    index\x18\x02\x20\x01(\x03R\x05index\"k\n\x0bVoteRequest\x12\x12\n\x04te\
+    rm\x18\x01\x20\x01(\x03R\x04term\x12\x20\n\x07log_seq\x18\x02\x20\x01(\
+    \x0b2\x07.LogSeqR\x06logSeq\x12&\n\tend_point\x18\x03\x20\x01(\x0b2\t.En\
+    dPointR\x08endPoint\"<\n\x0cVoteResponse\x12\x12\n\x04term\x18\x01\x20\
+    \x01(\x03R\x04term\x12\x18\n\x07granted\x18\x02\x20\x01(\x08R\x07granted\
+    \"\x0f\n\rAppendRequest\"\x10\n\x0eAppendResponse2^\n\x08PeerGRPC\x12%\n\
+    \x04Vote\x12\x0c.VoteRequest\x1a\r.VoteResponse\"\0\x12+\n\x06Append\x12\
+    \x0e.AppendRequest\x1a\x0f.AppendResponse\"\0J\xd1\x08\n\x06\x12\x04\0\0\
+    (\x01\n\x08\n\x01\x0c\x12\x03\0\0\x12\n\n\n\x02\x04\0\x12\x04\x02\0\x05\
+    \x01\n\n\n\x03\x04\0\x01\x12\x03\x02\x08\x10\n\x0b\n\x04\x04\0\x02\0\x12\
+    \x03\x03\x04\x12\n\r\n\x05\x04\0\x02\0\x04\x12\x04\x03\x04\x02\x12\n\x0c\
+    \n\x05\x04\0\x02\0\x05\x12\x03\x03\x04\n\n\x0c\n\x05\x04\0\x02\0\x01\x12\
+    \x03\x03\x0b\r\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\x03\x10\x11\n\x0b\n\
+    \x04\x04\0\x02\x01\x12\x03\x04\x04\x13\n\r\n\x05\x04\0\x02\x01\x04\x12\
+    \x04\x04\x04\x03\x12\n\x0c\n\x05\x04\0\x02\x01\x05\x12\x03\x04\x04\t\n\
+    \x0c\n\x05\x04\0\x02\x01\x01\x12\x03\x04\n\x0e\n\x0c\n\x05\x04\0\x02\x01\
+    \x03\x12\x03\x04\x11\x12\n\n\n\x02\x04\x01\x12\x04\x07\0\x0c\x01\n\n\n\
+    \x03\x04\x01\x01\x12\x03\x07\x08\x0e\n\x1f\n\x04\x04\x01\x02\0\x12\x03\t\
+    \x04\x13\x1a\x12\x20term\x20of\x20last\x20log\n\n\r\n\x05\x04\x01\x02\0\
+    \x04\x12\x04\t\x04\x07\x10\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03\t\x04\t\
+    \n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03\t\n\x0e\n\x0c\n\x05\x04\x01\x02\0\
+    \x03\x12\x03\t\x11\x12\n\x20\n\x04\x04\x01\x02\x01\x12\x03\x0b\x04\x14\
+    \x1a\x13\x20index\x20of\x20last\x20log\n\n\r\n\x05\x04\x01\x02\x01\x04\
+    \x12\x04\x0b\x04\t\x13\n\x0c\n\x05\x04\x01\x02\x01\x05\x12\x03\x0b\x04\t\
+    \n\x0c\n\x05\x04\x01\x02\x01\x01\x12\x03\x0b\n\x0f\n\x0c\n\x05\x04\x01\
+    \x02\x01\x03\x12\x03\x0b\x12\x13\n\n\n\x02\x04\x02\x12\x04\x0e\0\x15\x01\
+    \n\n\n\x03\x04\x02\x01\x12\x03\x0e\x08\x13\n(\n\x04\x04\x02\x02\0\x12\
+    \x03\x10\x04\x13\x1a\x1b\x20term\x20of\x20candidate\x20holding\n\n\r\n\
+    \x05\x04\x02\x02\0\x04\x12\x04\x10\x04\x0e\x15\n\x0c\n\x05\x04\x02\x02\0\
+    \x05\x12\x03\x10\x04\t\n\x0c\n\x05\x04\x02\x02\0\x01\x12\x03\x10\n\x0e\n\
+    \x0c\n\x05\x04\x02\x02\0\x03\x12\x03\x10\x11\x12\n,\n\x04\x04\x02\x02\
+    \x01\x12\x03\x12\x04\x17\x1a\x1f\x20last\x20seq\x20of\x20logs\x20of\x20c\
+    andidate\n\n\r\n\x05\x04\x02\x02\x01\x04\x12\x04\x12\x04\x10\x13\n\x0c\n\
+    \x05\x04\x02\x02\x01\x06\x12\x03\x12\x04\n\n\x0c\n\x05\x04\x02\x02\x01\
+    \x01\x12\x03\x12\x0b\x12\n\x0c\n\x05\x04\x02\x02\x01\x03\x12\x03\x12\x15\
+    \x16\n\x1e\n\x04\x04\x02\x02\x02\x12\x03\x14\x04\x1b\x1a\x11\x20id\x20of\
+    \x20candidate\n\n\r\n\x05\x04\x02\x02\x02\x04\x12\x04\x14\x04\x12\x17\n\
+    \x0c\n\x05\x04\x02\x02\x02\x06\x12\x03\x14\x04\x0c\n\x0c\n\x05\x04\x02\
+    \x02\x02\x01\x12\x03\x14\r\x16\n\x0c\n\x05\x04\x02\x02\x02\x03\x12\x03\
+    \x14\x19\x1a\n\n\n\x02\x04\x03\x12\x04\x17\0\x1c\x01\n\n\n\x03\x04\x03\
+    \x01\x12\x03\x17\x08\x14\n'\n\x04\x04\x03\x02\0\x12\x03\x19\x04\x13\x1a\
+    \x1a\x20term\x20of\x20follower\x20holding\n\n\r\n\x05\x04\x03\x02\0\x04\
+    \x12\x04\x19\x04\x17\x16\n\x0c\n\x05\x04\x03\x02\0\x05\x12\x03\x19\x04\t\
+    \n\x0c\n\x05\x04\x03\x02\0\x01\x12\x03\x19\n\x0e\n\x0c\n\x05\x04\x03\x02\
+    \0\x03\x12\x03\x19\x11\x12\n(\n\x04\x04\x03\x02\x01\x12\x03\x1b\x04\x15\
+    \x1a\x1b\x20vote\x20for\x20candidate\x20or\x20not\n\n\r\n\x05\x04\x03\
+    \x02\x01\x04\x12\x04\x1b\x04\x19\x13\n\x0c\n\x05\x04\x03\x02\x01\x05\x12\
+    \x03\x1b\x04\x08\n\x0c\n\x05\x04\x03\x02\x01\x01\x12\x03\x1b\t\x10\n\x0c\
+    \n\x05\x04\x03\x02\x01\x03\x12\x03\x1b\x13\x14\n\n\n\x02\x04\x04\x12\x04\
+    \x1e\0\x1f\x01\n\n\n\x03\x04\x04\x01\x12\x03\x1e\x08\x15\n\n\n\x02\x04\
+    \x05\x12\x04!\0\"\x01\n\n\n\x03\x04\x05\x01\x12\x03!\x08\x16\n\n\n\x02\
+    \x06\0\x12\x04$\0(\x01\n\n\n\x03\x06\0\x01\x12\x03$\x08\x10\n\x0b\n\x04\
+    \x06\0\x02\0\x12\x03%\x043\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03%\x08\x0c\
+    \n\x0c\n\x05\x06\0\x02\0\x02\x12\x03%\r\x18\n\x0c\n\x05\x06\0\x02\0\x03\
+    \x12\x03%#/\n\x0b\n\x04\x06\0\x02\x01\x12\x03'\x049\n\x0c\n\x05\x06\0\
+    \x02\x01\x01\x12\x03'\x08\x0e\n\x0c\n\x05\x06\0\x02\x01\x02\x12\x03'\x0f\
+    \x1c\n\x0c\n\x05\x06\0\x02\x01\x03\x12\x03''5b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy::INIT;

@@ -2,10 +2,7 @@ use std::{
     collections::HashMap,
     fs,
     path::Path,
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        Arc, Mutex,
-    },
+    sync::{mpsc, Arc, Mutex},
     thread,
     time::Duration,
 };
@@ -13,13 +10,18 @@ use std::{
 extern crate rand;
 use rand::Rng;
 
-extern crate futures;
-use futures::Select;
-
 use crate::{rpc::PeerClient, EndPoint};
 
 #[derive(Clone)]
-enum Entry {}
+pub(crate) struct LogSeq {
+    pub term: usize,
+    pub index: usize,
+}
+
+#[derive(Clone)]
+struct Entry {
+    seq: LogSeq,
+}
 
 #[derive(Default, Clone)]
 struct Logger {
@@ -78,12 +80,16 @@ enum Role {
     Candidate,
     Follower {
         voted: Option<EndPoint>,
+        leader_alive: bool,
     },
 }
 
 impl Default for Role {
     fn default() -> Self {
-        Self::Follower { voted: None }
+        Self::Follower {
+            voted: None,
+            leader_alive: false,
+        }
     }
 }
 
@@ -91,15 +97,16 @@ impl Default for Role {
 struct PeerState {
     role: Role,
     logs: Logger,
-    leader_alive: bool,
 }
 
 impl PeerState {
     fn new(logs: &str) -> Self {
         Self {
-            role: Role::Follower { voted: None },
+            role: Role::Follower {
+                voted: None,
+                leader_alive: false,
+            },
             logs: Logger::load(logs),
-            leader_alive: false,
         }
     }
 }
@@ -147,17 +154,45 @@ impl Peer {
 
                         thread::spawn(move || {
                             thread::sleep(Duration::from_millis(get_follower_deadline_rand()));
-                            tick_sender.send(());
+                            tick_sender.send(()).unwrap();
                         });
 
                         for (_, peer) in &self.peers {
-                            peer.request_vote_async(vote_sender.clone());
+                            peer.request_vote_async(
+                                self.host.clone(),
+                                s.logs.term,
+                                s.logs.entries[s.logs.applied].seq.clone(),
+                                vote_sender.clone(),
+                            );
                         }
 
-                        // select! {}
+                        let mut votes = 1usize;
+                        while votes < (self.peers.len() / 2) + 1 {
+                            if let Ok((granted, term)) = vote_recver.try_recv() {
+                                if granted {
+                                    votes += 1;
+                                } else if term > s.logs.term {
+                                    s.role = Role::Follower {
+                                        voted: None,
+                                        leader_alive: false,
+                                    };
+                                    self.sleep_time =
+                                        Duration::from_millis(get_follower_deadline_rand());
+                                    break;
+                                }
+                            } else if let Ok(_) = tick_recver.try_recv() {
+                                break;
+                            } else {
+                                thread::sleep(Duration::from_millis(10));
+                            }
+                        }
+                        if votes > (self.peers.len() / 2) + 1 {
+                            // become leader
+                            unimplemented!()
+                        }
                     }
-                    Role::Follower { .. } => {
-                        if !s.leader_alive {
+                    Role::Follower { leader_alive, .. } => {
+                        if !leader_alive {
                             s.role = Role::Candidate;
                             self.sleep_time = Duration::from_millis(0);
                         }
