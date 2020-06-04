@@ -1,12 +1,21 @@
-use std::sync::Arc;
+use std::{
+    sync::{
+        mpsc::{self, Sender},
+        Arc,
+    },
+    thread,
+};
+
+extern crate futures;
+use futures::Future;
 
 extern crate grpcio;
-use grpcio::{ChannelBuilder, EnvBuilder, Server, ServerBuilder};
+use grpcio::{ChannelBuilder, EnvBuilder, MessageReader, Server, ServerBuilder};
 
 mod grpc;
-use grpc::{PeerGrpcClient, PeerGrpcServer};
+use grpc::{PeerGrpcClient, PeerGrpcServer, VoteRequest, VoteResponse};
 
-use crate::EndPoint;
+use crate::{EndPoint};
 
 #[derive(Clone)]
 pub struct Config {
@@ -64,5 +73,14 @@ impl PeerClient {
 
     pub fn heart_beat(&self) {
         unimplemented!()
+    }
+
+    pub fn request_vote_async(&self, ch: Sender<(bool, usize)>) {
+        let req = VoteRequest::new();
+        let grpc_ch = self.inner.vote_async(&req).unwrap();
+        thread::spawn(move || {
+            let rsp = grpc_ch.wait().unwrap();
+            ch.send((rsp.get_granted(), rsp.get_term() as usize));
+        });
     }
 }

@@ -2,13 +2,19 @@ use std::{
     collections::HashMap,
     fs,
     path::Path,
-    sync::{Arc, Mutex},
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Arc, Mutex,
+    },
     thread,
     time::Duration,
 };
 
 extern crate rand;
 use rand::Rng;
+
+extern crate futures;
+use futures::Select;
 
 use crate::{rpc::PeerClient, EndPoint};
 
@@ -133,7 +139,23 @@ impl Peer {
                             p.heart_beat();
                         }
                     }
-                    Role::Candidate => unimplemented!(),
+                    Role::Candidate => {
+                        s.logs.term += 1;
+
+                        let (vote_sender, vote_recver) = mpsc::channel();
+                        let (tick_sender, tick_recver) = mpsc::channel::<()>();
+
+                        thread::spawn(move || {
+                            thread::sleep(Duration::from_millis(get_follower_deadline_rand()));
+                            tick_sender.send(());
+                        });
+
+                        for (_, peer) in &self.peers {
+                            peer.request_vote_async(vote_sender.clone());
+                        }
+
+                        // select! {}
+                    }
                     Role::Follower { .. } => {
                         if !s.leader_alive {
                             s.role = Role::Candidate;
