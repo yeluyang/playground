@@ -689,6 +689,7 @@ impl ::protobuf::reflect::ProtobufValue for VoteRequest {
 pub struct VoteResponse {
     // message fields
     pub term: i64,
+    pub log_seq: ::protobuf::SingularPtrField<LogSeq>,
     pub granted: bool,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
@@ -721,7 +722,40 @@ impl VoteResponse {
         self.term = v;
     }
 
-    // bool granted = 2;
+    // .LogSeq log_seq = 2;
+
+
+    pub fn get_log_seq(&self) -> &LogSeq {
+        self.log_seq.as_ref().unwrap_or_else(|| LogSeq::default_instance())
+    }
+    pub fn clear_log_seq(&mut self) {
+        self.log_seq.clear();
+    }
+
+    pub fn has_log_seq(&self) -> bool {
+        self.log_seq.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_log_seq(&mut self, v: LogSeq) {
+        self.log_seq = ::protobuf::SingularPtrField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_log_seq(&mut self) -> &mut LogSeq {
+        if self.log_seq.is_none() {
+            self.log_seq.set_default();
+        }
+        self.log_seq.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_log_seq(&mut self) -> LogSeq {
+        self.log_seq.take().unwrap_or_else(|| LogSeq::new())
+    }
+
+    // bool granted = 3;
 
 
     pub fn get_granted(&self) -> bool {
@@ -739,6 +773,11 @@ impl VoteResponse {
 
 impl ::protobuf::Message for VoteResponse {
     fn is_initialized(&self) -> bool {
+        for v in &self.log_seq {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
         true
     }
 
@@ -754,6 +793,9 @@ impl ::protobuf::Message for VoteResponse {
                     self.term = tmp;
                 },
                 2 => {
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.log_seq)?;
+                },
+                3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
@@ -775,6 +817,10 @@ impl ::protobuf::Message for VoteResponse {
         if self.term != 0 {
             my_size += ::protobuf::rt::value_size(1, self.term, ::protobuf::wire_format::WireTypeVarint);
         }
+        if let Some(ref v) = self.log_seq.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+        }
         if self.granted != false {
             my_size += 2;
         }
@@ -787,8 +833,13 @@ impl ::protobuf::Message for VoteResponse {
         if self.term != 0 {
             os.write_int64(1, self.term)?;
         }
+        if let Some(ref v) = self.log_seq.as_ref() {
+            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
+        }
         if self.granted != false {
-            os.write_bool(2, self.granted)?;
+            os.write_bool(3, self.granted)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -834,6 +885,11 @@ impl ::protobuf::Message for VoteResponse {
                     |m: &VoteResponse| { &m.term },
                     |m: &mut VoteResponse| { &mut m.term },
                 ));
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<LogSeq>>(
+                    "log_seq",
+                    |m: &VoteResponse| { &m.log_seq },
+                    |m: &mut VoteResponse| { &mut m.log_seq },
+                ));
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
                     "granted",
                     |m: &VoteResponse| { &m.granted },
@@ -859,6 +915,7 @@ impl ::protobuf::Message for VoteResponse {
 impl ::protobuf::Clear for VoteResponse {
     fn clear(&mut self) {
         self.term = 0;
+        self.log_seq.clear();
         self.granted = false;
         self.unknown_fields.clear();
     }
@@ -1123,24 +1180,25 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     index\x18\x02\x20\x01(\x03R\x05index\"k\n\x0bVoteRequest\x12\x12\n\x04te\
     rm\x18\x01\x20\x01(\x03R\x04term\x12\x20\n\x07log_seq\x18\x02\x20\x01(\
     \x0b2\x07.LogSeqR\x06logSeq\x12&\n\tend_point\x18\x03\x20\x01(\x0b2\t.En\
-    dPointR\x08endPoint\"<\n\x0cVoteResponse\x12\x12\n\x04term\x18\x01\x20\
-    \x01(\x03R\x04term\x12\x18\n\x07granted\x18\x02\x20\x01(\x08R\x07granted\
-    \"\x0f\n\rAppendRequest\"\x10\n\x0eAppendResponse2^\n\x08PeerGRPC\x12%\n\
-    \x04Vote\x12\x0c.VoteRequest\x1a\r.VoteResponse\"\0\x12+\n\x06Append\x12\
-    \x0e.AppendRequest\x1a\x0f.AppendResponse\"\0J\xd1\x08\n\x06\x12\x04\0\0\
-    (\x01\n\x08\n\x01\x0c\x12\x03\0\0\x12\n\n\n\x02\x04\0\x12\x04\x02\0\x05\
-    \x01\n\n\n\x03\x04\0\x01\x12\x03\x02\x08\x10\n\x0b\n\x04\x04\0\x02\0\x12\
-    \x03\x03\x04\x12\n\r\n\x05\x04\0\x02\0\x04\x12\x04\x03\x04\x02\x12\n\x0c\
-    \n\x05\x04\0\x02\0\x05\x12\x03\x03\x04\n\n\x0c\n\x05\x04\0\x02\0\x01\x12\
-    \x03\x03\x0b\r\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\x03\x10\x11\n\x0b\n\
-    \x04\x04\0\x02\x01\x12\x03\x04\x04\x13\n\r\n\x05\x04\0\x02\x01\x04\x12\
-    \x04\x04\x04\x03\x12\n\x0c\n\x05\x04\0\x02\x01\x05\x12\x03\x04\x04\t\n\
-    \x0c\n\x05\x04\0\x02\x01\x01\x12\x03\x04\n\x0e\n\x0c\n\x05\x04\0\x02\x01\
-    \x03\x12\x03\x04\x11\x12\n\n\n\x02\x04\x01\x12\x04\x07\0\x0c\x01\n\n\n\
-    \x03\x04\x01\x01\x12\x03\x07\x08\x0e\n\x1f\n\x04\x04\x01\x02\0\x12\x03\t\
-    \x04\x13\x1a\x12\x20term\x20of\x20last\x20log\n\n\r\n\x05\x04\x01\x02\0\
-    \x04\x12\x04\t\x04\x07\x10\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03\t\x04\t\
-    \n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03\t\n\x0e\n\x0c\n\x05\x04\x01\x02\0\
+    dPointR\x08endPoint\"^\n\x0cVoteResponse\x12\x12\n\x04term\x18\x01\x20\
+    \x01(\x03R\x04term\x12\x20\n\x07log_seq\x18\x02\x20\x01(\x0b2\x07.LogSeq\
+    R\x06logSeq\x12\x18\n\x07granted\x18\x03\x20\x01(\x08R\x07granted\"\x0f\
+    \n\rAppendRequest\"\x10\n\x0eAppendResponse2^\n\x08PeerGRPC\x12%\n\x04Vo\
+    te\x12\x0c.VoteRequest\x1a\r.VoteResponse\"\0\x12+\n\x06Append\x12\x0e.A\
+    ppendRequest\x1a\x0f.AppendResponse\"\0J\xb7\t\n\x06\x12\x04\0\0*\x01\n\
+    \x08\n\x01\x0c\x12\x03\0\0\x12\n\n\n\x02\x04\0\x12\x04\x02\0\x05\x01\n\n\
+    \n\x03\x04\0\x01\x12\x03\x02\x08\x10\n\x0b\n\x04\x04\0\x02\0\x12\x03\x03\
+    \x04\x12\n\r\n\x05\x04\0\x02\0\x04\x12\x04\x03\x04\x02\x12\n\x0c\n\x05\
+    \x04\0\x02\0\x05\x12\x03\x03\x04\n\n\x0c\n\x05\x04\0\x02\0\x01\x12\x03\
+    \x03\x0b\r\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\x03\x10\x11\n\x0b\n\x04\
+    \x04\0\x02\x01\x12\x03\x04\x04\x13\n\r\n\x05\x04\0\x02\x01\x04\x12\x04\
+    \x04\x04\x03\x12\n\x0c\n\x05\x04\0\x02\x01\x05\x12\x03\x04\x04\t\n\x0c\n\
+    \x05\x04\0\x02\x01\x01\x12\x03\x04\n\x0e\n\x0c\n\x05\x04\0\x02\x01\x03\
+    \x12\x03\x04\x11\x12\n\n\n\x02\x04\x01\x12\x04\x07\0\x0c\x01\n\n\n\x03\
+    \x04\x01\x01\x12\x03\x07\x08\x0e\n\x1f\n\x04\x04\x01\x02\0\x12\x03\t\x04\
+    \x13\x1a\x12\x20term\x20of\x20last\x20log\n\n\r\n\x05\x04\x01\x02\0\x04\
+    \x12\x04\t\x04\x07\x10\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03\t\x04\t\n\
+    \x0c\n\x05\x04\x01\x02\0\x01\x12\x03\t\n\x0e\n\x0c\n\x05\x04\x01\x02\0\
     \x03\x12\x03\t\x11\x12\n\x20\n\x04\x04\x01\x02\x01\x12\x03\x0b\x04\x14\
     \x1a\x13\x20index\x20of\x20last\x20log\n\n\r\n\x05\x04\x01\x02\x01\x04\
     \x12\x04\x0b\x04\t\x13\n\x0c\n\x05\x04\x01\x02\x01\x05\x12\x03\x0b\x04\t\
@@ -1159,24 +1217,29 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x20candidate\n\n\r\n\x05\x04\x02\x02\x02\x04\x12\x04\x14\x04\x12\x17\n\
     \x0c\n\x05\x04\x02\x02\x02\x06\x12\x03\x14\x04\x0c\n\x0c\n\x05\x04\x02\
     \x02\x02\x01\x12\x03\x14\r\x16\n\x0c\n\x05\x04\x02\x02\x02\x03\x12\x03\
-    \x14\x19\x1a\n\n\n\x02\x04\x03\x12\x04\x17\0\x1c\x01\n\n\n\x03\x04\x03\
+    \x14\x19\x1a\n\n\n\x02\x04\x03\x12\x04\x17\0\x1e\x01\n\n\n\x03\x04\x03\
     \x01\x12\x03\x17\x08\x14\n'\n\x04\x04\x03\x02\0\x12\x03\x19\x04\x13\x1a\
     \x1a\x20term\x20of\x20follower\x20holding\n\n\r\n\x05\x04\x03\x02\0\x04\
     \x12\x04\x19\x04\x17\x16\n\x0c\n\x05\x04\x03\x02\0\x05\x12\x03\x19\x04\t\
     \n\x0c\n\x05\x04\x03\x02\0\x01\x12\x03\x19\n\x0e\n\x0c\n\x05\x04\x03\x02\
-    \0\x03\x12\x03\x19\x11\x12\n(\n\x04\x04\x03\x02\x01\x12\x03\x1b\x04\x15\
-    \x1a\x1b\x20vote\x20for\x20candidate\x20or\x20not\n\n\r\n\x05\x04\x03\
-    \x02\x01\x04\x12\x04\x1b\x04\x19\x13\n\x0c\n\x05\x04\x03\x02\x01\x05\x12\
-    \x03\x1b\x04\x08\n\x0c\n\x05\x04\x03\x02\x01\x01\x12\x03\x1b\t\x10\n\x0c\
-    \n\x05\x04\x03\x02\x01\x03\x12\x03\x1b\x13\x14\n\n\n\x02\x04\x04\x12\x04\
-    \x1e\0\x1f\x01\n\n\n\x03\x04\x04\x01\x12\x03\x1e\x08\x15\n\n\n\x02\x04\
-    \x05\x12\x04!\0\"\x01\n\n\n\x03\x04\x05\x01\x12\x03!\x08\x16\n\n\n\x02\
-    \x06\0\x12\x04$\0(\x01\n\n\n\x03\x06\0\x01\x12\x03$\x08\x10\n\x0b\n\x04\
-    \x06\0\x02\0\x12\x03%\x043\n\x0c\n\x05\x06\0\x02\0\x01\x12\x03%\x08\x0c\
-    \n\x0c\n\x05\x06\0\x02\0\x02\x12\x03%\r\x18\n\x0c\n\x05\x06\0\x02\0\x03\
-    \x12\x03%#/\n\x0b\n\x04\x06\0\x02\x01\x12\x03'\x049\n\x0c\n\x05\x06\0\
-    \x02\x01\x01\x12\x03'\x08\x0e\n\x0c\n\x05\x06\0\x02\x01\x02\x12\x03'\x0f\
-    \x1c\n\x0c\n\x05\x06\0\x02\x01\x03\x12\x03''5b\x06proto3\
+    \0\x03\x12\x03\x19\x11\x12\n+\n\x04\x04\x03\x02\x01\x12\x03\x1b\x04\x17\
+    \x1a\x1e\x20last\x20seq\x20of\x20logs\x20of\x20follower\n\n\r\n\x05\x04\
+    \x03\x02\x01\x04\x12\x04\x1b\x04\x19\x13\n\x0c\n\x05\x04\x03\x02\x01\x06\
+    \x12\x03\x1b\x04\n\n\x0c\n\x05\x04\x03\x02\x01\x01\x12\x03\x1b\x0b\x12\n\
+    \x0c\n\x05\x04\x03\x02\x01\x03\x12\x03\x1b\x15\x16\n(\n\x04\x04\x03\x02\
+    \x02\x12\x03\x1d\x04\x15\x1a\x1b\x20vote\x20for\x20candidate\x20or\x20no\
+    t\n\n\r\n\x05\x04\x03\x02\x02\x04\x12\x04\x1d\x04\x1b\x17\n\x0c\n\x05\
+    \x04\x03\x02\x02\x05\x12\x03\x1d\x04\x08\n\x0c\n\x05\x04\x03\x02\x02\x01\
+    \x12\x03\x1d\t\x10\n\x0c\n\x05\x04\x03\x02\x02\x03\x12\x03\x1d\x13\x14\n\
+    \n\n\x02\x04\x04\x12\x04\x20\0!\x01\n\n\n\x03\x04\x04\x01\x12\x03\x20\
+    \x08\x15\n\n\n\x02\x04\x05\x12\x04#\0$\x01\n\n\n\x03\x04\x05\x01\x12\x03\
+    #\x08\x16\n\n\n\x02\x06\0\x12\x04&\0*\x01\n\n\n\x03\x06\0\x01\x12\x03&\
+    \x08\x10\n\x0b\n\x04\x06\0\x02\0\x12\x03'\x043\n\x0c\n\x05\x06\0\x02\0\
+    \x01\x12\x03'\x08\x0c\n\x0c\n\x05\x06\0\x02\0\x02\x12\x03'\r\x18\n\x0c\n\
+    \x05\x06\0\x02\0\x03\x12\x03'#/\n\x0b\n\x04\x06\0\x02\x01\x12\x03)\x049\
+    \n\x0c\n\x05\x06\0\x02\x01\x01\x12\x03)\x08\x0e\n\x0c\n\x05\x06\0\x02\
+    \x01\x02\x12\x03)\x0f\x1c\n\x0c\n\x05\x06\0\x02\x01\x03\x12\x03)'5b\x06p\
+    roto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy::INIT;

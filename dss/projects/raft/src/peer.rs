@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::{self, Display, Formatter},
     fs,
     path::Path,
     sync::{mpsc, Arc, Mutex},
@@ -12,10 +13,16 @@ use rand::Rng;
 
 use crate::{rpc::PeerClient, EndPoint};
 
-#[derive(Clone)]
-pub(crate) struct LogSeq {
+#[derive(Clone, Debug)]
+pub struct LogSeq {
     pub term: usize,
     pub index: usize,
+}
+
+impl Display for LogSeq {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{{ term={}, index={} }}", self.term, self.index)
+    }
 }
 
 #[derive(Clone)]
@@ -35,13 +42,8 @@ struct Logger {
 }
 
 impl Logger {
-    fn new(term: usize, entries: Vec<Entry>) -> Self {
-        Self {
-            term,
-            entries,
-            committed: 0usize,
-            applied: 0usize,
-        }
+    fn new() -> Self {
+        Self::default()
     }
 
     fn load(dir: &str) -> Self {
@@ -58,10 +60,44 @@ impl Logger {
             }
         }
 
+        debug!("loading logs from {} files: {:?}", paths.len(), paths);
         if paths.is_empty() {
-            Self::new(0, Vec::new())
+            Self::new()
         } else {
             unimplemented!()
+        }
+    }
+
+    fn get_last_seq(&self) -> Option<LogSeq> {
+        if let Some(entry) = self.entries.get(self.applied) {
+            Some(entry.seq.clone())
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Vote {
+    pub granted: bool,
+    pub term: usize,
+    pub log_seq: Option<LogSeq>,
+}
+
+impl Display for Vote {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Some(log_seq) = &self.log_seq {
+            write!(
+                f,
+                "{{ granted?={}, term={}, log_seq={} }}",
+                self.granted, self.term, log_seq
+            )
+        } else {
+            write!(
+                f,
+                "{{ granted?={}, term={}, log_seq=None }}",
+                self.granted, self.term,
+            )
         }
     }
 }
@@ -121,6 +157,11 @@ pub struct Peer {
 
 impl Peer {
     pub fn new(logs: &str, host: EndPoint, peer_hosts: Vec<EndPoint>) -> Self {
+        debug!(
+            "creating Peer on host={} with dir(logs)={}, other Peers={:?}",
+            host, logs, peer_hosts
+        );
+
         let mut peers = HashMap::new();
         for h in peer_hosts {
             let client = PeerClient::connect(&h);
@@ -142,14 +183,16 @@ impl Peer {
                 let mut s = self.state.lock().unwrap();
                 match s.role {
                     Role::Leader { .. } => {
+                        debug!("running as Leader");
                         for (_, p) in &self.peers {
                             p.heart_beat();
                         }
                     }
                     Role::Candidate => {
                         s.logs.term += 1;
+                        debug!("running as Candidate: term={}", s.logs.term);
 
-                        let (vote_sender, vote_recver) = mpsc::channel();
+                        let (vote_sender, vote_recver) = mpsc::channel::<Vote>();
                         let (tick_sender, tick_recver) = mpsc::channel::<()>();
 
                         thread::spawn(move || {
@@ -161,17 +204,23 @@ impl Peer {
                             peer.request_vote_async(
                                 self.host.clone(),
                                 s.logs.term,
-                                s.logs.entries[s.logs.applied].seq.clone(),
+                                s.logs.get_last_seq(),
                                 vote_sender.clone(),
                             );
                         }
 
                         let mut votes = 1usize;
                         while votes < (self.peers.len() / 2) + 1 {
-                            if let Ok((granted, term)) = vote_recver.try_recv() {
-                                if granted {
+                            if let Ok(vote) = vote_recver.try_recv() {
+                                if vote.granted {
+                                    debug!("receive granted vote from peer");
                                     votes += 1;
-                                } else if term > s.logs.term {
+                                } else {
+                                    debug!(
+                                        "receive greater term or log seq from peer: peers={}, self={{ term={}, log_seq={:?} }}",
+                                        vote, s.logs.term,s.logs.get_last_seq(),
+                                    );
+
                                     s.role = Role::Follower {
                                         voted: None,
                                         leader_alive: false,
@@ -181,6 +230,7 @@ impl Peer {
                                     break;
                                 }
                             } else if let Ok(_) = tick_recver.try_recv() {
+                                debug!("timeout when election");
                                 break;
                             } else {
                                 thread::sleep(Duration::from_millis(10));
@@ -188,10 +238,16 @@ impl Peer {
                         }
                         if votes > (self.peers.len() / 2) + 1 {
                             // become leader
+                            debug!("receive {} granted vote from peer, become leader", votes);
                             unimplemented!()
                         }
                     }
-                    Role::Follower { leader_alive, .. } => {
+                    Role::Follower {
+                        ref voted,
+                        leader_alive,
+                        ..
+                    } => {
+                        debug!("running as Follower, voted for={:?}", voted);
                         if !leader_alive {
                             s.role = Role::Candidate;
                             self.sleep_time = Duration::from_millis(0);

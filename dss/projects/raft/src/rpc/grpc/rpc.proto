@@ -24,8 +24,10 @@ message VoteRequest {
 message VoteResponse {
     // term of follower holding
     int64 term = 1;
+    // last seq of logs of follower
+    LogSeq log_seq = 2;
     // vote for candidate or not
-    bool granted = 2;
+    bool granted = 3;
 }
 
 message AppendRequest {

@@ -12,7 +12,10 @@ use grpcio::{ChannelBuilder, EnvBuilder, Server, ServerBuilder};
 mod grpc;
 use grpc::{PeerGrpcClient, PeerGrpcServer, VoteRequest, VoteResponse};
 
-use crate::{peer::LogSeq, EndPoint};
+use crate::{
+    peer::{LogSeq, Vote},
+    EndPoint,
+};
 
 #[derive(Clone)]
 pub struct Config {
@@ -76,19 +79,23 @@ impl PeerClient {
         &self,
         host: EndPoint,
         term: usize,
-        log_seq: LogSeq,
-        ch: Sender<(bool, usize)>,
+        log_seq: Option<LogSeq>,
+        ch: Sender<Vote>,
     ) {
         let mut req = VoteRequest::new();
-        req.set_end_point(grpc::grpc_end_point_from(host));
         req.set_term(term as i64);
         req.set_log_seq(grpc::grpc_log_seq_from(log_seq));
+        req.set_end_point(grpc::grpc_end_point_from(host));
 
         let grpc_ch = self.inner.vote_async(&req).unwrap();
         thread::spawn(move || {
-            let rsp = grpc_ch.wait().unwrap();
-            ch.send((rsp.get_granted(), rsp.get_term() as usize))
-                .unwrap();
+            let mut rsp = grpc_ch.wait().unwrap();
+            ch.send(Vote {
+                granted: rsp.get_granted(),
+                term: rsp.get_term() as usize,
+                log_seq: grpc::crate_log_seq_from(rsp.take_log_seq()),
+            })
+            .unwrap();
         });
     }
 }

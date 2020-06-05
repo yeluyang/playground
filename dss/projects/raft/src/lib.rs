@@ -1,5 +1,8 @@
 use std::fmt::{self, Display, Formatter};
 
+#[macro_use]
+extern crate log;
+
 mod peer;
 
 mod rpc;

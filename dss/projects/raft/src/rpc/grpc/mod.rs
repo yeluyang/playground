@@ -26,19 +26,33 @@ pub fn grpc_end_point_from(crate_end_point: crate::EndPoint) -> rpc::EndPoint {
     }
 }
 
-pub fn crate_log_seq_from(grpc_log_seq: rpc::LogSeq) -> peer::LogSeq {
-    peer::LogSeq {
-        term: grpc_log_seq.term as usize,
-        index: grpc_log_seq.index as usize,
+pub fn crate_log_seq_from(grpc_log_seq: rpc::LogSeq) -> Option<peer::LogSeq> {
+    assert!(grpc_log_seq.term * grpc_log_seq.index > 0);
+    if grpc_log_seq.term < 0 {
+        Some(peer::LogSeq {
+            term: grpc_log_seq.term as usize,
+            index: grpc_log_seq.index as usize,
+        })
+    } else {
+        None
     }
 }
 
-pub fn grpc_log_seq_from(crate_log_seq: peer::LogSeq) -> rpc::LogSeq {
-    rpc::LogSeq {
-        term: crate_log_seq.term as i64,
-        index: crate_log_seq.index as i64,
-        unknown_fields: Default::default(),
-        cached_size: Default::default(),
+pub fn grpc_log_seq_from(crate_log_seq: Option<peer::LogSeq>) -> rpc::LogSeq {
+    if let Some(crate_log_seq) = crate_log_seq {
+        rpc::LogSeq {
+            term: crate_log_seq.term as i64,
+            index: crate_log_seq.index as i64,
+            unknown_fields: Default::default(),
+            cached_size: Default::default(),
+        }
+    } else {
+        rpc::LogSeq {
+            term: -1i64,
+            index: -1i64,
+            unknown_fields: Default::default(),
+            cached_size: Default::default(),
+        }
     }
 }
 
