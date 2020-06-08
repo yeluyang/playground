@@ -13,7 +13,8 @@ use rand::Rng;
 
 use crate::{rpc::PeerClient, EndPoint};
 
-#[derive(Clone, Debug)]
+/// FIXME: bugs occur when self.term > other.term but self.index < other.index under derived `PartialOrd`
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub struct LogSeq {
     pub term: usize,
     pub index: usize,
@@ -176,6 +177,50 @@ impl Peer {
         }
     }
 
+    pub fn grant_for(
+        &mut self,
+        candidate: EndPoint,
+        term: usize,
+        log_seq: Option<LogSeq>,
+    ) -> (bool, usize, Option<LogSeq>) {
+        let mut s = self.state.lock().unwrap();
+
+        debug!(
+            "granting for peer={{ host={}, term={}, last_log_seq={:?} }}: self.term={}, self.last_log_seq={:?}",
+            candidate,term,log_seq,
+            s.logs.term,
+            s.logs.get_last_seq(),
+        );
+
+        if term < s.logs.term || log_seq < s.logs.get_last_seq() {
+            (false, s.logs.term, s.logs.get_last_seq())
+        } else if let Role::Follower { voted, .. } = &mut s.role {
+            if let Some(end_point) = voted {
+                if &candidate == end_point {
+                    debug!("already granted peer={} as leader", candidate);
+                    (true, s.logs.term, s.logs.get_last_seq())
+                } else {
+                    debug!("already granted other");
+                    (false, s.logs.term, s.logs.get_last_seq())
+                }
+            } else {
+                debug!("grant peer={} as leader", candidate);
+                *voted = Some(candidate);
+                (true, s.logs.term, s.logs.get_last_seq())
+            }
+        } else {
+            debug!(
+                "grant peer={} as leader, convert self to follower",
+                candidate
+            );
+            s.role = Role::Follower {
+                voted: Some(candidate),
+                leader_alive: false,
+            };
+            (true, s.logs.term, s.logs.get_last_seq())
+        }
+    }
+
     pub fn run(&mut self) {
         loop {
             thread::sleep(self.sleep_time);
@@ -213,11 +258,15 @@ impl Peer {
                         while votes < (self.peers.len() / 2) + 1 {
                             if let Ok(vote) = vote_recver.try_recv() {
                                 if vote.granted {
-                                    debug!("receive granted vote from peer");
                                     votes += 1;
+                                    debug!(
+                                        "receive granted vote from peer: {}/{}",
+                                        votes,
+                                        self.peers.len() + 1
+                                    );
                                 } else {
                                     debug!(
-                                        "receive greater term or log seq from peer: peers={}, self={{ term={}, log_seq={:?} }}",
+                                        "receive greater term or log seq from peer, convert self to follower: peers={}, self={{ term={}, log_seq={:?} }}",
                                         vote, s.logs.term,s.logs.get_last_seq(),
                                     );
 
@@ -236,7 +285,7 @@ impl Peer {
                                 thread::sleep(Duration::from_millis(10));
                             }
                         }
-                        if votes > (self.peers.len() / 2) + 1 {
+                        if votes >= (self.peers.len() / 2) + 1 {
                             // become leader
                             debug!("receive {} granted vote from peer, become leader", votes);
                             unimplemented!()

@@ -28,7 +28,7 @@ pub fn grpc_end_point_from(crate_end_point: crate::EndPoint) -> rpc::EndPoint {
 
 pub fn crate_log_seq_from(grpc_log_seq: rpc::LogSeq) -> Option<peer::LogSeq> {
     assert!(grpc_log_seq.term * grpc_log_seq.index > 0);
-    if grpc_log_seq.term < 0 {
+    if grpc_log_seq.term > 0 {
         Some(peer::LogSeq {
             term: grpc_log_seq.term as usize,
             index: grpc_log_seq.index as usize,
@@ -74,8 +74,21 @@ impl PeerGrpcServer {
 }
 
 impl PeerGrpc for PeerGrpcServer {
-    fn vote(&mut self, ctx: RpcContext, req: VoteRequest, sink: UnarySink<VoteResponse>) {
-        unimplemented!()
+    fn vote(&mut self, ctx: RpcContext, mut req: VoteRequest, sink: UnarySink<VoteResponse>) {
+        debug!("got vote request: request={{ {:?} }}", req);
+
+        let (granted, term, log_seq) = self.inner.grant_for(
+            crate_end_point_from(req.take_end_point()),
+            req.get_term() as usize,
+            crate_log_seq_from(req.take_log_seq()),
+        );
+
+        let mut rsp = VoteResponse::new();
+        rsp.set_granted(granted);
+        rsp.set_term(term as i64);
+        rsp.set_log_seq(grpc_log_seq_from(log_seq));
+
+        sink.success(rsp);
     }
 
     fn append(&mut self, ctx: RpcContext, req: AppendRequest, sink: UnarySink<AppendResponse>) {
