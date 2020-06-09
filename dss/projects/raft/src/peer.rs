@@ -11,7 +11,7 @@ use std::{
 extern crate rand;
 use rand::Rng;
 
-use crate::{rpc::PeerClient, EndPoint};
+use crate::{rpc::PeerClientRPC, EndPoint};
 
 /// FIXME: bugs occur when self.term > other.term but self.index < other.index under derived `PartialOrd`
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
@@ -158,14 +158,14 @@ impl PeerState {
 }
 
 #[derive(Default, Clone)]
-pub struct Peer {
+pub struct Peer<C: PeerClientRPC> {
     state: Arc<Mutex<PeerState>>,
     sleep_time: Duration,
     host: EndPoint,
-    peers: HashMap<EndPoint, PeerClient>,
+    peers: HashMap<EndPoint, C>,
 }
 
-impl Peer {
+impl<C: PeerClientRPC> Peer<C> {
     pub fn new(logs: &str, host: EndPoint, peer_hosts: Vec<EndPoint>) -> Self {
         debug!(
             "creating Peer on host={} with dir(logs)={}, other Peers={:?}",
@@ -174,7 +174,7 @@ impl Peer {
 
         let mut peers = HashMap::new();
         for h in peer_hosts {
-            let client = PeerClient::connect(&h);
+            let client = PeerClientRPC::connect(&h);
             peers.insert(h, client);
         }
 

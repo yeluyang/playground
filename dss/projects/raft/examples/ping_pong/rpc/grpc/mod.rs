@@ -1,7 +1,9 @@
 extern crate grpcio;
 use grpcio::{RpcContext, UnarySink};
 
-use crate::peer::{self, Peer};
+use raft::{self, Peer};
+
+use crate::rpc::PeerClient;
 
 mod rpc;
 pub use rpc::{AppendRequest, AppendResponse, VoteRequest, VoteResponse};
@@ -10,14 +12,14 @@ mod rpc_grpc;
 use rpc_grpc::PeerGrpc;
 pub use rpc_grpc::{create_peer_grpc, PeerGrpcClient};
 
-pub fn crate_end_point_from(mut rpc_end_point: rpc::EndPoint) -> crate::EndPoint {
-    crate::EndPoint {
+pub fn crate_end_point_from(mut rpc_end_point: rpc::EndPoint) -> raft::EndPoint {
+    raft::EndPoint {
         ip: rpc_end_point.take_ip(),
         port: rpc_end_point.get_port() as u16,
     }
 }
 
-pub fn grpc_end_point_from(crate_end_point: crate::EndPoint) -> rpc::EndPoint {
+pub fn grpc_end_point_from(crate_end_point: raft::EndPoint) -> rpc::EndPoint {
     rpc::EndPoint {
         ip: crate_end_point.ip,
         port: crate_end_point.port as i64,
@@ -26,10 +28,10 @@ pub fn grpc_end_point_from(crate_end_point: crate::EndPoint) -> rpc::EndPoint {
     }
 }
 
-pub fn crate_log_seq_from(grpc_log_seq: rpc::LogSeq) -> Option<peer::LogSeq> {
+pub fn crate_log_seq_from(grpc_log_seq: rpc::LogSeq) -> Option<raft::LogSeq> {
     assert!(grpc_log_seq.term * grpc_log_seq.index > 0);
     if grpc_log_seq.term > 0 {
-        Some(peer::LogSeq {
+        Some(raft::LogSeq {
             term: grpc_log_seq.term as usize,
             index: grpc_log_seq.index as usize,
         })
@@ -38,7 +40,7 @@ pub fn crate_log_seq_from(grpc_log_seq: rpc::LogSeq) -> Option<peer::LogSeq> {
     }
 }
 
-pub fn grpc_log_seq_from(crate_log_seq: Option<peer::LogSeq>) -> rpc::LogSeq {
+pub fn grpc_log_seq_from(crate_log_seq: Option<raft::LogSeq>) -> rpc::LogSeq {
     if let Some(crate_log_seq) = crate_log_seq {
         rpc::LogSeq {
             term: crate_log_seq.term as i64,
@@ -58,11 +60,11 @@ pub fn grpc_log_seq_from(crate_log_seq: Option<peer::LogSeq>) -> rpc::LogSeq {
 
 #[derive(Clone)]
 pub struct PeerGrpcServer {
-    inner: Peer,
+    inner: Peer<PeerClient>,
 }
 
 impl PeerGrpcServer {
-    pub fn new(host: crate::EndPoint, logs: &str, peers: Vec<crate::EndPoint>) -> Self {
+    pub fn new(host: raft::EndPoint, logs: &str, peers: Vec<raft::EndPoint>) -> Self {
         Self {
             inner: Peer::new(logs, host, peers),
         }

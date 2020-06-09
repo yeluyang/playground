@@ -4,13 +4,15 @@ use std::fmt::{self, Display, Formatter};
 extern crate log;
 
 mod rpc;
+pub use rpc::PeerClientRPC;
 
 mod peer;
+pub use peer::{LogSeq, Peer, Vote};
 
 #[derive(Default, Clone, Eq, PartialEq, Debug, Hash)]
 pub struct EndPoint {
-    ip: String,
-    port: u16,
+    pub ip: String,
+    pub port: u16,
 }
 
 impl Display for EndPoint {
@@ -29,7 +31,7 @@ impl From<(String, u16)> for EndPoint {
 }
 
 impl EndPoint {
-    fn from_hosts(hosts: &[(String, u16)]) -> Vec<Self> {
+    pub fn from_hosts(hosts: &[(String, u16)]) -> Vec<Self> {
         let mut endpoints: Vec<Self> = Vec::new();
 
         for host in hosts {

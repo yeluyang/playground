@@ -12,10 +12,7 @@ use grpcio::{ChannelBuilder, EnvBuilder, Server, ServerBuilder};
 mod grpc;
 use grpc::{PeerGrpcClient, PeerGrpcServer, VoteRequest, VoteResponse};
 
-use crate::{
-    peer::{LogSeq, Vote},
-    EndPoint,
-};
+use raft::{EndPoint, LogSeq, PeerClientRPC, Vote};
 
 #[derive(Clone)]
 pub struct Config {
@@ -61,8 +58,8 @@ pub struct PeerClient {
     inner: PeerGrpcClient,
 }
 
-impl PeerClient {
-    pub fn connect(host: &EndPoint) -> Self {
+impl raft::PeerClientRPC for PeerClient {
+    fn connect(host: &EndPoint) -> Self {
         Self {
             inner: PeerGrpcClient::new(
                 ChannelBuilder::new(Arc::new(EnvBuilder::new().build()))
@@ -71,11 +68,11 @@ impl PeerClient {
         }
     }
 
-    pub fn heart_beat(&self) {
+    fn heart_beat(&self) {
         unimplemented!()
     }
 
-    pub fn request_vote_async(
+    fn request_vote_async(
         &self,
         host: EndPoint,
         term: usize,
