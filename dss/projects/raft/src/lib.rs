@@ -3,10 +3,9 @@ use std::fmt::{self, Display, Formatter};
 #[macro_use]
 extern crate log;
 
-mod peer;
-
 mod rpc;
-pub use rpc::{Config, PeerClient, PeerServer};
+
+mod peer;
 
 #[derive(Default, Clone, Eq, PartialEq, Debug, Hash)]
 pub struct EndPoint {
