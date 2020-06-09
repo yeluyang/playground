@@ -106,7 +106,16 @@ impl Display for Vote {
 #[derive(Clone)]
 struct FollowerState {
     next: usize,
-    matched: usize,
+    matched: Option<LogSeq>,
+}
+
+impl FollowerState {
+    fn new(logs: usize) -> Self {
+        Self {
+            next: logs,
+            matched: Default::default(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -193,31 +202,46 @@ impl Peer {
         );
 
         if term < s.logs.term || log_seq < s.logs.get_last_seq() {
-            (false, s.logs.term, s.logs.get_last_seq())
-        } else if let Role::Follower { voted, .. } = &mut s.role {
-            if let Some(end_point) = voted {
-                if &candidate == end_point {
-                    debug!("already granted peer={} as leader", candidate);
-                    (true, s.logs.term, s.logs.get_last_seq())
-                } else {
-                    debug!("already granted other");
-                    (false, s.logs.term, s.logs.get_last_seq())
-                }
-            } else {
-                debug!("grant peer={} as leader", candidate);
-                *voted = Some(candidate);
-                (true, s.logs.term, s.logs.get_last_seq())
-            }
-        } else {
             debug!(
-                "grant peer={} as leader, convert self to follower",
+                "deny to grant peer={} as leader: candiate's term or log is out of date",
+                candidate
+            );
+            (false, s.logs.term, s.logs.get_last_seq())
+        } else if term > s.logs.term {
+            debug!(
+                "grant peer={} as leader, convert self to follower: candiate's term is larger",
                 candidate
             );
             s.role = Role::Follower {
                 voted: Some(candidate),
                 leader_alive: false,
             };
+            s.logs.term = term;
             (true, s.logs.term, s.logs.get_last_seq())
+        } else if let Role::Follower { voted, .. } = &mut s.role {
+            if let Some(end_point) = voted {
+                if &candidate == end_point {
+                    debug!("have been granted peer={} as leader", candidate);
+                    (true, s.logs.term, s.logs.get_last_seq())
+                } else {
+                    debug!( "deny ot grant peer={} as leader: have been granted other peer={} as leader", candidate, end_point);
+                    (false, s.logs.term, s.logs.get_last_seq())
+                }
+            } else {
+                debug!(
+                    "grant peer={} as leader: not grant any other yet",
+                    candidate
+                );
+                *voted = Some(candidate);
+                s.logs.term = term;
+                (true, s.logs.term, s.logs.get_last_seq())
+            }
+        } else {
+            debug!(
+                "deny ot grant peer={} as leader: self is leader or candidate and got same term from candidate",
+                candidate
+            );
+            (false, s.logs.term, s.logs.get_last_seq())
         }
     }
 
@@ -254,16 +278,19 @@ impl Peer {
                             );
                         }
 
-                        let mut votes = 1usize;
-                        while votes < (self.peers.len() / 2) + 1 {
+                        let mut votes = 0usize;
+                        loop {
                             if let Ok(vote) = vote_recver.try_recv() {
                                 if vote.granted {
                                     votes += 1;
                                     debug!(
                                         "receive granted vote from peer: {}/{}",
                                         votes,
-                                        self.peers.len() + 1
+                                        self.peers.len(),
                                     );
+                                    if votes >= self.peers.len() {
+                                        break;
+                                    };
                                 } else {
                                     debug!(
                                         "receive greater term or log seq from peer, convert self to follower: peers={}, self={{ term={}, log_seq={:?} }}",
@@ -285,10 +312,21 @@ impl Peer {
                                 thread::sleep(Duration::from_millis(10));
                             }
                         }
-                        if votes >= (self.peers.len() / 2) + 1 {
+                        if votes >= self.peers.len() / 2 {
                             // become leader
-                            debug!("receive {} granted vote from peer, become leader", votes);
-                            unimplemented!()
+                            debug!(
+                                "receive {}/{} granted vote from peer, become leader",
+                                votes,
+                                self.peers.len()
+                            );
+                            let mut followers = HashMap::new();
+                            for (peer_endpoint, _) in &self.peers {
+                                followers.insert(
+                                    peer_endpoint.clone(),
+                                    FollowerState::new(s.logs.applied),
+                                );
+                            }
+                            s.role = Role::Leader { followers }
                         }
                     }
                     Role::Follower {
