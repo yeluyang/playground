@@ -1,6 +1,7 @@
 use std::{
     fmt::{self, Display, Formatter},
     sync::mpsc::Sender,
+    thread,
 };
 
 use crate::{logger::LogSeq, peer::Vote};
@@ -17,6 +18,12 @@ impl Display for EndPoint {
     }
 }
 
+impl From<&(&str, u16)> for EndPoint {
+    fn from(host: &(&str, u16)) -> Self {
+        Self::from((host.0.to_owned(), host.1))
+    }
+}
+
 impl From<(String, u16)> for EndPoint {
     fn from(host: (String, u16)) -> Self {
         Self {
@@ -27,20 +34,23 @@ impl From<(String, u16)> for EndPoint {
 }
 
 impl EndPoint {
-    pub fn from_hosts(hosts: &[(String, u16)]) -> Vec<Self> {
+    pub fn from_hosts(hosts: Vec<(String, u16)>) -> Vec<Self> {
         let mut endpoints: Vec<Self> = Vec::new();
 
         for host in hosts {
-            endpoints.push(Self::from(host.clone()));
+            endpoints.push(Self::from(host));
         }
 
         endpoints
     }
 }
 
-pub trait PeerClientRPC: Clone {
+pub trait PeerClientRPC: Send + Clone + 'static {
     fn connect(host: &EndPoint) -> Self;
+
     fn heart_beat(&self);
+
+    fn request_vote(&self, host: EndPoint, term: usize, log_seq: Option<LogSeq>) -> Vote;
 
     fn request_vote_async(
         &self,
@@ -48,5 +58,10 @@ pub trait PeerClientRPC: Clone {
         term: usize,
         log_seq: Option<LogSeq>,
         ch: Sender<Vote>,
-    );
+    ) {
+        let agent = self.clone();
+        thread::spawn(move || {
+            ch.send(agent.request_vote(host, term, log_seq)).unwrap();
+        });
+    }
 }

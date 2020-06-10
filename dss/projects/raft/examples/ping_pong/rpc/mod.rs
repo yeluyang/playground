@@ -1,10 +1,4 @@
-use std::{
-    sync::{mpsc::Sender, Arc},
-    thread,
-};
-
-extern crate futures;
-use futures::Future;
+use std::sync::Arc;
 
 extern crate grpcio;
 use grpcio::{ChannelBuilder, EnvBuilder, Server, ServerBuilder};
@@ -31,7 +25,7 @@ pub struct PeerServer {
 impl PeerServer {
     pub fn new(config: Config) -> Self {
         let host = EndPoint::from((config.ip.clone(), config.port));
-        let peers = EndPoint::from_hosts(&config.peers);
+        let peers = EndPoint::from_hosts(config.peers.clone());
         let runner = PeerGrpcServer::new(host, &config.logs, peers);
 
         let inner = ServerBuilder::new(Arc::new(EnvBuilder::new().build()))
@@ -58,7 +52,7 @@ pub struct PeerClient {
     inner: PeerGrpcClient,
 }
 
-impl raft::PeerClientRPC for PeerClient {
+impl PeerClientRPC for PeerClient {
     fn connect(host: &EndPoint) -> Self {
         Self {
             inner: PeerGrpcClient::new(
@@ -72,27 +66,17 @@ impl raft::PeerClientRPC for PeerClient {
         unimplemented!()
     }
 
-    fn request_vote_async(
-        &self,
-        host: EndPoint,
-        term: usize,
-        log_seq: Option<LogSeq>,
-        ch: Sender<Vote>,
-    ) {
+    fn request_vote(&self, host: EndPoint, term: usize, log_seq: Option<LogSeq>) -> Vote {
         let mut req = VoteRequest::new();
         req.set_term(term as i64);
         req.set_log_seq(grpc::grpc_log_seq_from(log_seq));
         req.set_end_point(grpc::grpc_end_point_from(host));
 
-        let grpc_ch = self.inner.vote_async(&req).unwrap();
-        thread::spawn(move || {
-            let mut rsp = grpc_ch.wait().unwrap();
-            ch.send(Vote {
-                granted: rsp.get_granted(),
-                term: rsp.get_term() as usize,
-                log_seq: grpc::crate_log_seq_from(rsp.take_log_seq()),
-            })
-            .unwrap();
-        });
+        let mut rsp = self.inner.vote(&req).unwrap();
+        Vote {
+            granted: rsp.get_granted(),
+            term: rsp.get_term() as usize,
+            log_seq: grpc::crate_log_seq_from(rsp.take_log_seq()),
+        }
     }
 }
