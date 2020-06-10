@@ -21,7 +21,8 @@ pub struct Config {
     tuple: ((), i8, i16, i32, i64),
     array: Vec<char>,
     map: HashMap<isize, bool>,
-    // refer: Box<String>, TODO
+    array_tuples: Vec<((), i64, bool, char, String)>,
+    // refer: Box<String>, // TODO
     enum_var: EnumVariant,
     tuple_struct: TupleStruct,
     array_struct: Vec<Nested>,
