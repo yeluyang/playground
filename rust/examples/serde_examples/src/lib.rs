@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 // TODO: ron cannot support i128 and u128, should convert it manually
 // TODO: bson cannot support unsigned, should convert it manually
+// TODO: toml cannot support enum and tuple
 
 // normal derive
 #[derive(Debug, PartialEq, Default)]
