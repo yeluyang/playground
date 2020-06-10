@@ -1,4 +1,4 @@
-use std::fs;
+use std::fs::{self, File};
 
 extern crate clap;
 use clap::{App, AppSettings, Arg};
@@ -9,6 +9,8 @@ use log::LevelFilter;
 
 extern crate env_logger;
 use env_logger::{Builder, Env};
+
+extern crate serde_json;
 
 mod rpc;
 use rpc::{Config, PeerServer};
@@ -31,7 +33,12 @@ fn main() {
                 .long("quiet")
                 .conflicts_with("verbose"),
             // custome arguments
-            // TODO
+            Arg::with_name("config")
+                .help("/path/to/config")
+                .short("c")
+                .long("config")
+                .takes_value(true)
+                .required(true),
         ])
         .get_matches();
 
@@ -52,15 +59,9 @@ fn main() {
 
     info!("start with arguments: {:?}", matches.args);
 
-    let config = Config {
-        ip: "127.0.0.1".to_owned(),
-        port: 10081,
-        logs: "tmp/tests/all/1/logs".to_owned(),
-        peers: vec![
-            ("127.0.0.1".to_owned(), 10082),
-            ("127.0.0.1".to_owned(), 10083),
-        ],
-    };
+    let config: Config =
+        serde_json::from_reader(File::open(matches.value_of("config").unwrap()).unwrap()).unwrap();
+
     fs::create_dir_all(&config.logs).unwrap();
     let mut server = PeerServer::new(config.clone());
 

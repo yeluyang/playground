@@ -1,5 +1,8 @@
 use std::sync::Arc;
 
+extern crate serde;
+use serde::Deserialize;
+
 extern crate grpcio;
 use grpcio::{ChannelBuilder, EnvBuilder, Server, ServerBuilder};
 
@@ -8,7 +11,7 @@ use grpc::{PeerGrpcClient, PeerGrpcServer, VoteRequest, VoteResponse};
 
 use raft::{EndPoint, LogSeq, PeerClientRPC, Vote};
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 pub struct Config {
     pub ip: String,
     pub port: u16,
