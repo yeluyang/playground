@@ -20,6 +20,7 @@ impl Display for LogSeq {
 #[derive(Clone)]
 struct Entry {
     seq: LogSeq,
+    data: Vec<u8>,
 }
 
 #[derive(Default, Clone)]

@@ -39,6 +39,13 @@ impl Display for Vote {
     }
 }
 
+#[derive(Debug)]
+pub struct Receipt {
+    pub success: bool,
+    pub term: usize,
+    pub endpoint: EndPoint,
+}
+
 #[derive(Clone)]
 struct FollowerState {
     next: usize,
@@ -122,12 +129,44 @@ impl<C: PeerClientRPC> Peer<C> {
         }
     }
 
-    pub fn grant_for(
+    pub fn append(
         &mut self,
-        candidate: EndPoint,
+        leader: EndPoint,
         term: usize,
-        log_seq: Option<LogSeq>,
-    ) -> (bool, usize, Option<LogSeq>) {
+    ) -> Receipt {
+        let mut s = self.state.lock().unwrap();
+        if term < s.logs.term {
+            Receipt {
+                endpoint: self.host.clone(),
+                success: false,
+                term: s.logs.term,
+            }
+        } else {
+            s.logs.term = term;
+            match s.role {
+                Role::Follower {
+                    ref mut leader_alive,
+                    ..
+                } => {
+                    *leader_alive = true;
+                }
+                Role::Candidate => {
+                    s.role = Role::Follower {
+                        voted: None,
+                        leader_alive: false,
+                    };
+                }
+                Role::Leader { .. } => unreachable!(),
+            }
+            Receipt {
+                endpoint: self.host.clone(),
+                success: true,
+                term: s.logs.term,
+            }
+        }
+    }
+
+    pub fn grant_for(&mut self, candidate: EndPoint, term: usize, log_seq: Option<LogSeq>) -> Vote {
         let mut s = self.state.lock().unwrap();
 
         debug!(
@@ -142,7 +181,11 @@ impl<C: PeerClientRPC> Peer<C> {
                 "deny to grant peer={} as leader: candiate's term or log is out of date",
                 candidate
             );
-            (false, s.logs.term, s.logs.get_last_seq())
+            Vote {
+                granted: false,
+                term: s.logs.term,
+                log_seq: s.logs.get_last_seq(),
+            }
         } else if term > s.logs.term {
             debug!(
                 "grant peer={} as leader, convert self to follower: candiate's term is larger",
@@ -153,15 +196,27 @@ impl<C: PeerClientRPC> Peer<C> {
                 leader_alive: false,
             };
             s.logs.term = term;
-            (true, s.logs.term, s.logs.get_last_seq())
+            Vote {
+                granted: true,
+                term: s.logs.term,
+                log_seq: s.logs.get_last_seq(),
+            }
         } else if let Role::Follower { voted, .. } = &mut s.role {
             if let Some(end_point) = voted {
                 if &candidate == end_point {
                     debug!("have been granted peer={} as leader", candidate);
-                    (true, s.logs.term, s.logs.get_last_seq())
+                    Vote {
+                        granted: true,
+                        term: s.logs.term,
+                        log_seq: s.logs.get_last_seq(),
+                    }
                 } else {
                     debug!( "deny ot grant peer={} as leader: have been granted other peer={} as leader", candidate, end_point);
-                    (false, s.logs.term, s.logs.get_last_seq())
+                    Vote {
+                        granted: false,
+                        term: s.logs.term,
+                        log_seq: s.logs.get_last_seq(),
+                    }
                 }
             } else {
                 debug!(
@@ -170,14 +225,22 @@ impl<C: PeerClientRPC> Peer<C> {
                 );
                 *voted = Some(candidate);
                 s.logs.term = term;
-                (true, s.logs.term, s.logs.get_last_seq())
+                Vote {
+                    granted: true,
+                    term: s.logs.term,
+                    log_seq: s.logs.get_last_seq(),
+                }
             }
         } else {
             debug!(
                 "deny ot grant peer={} as leader: self is leader or candidate and got same term from candidate",
                 candidate
             );
-            (false, s.logs.term, s.logs.get_last_seq())
+            Vote {
+                granted: false,
+                term: s.logs.term,
+                log_seq: s.logs.get_last_seq(),
+            }
         }
     }
 
@@ -190,7 +253,7 @@ impl<C: PeerClientRPC> Peer<C> {
                     Role::Leader { .. } => {
                         debug!("running as Leader");
                         for (_, p) in &self.peers {
-                            p.heart_beat();
+                            p.heart_beat(self.host.clone(), s.logs.term);
                         }
                     }
                     Role::Candidate => {

@@ -13,27 +13,37 @@ message LogSeq {
 }
 
 message VoteRequest {
-    // term of candidate holding
-    int64 term = 1;
-    // last seq of logs of candidate
-    LogSeq log_seq = 2;
     // id of candidate
-    EndPoint end_point = 3;
+    EndPoint end_point = 1;
+    // term of candidate holding
+    int64 term = 2;
+    // last seq of logs of candidate
+    LogSeq last_log_seq = 3;
 }
 
 message VoteResponse {
     // term of follower holding
     int64 term = 1;
     // last seq of logs of follower
-    LogSeq log_seq = 2;
+    LogSeq last_log_seq = 2;
     // vote for candidate or not
     bool granted = 3;
 }
 
 message AppendRequest {
+    // id of leader
+    EndPoint end_point = 1;
+    // term of leader
+    int64 term = 2;
 }
 
 message AppendResponse {
+    // id of follower
+    EndPoint end_point = 1;
+    // term of peer
+    int64 term = 2;
+    // append successful or not
+    bool success = 3;
 }
 
 service PeerGRPC {

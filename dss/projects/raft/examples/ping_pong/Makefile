@@ -1,4 +1,4 @@
-GRPC_DIR = src/rpc/grpc
+GRPC_DIR = rpc/grpc
 GRPC_PB = $(GRPC_DIR)/rpc.proto
 GRPC_GEN_FILES = $(GRPC_DIR)/rpc.rs $(GRPC_DIR)/rpc_grpc.rs
 

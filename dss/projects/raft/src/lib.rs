@@ -8,4 +8,4 @@ mod logger;
 pub use logger::LogSeq;
 
 mod peer;
-pub use peer::{Peer, Vote};
+pub use peer::{Peer, Receipt, Vote};

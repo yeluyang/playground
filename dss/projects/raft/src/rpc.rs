@@ -4,7 +4,10 @@ use std::{
     thread,
 };
 
-use crate::{logger::LogSeq, peer::Vote};
+use crate::{
+    logger::LogSeq,
+    peer::{Receipt, Vote},
+};
 
 #[derive(Default, Clone, Eq, PartialEq, Debug, Hash)]
 pub struct EndPoint {
@@ -48,7 +51,14 @@ impl EndPoint {
 pub trait PeerClientRPC: Send + Clone + 'static {
     fn connect(host: &EndPoint) -> Self;
 
-    fn heart_beat(&self);
+    fn heart_beat(&self, leader: EndPoint, term: usize) -> Receipt;
+
+    fn heart_beat_async(&self, leader: EndPoint, term: usize, ch: Sender<Receipt>) {
+        let agent = self.clone();
+        thread::spawn(move || {
+            ch.send(agent.heart_beat(leader, term)).unwrap();
+        });
+    }
 
     fn request_vote(&self, host: EndPoint, term: usize, log_seq: Option<LogSeq>) -> Vote;
 
