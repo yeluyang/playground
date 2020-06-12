@@ -330,13 +330,15 @@ impl<C: PeerClientRPC> Peer<C> {
                     }
                     Role::Follower {
                         ref voted,
-                        leader_alive,
+                        ref mut leader_alive,
                         ..
                     } => {
                         debug!("running as Follower, voted for={:?}", voted);
-                        if !leader_alive {
+                        if !*leader_alive {
                             s.role = Role::Candidate;
                             self.sleep_time = Duration::from_millis(0);
+                        } else {
+                            *leader_alive = false
                         }
                     }
                 }
