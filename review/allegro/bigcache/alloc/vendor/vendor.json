@@ -1,0 +1,19 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "8skJYOdQytXjimcDPLRW4tonX3A=",
+			"path": "github.com/allegro/bigcache",
+			"revision": "0605c28b510103c549fb020d5fb50e1ad4093de8",
+			"revisionTime": "2019-06-18T07:24:24Z"
+		},
+		{
+			"checksumSHA1": "vtT7NcYLatJmxVQQEeSESyrgVg0=",
+			"path": "github.com/allegro/bigcache/queue",
+			"revision": "0605c28b510103c549fb020d5fb50e1ad4093de8",
+			"revisionTime": "2019-06-18T07:24:24Z"
+		}
+	],
+	"rootPath": "github.com/yeluyang/playground/review/allegro/bigcache/alloc"
+}
