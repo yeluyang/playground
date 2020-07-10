@@ -20,7 +20,7 @@ const (
 	GB    = 1 * SCALE * MB
 )
 
-func BigCacheConfigFrom(itemTotal int, itemMaxSize int, verbose bool) bigcache.Config {
+func BigCacheConfigFrom(itemTotal int, itemMaxSize int, initNum int, verbose bool) bigcache.Config {
 	// XXX: never evict
 	config := bigcache.DefaultConfig(200 * 365 * 24 * time.Hour)
 
@@ -35,7 +35,7 @@ func BigCacheConfigFrom(itemTotal int, itemMaxSize int, verbose bool) bigcache.C
 
 	// init 10 entry in each shard, 10 is equal to `bigcache.minimumEntriesInShard`
 	// `bigcache.minimumEntriesInShard` ensure number of entries in initialized shard > 0
-	config.MaxEntriesInWindow = 10 * config.Shards
+	config.MaxEntriesInWindow = initNum
 	config.MaxEntrySize = itemMaxSize
 
 	// `+1` ensure config.HardMaxCacheSize > 0
@@ -68,6 +68,10 @@ func main() {
 				Usage:   "number of total items",
 			},
 			&cli.IntFlag{
+				Name:  "init-num",
+				Usage: "number of inital item",
+			},
+			&cli.IntFlag{
 				Name:    "size",
 				Aliases: []string{"s"},
 				Usage:   "size of item, unit is 'KB'",
@@ -92,7 +96,7 @@ func main() {
 			sizeExpected := float64(itemTotal*itemSize) / float64(GB)
 			fmt.Printf("size expected is %f GB\n", sizeExpected)
 
-			config := BigCacheConfigFrom(itemTotal, itemSize, c.Bool("verbose"))
+			config := BigCacheConfigFrom(itemTotal, itemSize, c.Int("init-num"), c.Bool("verbose"))
 			fmt.Printf("config=%+v\n", config)
 
 			cache, err := bigcache.NewBigCache(config)
