@@ -13,6 +13,12 @@
 			"path": "github.com/allegro/bigcache/queue",
 			"revision": "0605c28b510103c549fb020d5fb50e1ad4093de8",
 			"revisionTime": "2019-06-18T07:24:24Z"
+		},
+		{
+			"checksumSHA1": "9pyKN9r6PEtgS8o14r/CJoH7HbM=",
+			"path": "github.com/urfave/cli",
+			"revision": "b626059537179114d912b95f3679eb2fb87e73f4",
+			"revisionTime": "2019-08-06T20:17:27Z"
 		}
 	],
 	"rootPath": "github.com/yeluyang/playground/review/allegro/bigcache/alloc"

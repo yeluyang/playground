@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"time"
+
+	"github.com/urfave/cli"
 
 	"github.com/allegro/bigcache"
 )
@@ -54,27 +57,59 @@ func getNearestPowerOf2(a uint) uint {
 }
 
 func main() {
-	var itemTotal = 10 * 10000
-	var itemSize = 8 * KB
+	app := cli.App{
+		Name: "bigcache-alloc",
+		Flags: []cli.Flag{
+			&cli.IntFlag{
+				Name:    "total",
+				Aliases: []string{"t"},
+				Usage:   "number of total items",
+			},
+			&cli.IntFlag{
+				Name:    "size",
+				Aliases: []string{"s"},
+				Usage:   "size of item, unit is 'KB'",
+				Value:   8,
+			},
+		},
+		Before: func(c *cli.Context) error {
+			if c.Int("total")*c.Int("size") == 0 {
+				return fmt.Errorf("value of total and size must be given and greater than zero: total=%d, size=%d", c.Int("total"), c.Int("size"))
+			}
+			return nil
+		},
+		Action: func(c *cli.Context) error {
+			itemTotal := c.Int("total")
+			itemSize := c.Int("size") * KB
 
-	config := BigCacheConfigFrom(itemTotal, itemSize)
-	fmt.Printf("config=%+v\n", config)
+			sizeExpected := float64(itemTotal*itemSize) / float64(GB)
+			fmt.Printf("size expected is %f GB\n", sizeExpected)
 
-	cache, err := bigcache.NewBigCache(config)
-	if err != nil {
-		panic(err)
+			config := BigCacheConfigFrom(itemTotal, itemSize)
+			fmt.Printf("config=%+v\n", config)
+
+			cache, err := bigcache.NewBigCache(config)
+			if err != nil {
+				return err
+			}
+
+			b := make([]byte, config.MaxEntrySize)
+			for i := 0; err == nil; i++ {
+				err = cache.Set(strconv.Itoa(i), b)
+				if err != nil {
+					fmt.Printf("err=%s\n", err)
+				}
+			}
+
+			fmt.Printf("sleeping\n")
+			time.Sleep(1 * time.Hour)
+
+			return nil
+		},
 	}
 
-	b := make([]byte, config.MaxEntrySize)
-	for i := 0; err == nil; i++ {
-		err = cache.Set(strconv.Itoa(i), b)
-		if err != nil {
-			fmt.Printf("err=%s\n", err)
-		}
-	}
-
-	for {
-		fmt.Printf("sleeping\n")
-		time.Sleep(1 * time.Hour)
+	if err := app.Run(os.Args); err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
 	}
 }
