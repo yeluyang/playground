@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/urfave/cli"
@@ -18,11 +20,11 @@ const (
 	GB    = 1 * SCALE * MB
 )
 
-func BigCacheConfigFrom(itemTotal, itemMaxSize int) bigcache.Config {
+func BigCacheConfigFrom(itemTotal int, itemMaxSize int, verbose bool) bigcache.Config {
 	// XXX: never evict
 	config := bigcache.DefaultConfig(200 * 365 * 24 * time.Hour)
 
-	config.Verbose = false
+	config.Verbose = verbose
 
 	// `+1` ensure shardsNumUpLimit > 0
 	shardsNumUpLimit := uint(itemTotal/100) + 1
@@ -71,6 +73,11 @@ func main() {
 				Usage:   "size of item, unit is 'KB'",
 				Value:   8,
 			},
+			&cli.BoolFlag{
+				Name:    "verbose",
+				Aliases: []string{"V"},
+				Value:   false,
+			},
 		},
 		Before: func(c *cli.Context) error {
 			if c.Int("total")*c.Int("size") == 0 {
@@ -85,7 +92,7 @@ func main() {
 			sizeExpected := float64(itemTotal*itemSize) / float64(GB)
 			fmt.Printf("size expected is %f GB\n", sizeExpected)
 
-			config := BigCacheConfigFrom(itemTotal, itemSize)
+			config := BigCacheConfigFrom(itemTotal, itemSize, c.Bool("verbose"))
 			fmt.Printf("config=%+v\n", config)
 
 			cache, err := bigcache.NewBigCache(config)
@@ -94,15 +101,16 @@ func main() {
 			}
 
 			b := make([]byte, config.MaxEntrySize)
-			for i := 0; err == nil; i++ {
+			i := 0
+			for ; i < itemTotal; i++ {
 				err = cache.Set(strconv.Itoa(i), b)
 				if err != nil {
 					fmt.Printf("err=%s\n", err)
+					break
 				}
 			}
 
-			fmt.Printf("sleeping\n")
-			time.Sleep(1 * time.Hour)
+			fmt.Printf("add %d item successfully\n", i)
 
 			return nil
 		},
@@ -111,5 +119,17 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
+	}
+
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	for {
+		select {
+		case <-c:
+			os.Exit(0)
+		default:
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 }
