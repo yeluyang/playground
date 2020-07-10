@@ -93,9 +93,6 @@ func main() {
 			itemTotal := c.Int("total")
 			itemSize := c.Int("size") * KB
 
-			sizeExpected := float64(itemTotal*itemSize) / float64(GB)
-			fmt.Printf("size expected is %f GB\n", sizeExpected)
-
 			config := BigCacheConfigFrom(itemTotal, itemSize, c.Int("init-num"), c.Bool("verbose"))
 			fmt.Printf("config=%+v\n", config)
 
@@ -114,7 +111,11 @@ func main() {
 				}
 			}
 
-			fmt.Printf("add %d item successfully\n", i)
+			fmt.Printf("add %d item successfully, size expected: %fGB, actual={len=%fGB, capacity=%fGB}\n", i,
+				float64(itemTotal*itemSize)/float64(GB),
+				float64(cache.Len())/float64(GB),
+				float64(cache.Capacity())/float64(GB),
+			)
 
 			return nil
 		},
