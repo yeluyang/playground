@@ -120,20 +120,25 @@ func main() {
 		},
 	}
 
-	if err := app.Run(os.Args); err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
+	errCH := make(chan error, 1)
+	go func() {
+		if err := app.Run(os.Args); err != nil {
+			errCH <- err
+		}
+	}()
 
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
 	for {
 		select {
+		case err := <-errCH:
+			fmt.Printf("%s", err)
+			os.Exit(1)
 		case <-c:
 			os.Exit(0)
 		default:
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
