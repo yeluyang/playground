@@ -201,7 +201,9 @@ func (s *cacheShard) reset(config Config) {
 
 func (s *cacheShard) len() int {
 	s.lock.RLock()
-	res := len(s.hashmap)
+	// NOTE modified by yeluyang
+	// res := len(s.hashmap)
+	res := s.entries.Len()
 	s.lock.RUnlock()
 	return res
 }

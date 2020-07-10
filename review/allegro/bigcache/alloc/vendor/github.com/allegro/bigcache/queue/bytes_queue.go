@@ -175,12 +175,16 @@ func (q *BytesQueue) CheckGet(index int) error {
 
 // Capacity returns number of allocated bytes for queue
 func (q *BytesQueue) Capacity() int {
-	return q.capacity
+	// NOTE modified by yeluyang
+	// return q.capacity
+	return cap(q.array)
 }
 
 // Len returns number of entries kept in queue
 func (q *BytesQueue) Len() int {
-	return q.count
+	// NOTE modified by yeluyang
+	// return q.count
+	return len(q.array)
 }
 
 // Error returns error message
