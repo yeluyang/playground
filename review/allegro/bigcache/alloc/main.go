@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -20,7 +21,54 @@ const (
 	GB    = 1 * SCALE * MB
 )
 
-func BigCacheConfigFrom(itemTotal int, itemMaxSize int, initNum int, verbose bool) bigcache.Config {
+var verbose bool
+var caches []*bigcache.BigCache
+
+var app = cli.App{
+	Name: "bigcache-alloc",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:        "verbose",
+			Aliases:     []string{"V"},
+			Value:       false,
+			Destination: &verbose,
+		},
+		&cli.BoolFlag{
+			Name:    "pre-allocate",
+			Aliases: []string{"a"},
+			Usage:   "should allocate all capacity need?",
+		},
+		&cli.IntFlag{
+			Name:    "cache-number",
+			Aliases: []string{"c"},
+			Usage:   "number of caches",
+		},
+		&cli.IntFlag{
+			Name:    "item-szie",
+			Aliases: []string{"s"},
+			Usage:   "size of item, unit is 'KB'",
+			Value:   8,
+		},
+		&cli.IntSliceFlag{
+			Name:    "item-number",
+			Aliases: []string{"n"},
+			Usage:   "number of total items in per cache",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		if !c.IsSet("item-number") {
+			return fmt.Errorf("value of item-number must be given")
+		}
+		if !c.IsSet("cache-number") {
+			if err := c.Set("cache-number", strconv.Itoa(len(c.IntSlice("item-number")))); err != nil {
+				return err
+			}
+		}
+		return run(c.Int("cache-number"), c.Int("item-size")*KB, c.Bool("pre-allocate"), c.IntSlice("item-number"))
+	},
+}
+
+func BigCacheConfigFrom(itemTotal int, itemMaxSize int, preAlloc bool, verbose bool) bigcache.Config {
 	// XXX: never evict
 	config := bigcache.DefaultConfig(200 * 365 * 24 * time.Hour)
 
@@ -35,7 +83,11 @@ func BigCacheConfigFrom(itemTotal int, itemMaxSize int, initNum int, verbose boo
 
 	// init 10 entry in each shard, 10 is equal to `bigcache.minimumEntriesInShard`
 	// `bigcache.minimumEntriesInShard` ensure number of entries in initialized shard > 0
-	config.MaxEntriesInWindow = initNum
+	if preAlloc {
+		config.MaxEntriesInWindow = itemTotal
+	} else {
+		config.MaxEntriesInWindow = itemTotal / 10
+	}
 	config.MaxEntrySize = itemMaxSize
 
 	// `+1` ensure config.HardMaxCacheSize > 0
@@ -58,68 +110,77 @@ func getNearestPowerOf2(a uint) uint {
 	return r
 }
 
-func main() {
-	app := cli.App{
-		Name: "bigcache-alloc",
-		Flags: []cli.Flag{
-			&cli.IntFlag{
-				Name:    "total",
-				Aliases: []string{"t"},
-				Usage:   "number of total items",
-			},
-			&cli.IntFlag{
-				Name:  "init-num",
-				Usage: "number of inital item",
-			},
-			&cli.IntFlag{
-				Name:    "size",
-				Aliases: []string{"s"},
-				Usage:   "size of item, unit is 'KB'",
-				Value:   8,
-			},
-			&cli.BoolFlag{
-				Name:    "verbose",
-				Aliases: []string{"V"},
-				Value:   false,
-			},
-		},
-		Before: func(c *cli.Context) error {
-			if c.Int("total")*c.Int("size") == 0 {
-				return fmt.Errorf("value of total and size must be given and greater than zero: total=%d, size=%d", c.Int("total"), c.Int("size"))
-			}
-			return nil
-		},
-		Action: func(c *cli.Context) error {
-			itemTotal := c.Int("total")
-			itemSize := c.Int("size") * KB
+func run(cacheTotal int, itemSize int, preAlloc bool, items []int) error {
+	if len(items) != cacheTotal {
+		remainTotalItems := cacheTotal
+		for i := range items {
+			remainTotalItems -= i
+		}
+		remainItemNum := cacheTotal - len(items)
+		remainAvgItems := remainTotalItems / remainItemNum
+		for i := 0; i < remainItemNum; i++ {
+			items = append(items, remainAvgItems)
+		}
+	}
 
-			config := BigCacheConfigFrom(itemTotal, itemSize, c.Int("init-num"), c.Bool("verbose"))
+	type helper struct {
+		index     int
+		itemTotal int
+		err       error
+	}
+
+	caches = make([]*bigcache.BigCache, len(items))
+	ch := make(chan *helper, len(items))
+	b := make([]byte, itemSize)
+	var wg sync.WaitGroup
+	wg.Add(len(items))
+	for i, itemTotal := range items {
+		go func(i, itemTotal int) {
+			defer wg.Done()
+			config := BigCacheConfigFrom(itemTotal, itemSize, preAlloc, verbose)
 			fmt.Printf("config=%+v\n", config)
 
-			cache, err := bigcache.NewBigCache(config)
+			var err error
+			caches[i], err = bigcache.NewBigCache(config)
 			if err != nil {
-				return err
+				ch <- &helper{err: err}
+				return
 			}
 
-			b := make([]byte, config.MaxEntrySize)
-			i := 0
-			for ; i < itemTotal; i++ {
-				err = cache.Set(strconv.Itoa(i), b)
+			for k := 0; k < itemTotal; k++ {
+				err = caches[i].Set(strconv.Itoa(k), b)
 				if err != nil {
-					fmt.Printf("err=%s\n", err)
-					break
+					ch <- &helper{err: err}
+					return
 				}
 			}
-
-			fmt.Printf("add %d item successfully, size expected: %fGB, actual={len=%fGB, capacity=%fGB}\n", i,
-				float64(itemTotal*itemSize)/float64(GB),
-				float64(cache.Len())/float64(GB),
-				float64(cache.Capacity())/float64(GB),
-			)
-
-			return nil
-		},
+			ch <- &helper{
+				index:     i,
+				itemTotal: itemTotal,
+			}
+		}(i, itemTotal)
 	}
+
+	wg.Wait()
+	close(ch)
+
+	for h := range ch {
+		if h.err != nil {
+			return h.err
+		} else {
+			fmt.Printf("add %d item successfully, size expected: %fGB, actual={len=%fGB, capacity=%fGB}\n",
+				h.itemTotal,
+				float64(h.itemTotal*itemSize)/float64(GB),
+				float64(caches[h.index].Len())/float64(GB),
+				float64(caches[h.index].Capacity())/float64(GB),
+			)
+		}
+	}
+
+	return nil
+}
+
+func main() {
 
 	errCH := make(chan error, 1)
 	go func() {
@@ -128,15 +189,15 @@ func main() {
 		}
 	}()
 
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	sig := make(chan os.Signal, 2)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
 	for {
 		select {
 		case err := <-errCH:
 			fmt.Printf("%s", err)
 			os.Exit(1)
-		case <-c:
+		case <-sig:
 			os.Exit(0)
 		default:
 			time.Sleep(10 * time.Millisecond)
