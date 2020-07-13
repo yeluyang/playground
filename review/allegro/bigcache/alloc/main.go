@@ -44,7 +44,12 @@ var app = cli.App{
 			Usage:   "number of caches",
 		},
 		&cli.IntFlag{
-			Name:    "item-szie",
+			Name:    "item-total",
+			Aliases: []string{"t"},
+			Usage:   "number of total items in all cache",
+		},
+		&cli.IntFlag{
+			Name:    "item-size",
 			Aliases: []string{"s"},
 			Usage:   "size of item, unit is 'KB'",
 			Value:   8,
@@ -56,15 +61,46 @@ var app = cli.App{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		if !c.IsSet("item-number") {
-			return fmt.Errorf("value of item-number must be given")
+		if !c.IsSet("item-number") && !c.IsSet("item-total") {
+			return fmt.Errorf("item-number and item-total must be given at least one")
 		}
-		if !c.IsSet("cache-number") {
-			if err := c.Set("cache-number", strconv.Itoa(len(c.IntSlice("item-number")))); err != nil {
+
+		if c.IsSet("item-total") {
+			if !c.IsSet("cache-number") {
+				if err := c.Set("cache-number", strconv.Itoa(1)); err != nil {
+					return err
+				}
+			}
+			if c.IsSet("item-number") {
+				total := 0
+				for n := range c.IntSlice("item-number") {
+					total += n
+				}
+				if c.Int("item-total") < total {
+					return fmt.Errorf("value of item-total must be greater than or equal to sum of values of item-number")
+				}
+			}
+		} else {
+			total := 0
+			for n := range c.IntSlice("item-number") {
+				total += n
+			}
+			if err := c.Set("item-total", strconv.Itoa(total)); err != nil {
 				return err
 			}
+
+			if !c.IsSet("cache-number") {
+				if err := c.Set("cache-number", strconv.Itoa(len(c.IntSlice("item-number")))); err != nil {
+					return err
+				}
+			} else {
+				if c.Int("cache-number") != len(c.IntSlice("item-number")) {
+					return fmt.Errorf("value of cache-number must be equal to length of value-list of item-number when item-total is not set")
+				}
+			}
 		}
-		return run(c.Int("cache-number"), c.Int("item-size")*KB, c.Bool("pre-allocate"), c.IntSlice("item-number"))
+
+		return run(c.Int("cache-number"), c.Int("item-total"), c.Int("item-size")*KB, c.Bool("pre-allocate"), c.IntSlice("item-number"))
 	},
 }
 
@@ -81,10 +117,8 @@ func BigCacheConfigFrom(itemTotal int, itemMaxSize int, preAlloc bool, verbose b
 		config.Shards = 128
 	}
 
-	// init 10 entry in each shard, 10 is equal to `bigcache.minimumEntriesInShard`
-	// `bigcache.minimumEntriesInShard` ensure number of entries in initialized shard > 0
 	if preAlloc {
-		config.MaxEntriesInWindow = itemTotal
+		config.MaxEntriesInWindow = itemTotal + 1
 	} else {
 		config.MaxEntriesInWindow = itemTotal / 10
 	}
@@ -110,16 +144,17 @@ func getNearestPowerOf2(a uint) uint {
 	return r
 }
 
-func run(cacheTotal int, itemSize int, preAlloc bool, items []int) error {
-	if len(items) != cacheTotal {
-		remainTotalItems := cacheTotal
-		for i := range items {
-			remainTotalItems -= i
+func run(cacheTotal int, itemTotal int, itemSize int, preAlloc bool, itemNums []int) error {
+	fmt.Printf("run with arguments: cacheTotal=%d, itemTotal=%d, itemSize=%d, preAlloc=%t, items=%+v\n", cacheTotal, itemTotal, itemSize, preAlloc, itemNums)
+	if len(itemNums) != cacheTotal {
+		remainTotalItems := itemTotal
+		for _, num := range itemNums {
+			remainTotalItems -= num
 		}
-		remainItemNum := cacheTotal - len(items)
-		remainAvgItems := remainTotalItems / remainItemNum
-		for i := 0; i < remainItemNum; i++ {
-			items = append(items, remainAvgItems)
+		remainCaches := cacheTotal - len(itemNums)
+		remainAvgItems := remainTotalItems / remainCaches
+		for i := 0; i < remainCaches; i++ {
+			itemNums = append(itemNums, remainAvgItems)
 		}
 	}
 
@@ -129,15 +164,15 @@ func run(cacheTotal int, itemSize int, preAlloc bool, items []int) error {
 		err       error
 	}
 
-	caches = make([]*bigcache.BigCache, len(items))
-	ch := make(chan *helper, len(items))
+	caches = make([]*bigcache.BigCache, len(itemNums))
+	ch := make(chan *helper, len(itemNums))
 	b := make([]byte, itemSize)
 	var wg sync.WaitGroup
-	wg.Add(len(items))
-	for i, itemTotal := range items {
-		go func(i, itemTotal int) {
+	wg.Add(len(itemNums))
+	for i, itemNum := range itemNums {
+		go func(i, itemNum int) {
 			defer wg.Done()
-			config := BigCacheConfigFrom(itemTotal, itemSize, preAlloc, verbose)
+			config := BigCacheConfigFrom(itemNum, itemSize, preAlloc, verbose)
 			fmt.Printf("config=%+v\n", config)
 
 			var err error
@@ -147,7 +182,7 @@ func run(cacheTotal int, itemSize int, preAlloc bool, items []int) error {
 				return
 			}
 
-			for k := 0; k < itemTotal; k++ {
+			for k := 0; k < itemNum; k++ {
 				err = caches[i].Set(strconv.Itoa(k), b)
 				if err != nil {
 					ch <- &helper{err: err}
@@ -156,9 +191,9 @@ func run(cacheTotal int, itemSize int, preAlloc bool, items []int) error {
 			}
 			ch <- &helper{
 				index:     i,
-				itemTotal: itemTotal,
+				itemTotal: itemNum,
 			}
-		}(i, itemTotal)
+		}(i, itemNum)
 	}
 
 	wg.Wait()
