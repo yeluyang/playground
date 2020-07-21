@@ -22,6 +22,10 @@ env:
 		$(ENV_IMAGE) bash || docker start $(ENV_NAME)
 	docker exec -it $(ENV_NAME) bash
 
+dep:
+	cargo install protobuf-codegen
+	cargo install grpcio-compiler
+
 .PHONY: debug
 debug: $(GRPC_GEN_FILES)
 	cargo build
