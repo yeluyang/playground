@@ -14,7 +14,7 @@ message LogSeq {
 
 message VoteRequest {
     // id of candidate
-    EndPoint end_point = 1;
+    EndPoint candidate = 1;
     // term of candidate holding
     int64 term = 2;
     // last seq of logs of candidate
@@ -22,24 +22,26 @@ message VoteRequest {
 }
 
 message VoteResponse {
+    // id of peer
+    EndPoint peer = 1;
     // term of follower holding
-    int64 term = 1;
+    int64 term = 2;
     // last seq of logs of follower
-    LogSeq last_log_seq = 2;
+    LogSeq last_log_seq = 3;
     // vote for candidate or not
-    bool granted = 3;
+    bool granted = 4;
 }
 
 message AppendRequest {
     // id of leader
-    EndPoint end_point = 1;
+    EndPoint leader = 1;
     // term of leader
     int64 term = 2;
 }
 
 message AppendResponse {
     // id of follower
-    EndPoint end_point = 1;
+    EndPoint follower = 1;
     // term of peer
     int64 term = 2;
     // append successful or not

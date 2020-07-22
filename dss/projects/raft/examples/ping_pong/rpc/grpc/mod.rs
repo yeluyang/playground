@@ -80,7 +80,7 @@ impl PeerGrpc for PeerGrpcServer {
         debug!("got vote request: request={{ {:?} }}", req);
 
         let vote = self.inner.grant_for(
-            crate_end_point_from(req.take_end_point()),
+            crate_end_point_from(req.take_candidate()),
             req.get_term() as usize,
             crate_log_seq_from(req.take_last_log_seq()),
         );
@@ -95,12 +95,12 @@ impl PeerGrpc for PeerGrpcServer {
 
     fn append(&mut self, ctx: RpcContext, mut req: AppendRequest, sink: UnarySink<AppendResponse>) {
         let receipt = self.inner.append(
-            crate_end_point_from(req.take_end_point()),
+            crate_end_point_from(req.take_leader()),
             req.get_term() as usize,
         );
 
         let mut rsp = AppendResponse::new();
-        rsp.set_end_point(grpc_end_point_from(receipt.endpoint));
+        rsp.set_follower(grpc_end_point_from(receipt.endpoint));
         rsp.set_term(receipt.term as i64);
         rsp.set_success(receipt.success);
 

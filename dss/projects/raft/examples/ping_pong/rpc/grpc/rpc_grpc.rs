@@ -1,7 +1,7 @@
 // This file is generated. Do not edit
 // @generated
 
-// https://github.com/Manishearth/rust-clippy/issues/702
+// https://github.com/rust-lang/rust-clippy/issues/702
 #![allow(unknown_lints)]
 #![allow(clippy::all)]
 
@@ -91,7 +91,7 @@ pub fn create_peer_grpc<S: PeerGrpc + Send + Clone + 'static>(s: S) -> ::grpcio:
     builder = builder.add_unary_handler(&METHOD_PEER_GRPC_VOTE, move |ctx, req, resp| {
         instance.vote(ctx, req, resp)
     });
-    let mut instance = s;
+    let mut instance = s.clone();
     builder = builder.add_unary_handler(&METHOD_PEER_GRPC_APPEND, move |ctx, req, resp| {
         instance.append(ctx, req, resp)
     });
