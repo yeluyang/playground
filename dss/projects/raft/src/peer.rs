@@ -125,7 +125,7 @@ impl<C: PeerClientRPC> Peer<C> {
 
         Self {
             state: Arc::new(Mutex::new(PeerState::new(logs))),
-            sleep_time: Duration::from_millis(get_follower_deadline_rand()),
+            sleep_time: get_raft_sleep_deadline_rand(),
             host,
             peers,
         }
@@ -262,13 +262,18 @@ impl<C: PeerClientRPC> Peer<C> {
                     }
                     Role::Candidate => {
                         s.logs.term += 1;
-                        debug!("running as Candidate: term={}", s.logs.term);
+                        self.sleep_time = get_raft_sleep_deadline_rand();
+                        debug!(
+                            "running as Candidate: term={}, timeout_after={:?}",
+                            s.logs.term, self.sleep_time
+                        );
 
                         let (vote_sender, vote_recver) = mpsc::channel::<Result<Vote>>();
                         let (tick_sender, tick_recver) = mpsc::channel::<()>();
 
+                        let timeout_duration = self.sleep_time;
                         thread::spawn(move || {
-                            thread::sleep(Duration::from_millis(get_follower_deadline_rand()));
+                            thread::sleep(timeout_duration);
                             tick_sender.send(()).unwrap();
                         });
 
@@ -308,8 +313,7 @@ impl<C: PeerClientRPC> Peer<C> {
                                                 voted: None,
                                                 leader_alive: false,
                                             };
-                                            self.sleep_time =
-                                                Duration::from_millis(get_follower_deadline_rand());
+                                            self.sleep_time = get_raft_sleep_deadline_rand();
                                             break;
                                         }
                                     }
@@ -356,6 +360,6 @@ impl<C: PeerClientRPC> Peer<C> {
     }
 }
 
-fn get_follower_deadline_rand() -> u64 {
-    rand::thread_rng().gen_range(100, 500 + 1)
+fn get_raft_sleep_deadline_rand() -> Duration {
+    Duration::from_millis(rand::thread_rng().gen_range(100, 500 + 1))
 }
