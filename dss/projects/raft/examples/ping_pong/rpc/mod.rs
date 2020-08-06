@@ -76,7 +76,7 @@ impl PeerClientRPC for PeerClient {
 
         match self.inner.append(&req) {
             Ok(mut rsp) => {
-                debug!(
+                trace!(
                     "got response of heart_beat from peer{{addr={},term={}}}: {}",
                     grpc::crate_end_point_from(rsp.get_follower().clone()),
                     rsp.get_term(),
@@ -105,8 +105,8 @@ impl PeerClientRPC for PeerClient {
 
         match self.inner.vote(&req) {
             Ok(mut rsp) => {
-                debug!(
-                    "got response of heart_beat from peer{{addr={}, term={}, log_seq={:?}}}: {}",
+                trace!(
+                    "got response of heart_beat from peer={{addr={}, term={}, log_seq={:?}}}: {}",
                     grpc::crate_end_point_from(rsp.get_peer().clone()),
                     rsp.get_term(),
                     grpc::crate_log_seq_from(rsp.get_last_log_seq().clone()),

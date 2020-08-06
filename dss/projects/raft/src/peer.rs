@@ -143,18 +143,28 @@ impl<C: PeerClientRPC> Peer<C> {
             s.logs.term = term;
             match s.role {
                 Role::Follower {
+                    ref mut voted,
                     ref mut leader_alive,
-                    ..
                 } => {
+                    trace!(
+                        "get heart beat from leader={{host={}, term={}}}, stay in follower",
+                        leader,
+                        term,
+                    );
+                    *voted = None;
                     *leader_alive = true;
                 }
                 Role::Candidate => {
+                    debug!(
+                        "get heart beat from leader={{host={}, term={}}}, convert self to follower",
+                        leader, term,
+                    );
                     s.role = Role::Follower {
                         voted: None,
-                        leader_alive: false,
+                        leader_alive: true,
                     };
                 }
-                Role::Leader { .. } => unreachable!(),
+                Role::Leader { .. } => unimplemented!(),
             }
             Receipt {
                 endpoint: self.host.clone(),
@@ -255,7 +265,7 @@ impl<C: PeerClientRPC> Peer<C> {
                 let mut s = self.state.lock().unwrap();
                 match s.role {
                     Role::Leader { .. } => {
-                        debug!("running as Leader");
+                        trace!("running as Leader");
                         for (_, p) in &self.peers {
                             p.heart_beat(self.host.clone(), s.logs.term);
                         }
@@ -274,7 +284,9 @@ impl<C: PeerClientRPC> Peer<C> {
                         let timeout_duration = self.sleep_time;
                         thread::spawn(move || {
                             thread::sleep(timeout_duration);
-                            tick_sender.send(()).unwrap();
+                            tick_sender.send(()).unwrap_or_else(|err| {
+                                error!("candidate timeout ticker error: {}", err)
+                            });
                         });
 
                         for (_, peer) in &self.peers {
@@ -317,7 +329,7 @@ impl<C: PeerClientRPC> Peer<C> {
                                             break;
                                         }
                                     }
-                                    Err(err) => error!("failed to get vote: {}", err),
+                                    Err(err) => debug!("failed to get vote: {}", err),
                                 };
                             } else if let Ok(_) = tick_recver.try_recv() {
                                 debug!("timeout when election");
@@ -346,7 +358,7 @@ impl<C: PeerClientRPC> Peer<C> {
                         ref mut leader_alive,
                         ..
                     } => {
-                        debug!("running as Follower, voted for={:?}", voted);
+                        trace!("running as Follower, voted for={:?}", voted);
                         if !*leader_alive {
                             s.role = Role::Candidate;
                             self.sleep_time = Duration::from_millis(0);
