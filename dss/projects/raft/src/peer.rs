@@ -10,6 +10,7 @@ extern crate rand;
 use rand::Rng;
 
 use crate::{
+    error::Result,
     logger::{LogSeq, Logger},
     rpc::{EndPoint, PeerClientRPC},
 };
@@ -118,7 +119,7 @@ impl<C: PeerClientRPC> Peer<C> {
 
         let mut peers = HashMap::new();
         for h in peer_hosts {
-            let client = PeerClientRPC::connect(&h);
+            let client = PeerClientRPC::connect(h.clone());
             peers.insert(h, client);
         }
 
@@ -263,7 +264,7 @@ impl<C: PeerClientRPC> Peer<C> {
                         s.logs.term += 1;
                         debug!("running as Candidate: term={}", s.logs.term);
 
-                        let (vote_sender, vote_recver) = mpsc::channel::<Vote>();
+                        let (vote_sender, vote_recver) = mpsc::channel::<Result<Vote>>();
                         let (tick_sender, tick_recver) = mpsc::channel::<()>();
 
                         thread::spawn(move || {
@@ -283,35 +284,40 @@ impl<C: PeerClientRPC> Peer<C> {
                         let mut votes = 0usize;
                         loop {
                             if let Ok(vote) = vote_recver.try_recv() {
-                                if vote.granted {
-                                    votes += 1;
-                                    debug!(
-                                        "receive granted vote from peer: {}/{}",
-                                        votes,
-                                        self.peers.len(),
-                                    );
-                                    if votes >= self.peers.len() {
-                                        break;
-                                    };
-                                } else {
-                                    debug!(
-                                        "receive greater term or log seq from peer, convert self to follower: peers={}, self={{ term={}, log_seq={:?} }}",
-                                        vote, s.logs.term,s.logs.get_last_seq(),
-                                    );
+                                match vote {
+                                    Ok(vote) => {
+                                        if vote.granted {
+                                            votes += 1;
+                                            debug!(
+                                                "receive granted vote from peer: {}/{}",
+                                                votes,
+                                                self.peers.len(),
+                                            );
+                                            if votes >= self.peers.len() {
+                                                break;
+                                            };
+                                        } else {
+                                            debug!(
+                                                "receive greater term or log seq from peer, convert self to follower: peers={}, self={{ term={}, log_seq={:?} }}",
+                                                vote,
+                                                s.logs.term,
+                                                s.logs.get_last_seq()
+                                            );
 
-                                    s.role = Role::Follower {
-                                        voted: None,
-                                        leader_alive: false,
-                                    };
-                                    self.sleep_time =
-                                        Duration::from_millis(get_follower_deadline_rand());
-                                    break;
-                                }
+                                            s.role = Role::Follower {
+                                                voted: None,
+                                                leader_alive: false,
+                                            };
+                                            self.sleep_time =
+                                                Duration::from_millis(get_follower_deadline_rand());
+                                            break;
+                                        }
+                                    }
+                                    Err(err) => error!("failed to get vote: {}", err),
+                                };
                             } else if let Ok(_) = tick_recver.try_recv() {
                                 debug!("timeout when election");
                                 break;
-                            } else {
-                                thread::sleep(Duration::from_millis(10));
                             }
                         }
                         if votes >= self.peers.len() / 2 {

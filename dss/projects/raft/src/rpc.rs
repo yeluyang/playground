@@ -5,6 +5,7 @@ use std::{
 };
 
 use crate::{
+    error::Result,
     logger::LogSeq,
     peer::{Receipt, Vote},
 };
@@ -49,29 +50,31 @@ impl EndPoint {
 }
 
 pub trait PeerClientRPC: Send + Clone + 'static {
-    fn connect(host: &EndPoint) -> Self;
+    fn connect(host: EndPoint) -> Self;
 
-    fn heart_beat(&self, leader: EndPoint, term: usize) -> Receipt;
+    fn heart_beat(&self, leader: EndPoint, term: usize) -> Result<Receipt>;
 
-    fn heart_beat_async(&self, leader: EndPoint, term: usize, ch: Sender<Receipt>) {
+    fn heart_beat_async(&self, leader: EndPoint, term: usize, ch: Sender<Result<Receipt>>) {
         let agent = self.clone();
         thread::spawn(move || {
-            ch.send(agent.heart_beat(leader, term)).unwrap();
+            ch.send(agent.heart_beat(leader, term))
+                .expect("failed to get response of heart beat from channel");
         });
     }
 
-    fn request_vote(&self, host: EndPoint, term: usize, log_seq: Option<LogSeq>) -> Vote;
+    fn request_vote(&self, host: EndPoint, term: usize, log_seq: Option<LogSeq>) -> Result<Vote>;
 
     fn request_vote_async(
         &self,
         host: EndPoint,
         term: usize,
         log_seq: Option<LogSeq>,
-        ch: Sender<Vote>,
+        ch: Sender<Result<Vote>>,
     ) {
         let agent = self.clone();
         thread::spawn(move || {
-            ch.send(agent.request_vote(host, term, log_seq)).unwrap();
+            ch.send(agent.request_vote(host, term, log_seq))
+                .expect("failed to get vote from channel");
         });
     }
 }
