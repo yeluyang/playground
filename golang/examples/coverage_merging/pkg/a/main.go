@@ -14,3 +14,7 @@ func callB() {
 	fmt.Printf("callB is invoked")
 	b.BPub()
 }
+
+func envOnly() {
+	fmt.Printf("envOnly is invoked")
+}
