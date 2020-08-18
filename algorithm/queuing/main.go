@@ -10,6 +10,8 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var costs []int
+
 type Processor struct {
 	TPS   float64
 	State *pkg.ProcessorState
@@ -60,13 +62,21 @@ func main() {
 				Required: true,
 			},
 			&cli.Float64Flag{
+		Before: func(c *cli.Context) error {
+			costs = c.IntSlice("costs")
+			return nil
+		},
+		Commands: []*cli.Command{
+			&cli.Command{
+				Name: "calc",
+				Flags: []cli.Flag{
+					&cli.Float64Flag{
 				Name:    "qps",
 				Aliases: []string{"q"},
 				Value:   100.0,
 			},
 		},
 		Action: func(c *cli.Context) error {
-			costs := c.IntSlice("costs")
 			tpss := make([]float64, len(costs))
 			for i := range costs {
 				tpss[i] = 1000 / float64(costs[i])
@@ -75,6 +85,8 @@ func main() {
 			ps := NewProcessorSet(tpss, qps)
 			fmt.Printf("%s\n", ps)
 			return nil
+		},
+			},
 		},
 	}
 	if err := app.Run(os.Args); err != nil {
