@@ -11,25 +11,17 @@ type ProcessorState struct {
 
 	RemainCeil  int
 	RemainFloor int
-
-	RemainsCeil  float64
-	RemainsFloor float64
 }
 
-func NewProcessorState(speed float64, others int, qps float64, seconds float64) *ProcessorState {
+func NewProcessorState(tps float64, others int, qps float64) *ProcessorState {
 	incomeCeil := math.Ceil(qps / float64(others))
 	incomeFloor := math.Floor(qps / float64(others))
 
-	remainCeil := math.Max(incomeCeil-speed, 0)
-	remainFloor := math.Max(incomeFloor-speed, 0)
-
 	return &ProcessorState{
-		IncomeCeil:   int(incomeCeil),
-		IncomeFloor:  int(incomeFloor),
-		RemainCeil:   int(remainCeil),
-		RemainFloor:  int(remainFloor),
-		RemainsCeil:  remainCeil * seconds,
-		RemainsFloor: remainFloor * seconds,
+		IncomeCeil:  int(incomeCeil),
+		IncomeFloor: int(incomeFloor),
+		RemainCeil:  int(math.Max(incomeCeil-tps, 0)),
+		RemainFloor: int(math.Max(incomeFloor-tps, 0)),
 	}
 }
 
