@@ -61,7 +61,7 @@ func main() {
 				Aliases:  []string{"c"},
 				Required: true,
 			},
-			&cli.Float64Flag{
+		},
 		Before: func(c *cli.Context) error {
 			costs = c.IntSlice("costs")
 			return nil
@@ -71,21 +71,35 @@ func main() {
 				Name: "calc",
 				Flags: []cli.Flag{
 					&cli.Float64Flag{
-				Name:    "qps",
-				Aliases: []string{"q"},
-				Value:   100.0,
+						Name:    "qps",
+						Aliases: []string{"q"},
+						Value:   100.0,
+					},
+				},
+				Action: func(c *cli.Context) error {
+					tpss := make([]float64, len(costs))
+					for i := range costs {
+						tpss[i] = 1000 / float64(costs[i])
+					}
+					qps := c.Float64("qps")
+					ps := NewProcessorSet(tpss, qps)
+					fmt.Printf("%s\n", ps)
+					return nil
+				},
 			},
-		},
-		Action: func(c *cli.Context) error {
-			tpss := make([]float64, len(costs))
-			for i := range costs {
-				tpss[i] = 1000 / float64(costs[i])
-			}
-			qps := c.Float64("qps")
-			ps := NewProcessorSet(tpss, qps)
-			fmt.Printf("%s\n", ps)
-			return nil
-		},
+			&cli.Command{
+				Name: "sim",
+				Flags: []cli.Flag{
+					&cli.Float64Flag{
+						Name:    "duration",
+						Aliases: []string{"d"},
+						Value:   60,
+					},
+				},
+				Action: func(c *cli.Context) error {
+					// TODO
+					return nil
+				},
 			},
 		},
 	}
