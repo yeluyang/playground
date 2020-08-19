@@ -1,38 +1,38 @@
 package pkg
 
 import (
-	"encoding/json"
 	"time"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 type Processor struct {
-	cost  time.Duration
+	ID    string
+	Cost  time.Duration
 	TPS   float64
+	peers int
 	State *ProcessorState
 }
 
-func NewProcessor(cost time.Duration, others int, qps float64) *Processor {
-	tps := float64(time.Second) / float64(cost)
+func NewProcessor(cost time.Duration, peers int) *Processor {
 	return &Processor{
-		cost:  cost,
-		TPS:   tps,
-		State: NewProcessorState(tps, others, qps),
+		ID:    uuid.NewV4().String(),
+		Cost:  cost,
+		TPS:   float64(time.Second) / float64(cost),
+		peers: peers,
+		State: nil,
 	}
 }
 
-func (p *Processor) String() string {
-	s, err := json.MarshalIndent(p, "", "\t")
-	if err != nil {
-		panic(err)
-	}
-	return string(s)
+func (p *Processor) Calc(qps float64) {
+	p.State = NewProcessorState(p.TPS, qps, p.peers)
 }
 
-func NewProcessorSet(costs []time.Duration, qps float64) []*Processor {
+func NewProcessorSet(costs []time.Duration) []*Processor {
 	processors := make([]*Processor, len(costs))
 
 	for i := range costs {
-		processors[i] = NewProcessor(costs[i], len(costs), qps)
+		processors[i] = NewProcessor(costs[i], len(costs))
 	}
 
 	return processors

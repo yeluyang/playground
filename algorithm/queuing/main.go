@@ -46,7 +46,10 @@ func main() {
 				},
 				Action: func(c *cli.Context) error {
 					qps := c.Float64("qps")
-					ps := pkg.NewProcessorSet(costs, qps)
+					ps := pkg.NewProcessorSet(costs)
+					for i := range ps {
+						ps[i].Calc(qps)
+					}
 					if s, err := json.MarshalIndent(ps, "", "\t"); err != nil {
 						return err
 					} else {
