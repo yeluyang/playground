@@ -4,25 +4,34 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/urfave/cli/v2"
 	"github.com/yeluyang/playground/algorithm/queuing/pkg"
 )
 
-var costs []int
+var costs []time.Duration
 
 func main() {
 	app := &cli.App{
 		Name: "queuing",
 		Flags: []cli.Flag{
-			&cli.IntSliceFlag{
+			&cli.StringSliceFlag{
 				Name:     "costs",
 				Aliases:  []string{"c"},
 				Required: true,
 			},
 		},
 		Before: func(c *cli.Context) error {
-			costs = c.IntSlice("costs")
+			costStrs := c.StringSlice("costs")
+			costs = make([]time.Duration, len(costStrs))
+			for i := range costStrs {
+				if d, err := time.ParseDuration(costStrs[i]); err != nil {
+					return fmt.Errorf("failed to parse costs: %s", err)
+				} else {
+					costs[i] = d
+				}
+			}
 			return nil
 		},
 		Commands: []*cli.Command{
@@ -36,12 +45,8 @@ func main() {
 					},
 				},
 				Action: func(c *cli.Context) error {
-					tpss := make([]float64, len(costs))
-					for i := range costs {
-						tpss[i] = 1000 / float64(costs[i])
-					}
 					qps := c.Float64("qps")
-					ps := pkg.NewProcessorSet(tpss, qps)
+					ps := pkg.NewProcessorSet(costs, qps)
 					if s, err := json.MarshalIndent(ps, "", "\t"); err != nil {
 						return err
 					} else {

@@ -1,14 +1,20 @@
 package pkg
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Processor struct {
+	cost  time.Duration
 	TPS   float64
 	State *ProcessorState
 }
 
-func NewProcessor(tps float64, others int, qps float64) *Processor {
+func NewProcessor(cost time.Duration, others int, qps float64) *Processor {
+	tps := float64(time.Second) / float64(cost)
 	return &Processor{
+		cost:  cost,
 		TPS:   tps,
 		State: NewProcessorState(tps, others, qps),
 	}
@@ -22,11 +28,11 @@ func (p *Processor) String() string {
 	return string(s)
 }
 
-func NewProcessorSet(tpss []float64, qps float64) []*Processor {
-	processors := make([]*Processor, len(tpss))
+func NewProcessorSet(costs []time.Duration, qps float64) []*Processor {
+	processors := make([]*Processor, len(costs))
 
-	for i := range tpss {
-		processors[i] = NewProcessor(tpss[i], len(tpss), qps)
+	for i := range costs {
+		processors[i] = NewProcessor(costs[i], len(costs), qps)
 	}
 
 	return processors
