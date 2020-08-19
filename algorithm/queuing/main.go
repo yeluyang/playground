@@ -5,42 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/yeluyang/playground/algorithm/queuing/pkg"
-
 	"github.com/urfave/cli/v2"
+	"github.com/yeluyang/playground/algorithm/queuing/pkg"
 )
 
 var costs []int
-
-type Processor struct {
-	TPS   float64
-	State *pkg.ProcessorState
-}
-
-func NewProcessor(tps float64, others int, qps float64) *Processor {
-	return &Processor{
-		TPS:   tps,
-		State: pkg.NewProcessorState(tps, others, qps),
-	}
-}
-
-func (p *Processor) String() string {
-	s, err := json.MarshalIndent(p, "", "\t")
-	if err != nil {
-		panic(err)
-	}
-	return string(s)
-}
-
-func NewProcessorSet(tpss []float64, qps float64) []*Processor {
-	processors := make([]*Processor, len(tpss))
-
-	for i := range tpss {
-		processors[i] = NewProcessor(tpss[i], len(tpss), qps)
-	}
-
-	return processors
-}
 
 func main() {
 	app := &cli.App{
@@ -72,7 +41,7 @@ func main() {
 						tpss[i] = 1000 / float64(costs[i])
 					}
 					qps := c.Float64("qps")
-					ps := NewProcessorSet(tpss, qps)
+					ps := pkg.NewProcessorSet(tpss, qps)
 					if s, err := json.MarshalIndent(ps, "", "\t"); err != nil {
 						return err
 					} else {
