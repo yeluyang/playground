@@ -24,32 +24,22 @@ func NewProcessor(tps float64, others int, qps float64) *Processor {
 	}
 }
 
-type ProcessorSet []*Processor
-
-func NewProcessorSet(tpss []float64, qps float64) ProcessorSet {
-	processors := make(ProcessorSet, len(tpss))
-
-	for i := range tpss {
-		processors[i] = NewProcessor(tpss[i], len(tpss), qps)
-	}
-
-	return processors
-}
-
-func (ps *ProcessorSet) String() string {
-	s, err := json.MarshalIndent(ps, "", "\t")
-	if err != nil {
-		panic(err)
-	}
-	return string(s)
-}
-
 func (p *Processor) String() string {
 	s, err := json.MarshalIndent(p, "", "\t")
 	if err != nil {
 		panic(err)
 	}
 	return string(s)
+}
+
+func NewProcessorSet(tpss []float64, qps float64) []*Processor {
+	processors := make([]*Processor, len(tpss))
+
+	for i := range tpss {
+		processors[i] = NewProcessor(tpss[i], len(tpss), qps)
+	}
+
+	return processors
 }
 
 func main() {
@@ -83,8 +73,12 @@ func main() {
 					}
 					qps := c.Float64("qps")
 					ps := NewProcessorSet(tpss, qps)
-					fmt.Printf("%s\n", ps)
-					return nil
+					if s, err := json.MarshalIndent(ps, "", "\t"); err != nil {
+						return err
+					} else {
+						fmt.Printf("%s\n", s)
+						return nil
+					}
 				},
 			},
 			&cli.Command{
@@ -105,5 +99,6 @@ func main() {
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Printf("error occured: %s", err)
+		os.Exit(1)
 	}
 }
