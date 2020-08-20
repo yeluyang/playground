@@ -1,11 +1,16 @@
 package pkg
 
 import (
-	"fmt"
 	"math"
 	"sort"
 	"time"
 )
+
+type SimulatorState struct {
+	Seconds int64
+	IPS     uint64
+	QPS     uint64
+}
 
 type SimUnit struct {
 	Cost  time.Duration
@@ -46,17 +51,14 @@ func (s *SimUnit) Transform(sep time.Duration) bool {
 	}
 }
 
-func (s *SimUnit) Alloc() {
-	s.Queue += 1
-}
-
 type Simulator struct {
 	Units              []*SimUnit
-	Users              int64
-	RoundRobinBalancer int
+	Users              uint64
+	RoundRobinBalancer uint
+	State              []*SimulatorState
 }
 
-func NewSimulator(costs []time.Duration, users int64) *Simulator {
+func NewSimulator(costs []time.Duration, users uint64) *Simulator {
 	s := &Simulator{
 		Users:              users,
 		RoundRobinBalancer: 0,
@@ -89,8 +91,8 @@ func (s *Simulator) NextTransformation() time.Duration {
 	return sep
 }
 
-func (s *Simulator) Transform(sep time.Duration) int64 {
-	newReqs := int64(0)
+func (s *Simulator) Transform(sep time.Duration) uint64 {
+	newReqs := uint64(0)
 	for i := range s.Units {
 		if s.Units[i].Transform(sep) {
 			newReqs += 1
@@ -99,20 +101,31 @@ func (s *Simulator) Transform(sep time.Duration) int64 {
 	return newReqs
 }
 
-func (s *Simulator) Alloc(requests int64) {
-	for i := int64(0); i < requests; i++ {
-		s.Units[s.RoundRobinBalancer].Alloc()
-		s.RoundRobinBalancer = (s.RoundRobinBalancer + 1) % len(s.Units)
+func (s *Simulator) Waitting() uint64 {
+	waitting := uint64(0)
+	for i := range s.Units {
+		waitting += s.Units[i].Queue
+	}
+	return waitting
+}
+
+func (s *Simulator) Alloc(requests uint64) {
+	for i := uint64(0); i < requests; i++ {
+		s.Units[s.RoundRobinBalancer].Queue += 1
+		s.RoundRobinBalancer = (s.RoundRobinBalancer + 1) % uint(len(s.Units))
 	}
 }
 
-func (s *Simulator) Run(duartion time.Duration) {
-	remain := duartion
+func (s *Simulator) Run(duration time.Duration) {
+	s.State = make([]*SimulatorState, 0, int(duration.Seconds()))
+	remain := duration
+	seconds := int64(0)
 	for remain >= time.Second {
 		remain -= time.Second
 		second := time.Second
 
-		qps := int64(0)
+		ips := s.Waitting()
+		qps := uint64(0)
 		// strat sample in one second
 		for second > 0 {
 			sep := time.Duration(math.Min(float64(s.NextTransformation()), float64(second)))
@@ -122,8 +135,10 @@ func (s *Simulator) Run(duartion time.Duration) {
 
 			// allocate new requests
 			s.Alloc(newReqs)
+			ips += newReqs
 			second -= sep
 		}
-		fmt.Printf("%d\n", qps)
+		seconds += 1
+		s.State = append(s.State, &SimulatorState{Seconds: seconds, IPS: ips, QPS: qps})
 	}
 }
