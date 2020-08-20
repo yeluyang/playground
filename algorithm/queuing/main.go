@@ -61,14 +61,26 @@ func main() {
 			&cli.Command{
 				Name: "sim",
 				Flags: []cli.Flag{
-					&cli.Float64Flag{
+					&cli.Int64Flag{
+						Name:    "users",
+						Aliases: []string{"u"},
+						Value:   10,
+					},
+					&cli.StringFlag{
 						Name:    "duration",
 						Aliases: []string{"d"},
-						Value:   60,
+						Value:   "1s",
 					},
 				},
 				Action: func(c *cli.Context) error {
-					// TODO
+					users := c.Int64("users")
+					duration, err := time.ParseDuration(c.String("duration"))
+					if err != nil {
+						return fmt.Errorf("failed to parse duration: %s", err)
+					}
+					ps := pkg.NewProcessorSet(costs)
+					sim := pkg.NewSimulator(ps, users)
+					sim.Run(duration)
 					return nil
 				},
 			},
