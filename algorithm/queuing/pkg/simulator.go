@@ -8,16 +8,16 @@ import (
 )
 
 type SimUnit struct {
-	Processor *Processor
-	Queue     uint64
-	Timer     time.Duration
+	Cost  time.Duration
+	Queue uint64
+	Timer time.Duration
 }
 
-func NewSimUnit(processor *Processor) *SimUnit {
+func NewSimUnit(cost time.Duration) *SimUnit {
 	return &SimUnit{
-		Processor: processor,
-		Queue:     0,
-		Timer:     0,
+		Cost:  cost,
+		Queue: 0,
+		Timer: 0,
 	}
 }
 
@@ -25,7 +25,7 @@ func (s *SimUnit) NextTransformation() *time.Duration {
 	if s.Queue == 0 {
 		return nil
 	} else {
-		t := time.Duration(math.Abs(float64(s.Timer - s.Processor.Cost)))
+		t := time.Duration(math.Abs(float64(s.Timer - s.Cost)))
 		return &t
 	}
 }
@@ -33,9 +33,9 @@ func (s *SimUnit) NextTransformation() *time.Duration {
 func (s *SimUnit) Transform(sep time.Duration) bool {
 	if s.Queue > 0 {
 		s.Timer += sep
-		if s.Timer >= s.Processor.Cost {
+		if s.Timer >= s.Cost {
 			s.Queue -= 1
-			s.Timer -= s.Processor.Cost
+			s.Timer -= s.Cost
 			return true
 		} else {
 			return false
@@ -56,18 +56,18 @@ type Simulator struct {
 	RoundRobinBalancer int
 }
 
-func NewSimulator(processors []*Processor, users int64) *Simulator {
+func NewSimulator(costs []time.Duration, users int64) *Simulator {
 	s := &Simulator{
 		Users:              users,
 		RoundRobinBalancer: 0,
 	}
 
-	s.Units = make([]*SimUnit, len(processors))
-	for i := range processors {
-		s.Units[i] = NewSimUnit(processors[i])
+	s.Units = make([]*SimUnit, len(costs))
+	for i := range costs {
+		s.Units[i] = NewSimUnit(costs[i])
 	}
 	sort.SliceStable(s.Units, func(i, j int) bool {
-		return s.Units[i].Processor.Cost < s.Units[j].Processor.Cost
+		return s.Units[i].Cost < s.Units[j].Cost
 	})
 
 	s.Alloc(s.Users)

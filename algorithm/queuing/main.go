@@ -78,10 +78,14 @@ func main() {
 					if err != nil {
 						return fmt.Errorf("failed to parse duration: %s", err)
 					}
-					ps := pkg.NewProcessorSet(costs)
-					sim := pkg.NewSimulator(ps, users)
+					sim := pkg.NewSimulator(costs, users)
 					sim.Run(duration)
-					return nil
+					if s, err := json.MarshalIndent(sim, "", "\t"); err != nil {
+						return err
+					} else {
+						fmt.Printf("%s\n", s)
+						return nil
+					}
 				},
 			},
 		},
