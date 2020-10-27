@@ -32,7 +32,7 @@ impl SegmentHeader {
         }
     }
 
-    fn to_vec_u8(&self) -> Result<Vec<u8>> {
+    fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut wtr = Vec::new();
 
         wtr.write_u128::<Endian>(self.length)?;
@@ -76,7 +76,7 @@ impl TryInto<Vec<u8>> for SegmentHeader {
     type Error = Error;
 
     fn try_into(self) -> result::Result<Vec<u8>, Self::Error> {
-        self.to_vec_u8()
+        self.to_bytes()
     }
 }
 
@@ -99,8 +99,8 @@ impl Segment {
         Self { header, payload }
     }
 
-    pub(crate) fn to_vec_u8(&self) -> Result<Vec<u8>> {
-        let mut bytes = self.header.to_vec_u8()?;
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>> {
+        let mut bytes = self.header.to_bytes()?;
         bytes.extend(self.payload.clone());
         assert_eq!(bytes.len(), SEGMENT_HEADER_SIZE + self.payload.len());
 
@@ -146,7 +146,7 @@ impl TryInto<Vec<u8>> for Segment {
     type Error = Error;
 
     fn try_into(self) -> result::Result<Vec<u8>, Self::Error> {
-        self.to_vec_u8()
+        self.to_bytes()
     }
 }
 
@@ -285,11 +285,11 @@ mod tests {
         }];
 
         for c in cases.iter() {
-            let bytes = c.header.to_vec_u8().unwrap();
+            let bytes = c.header.to_bytes().unwrap();
             assert_eq!(bytes.len(), SEGMENT_HEADER_SIZE);
             let header = SegmentHeader::try_from(bytes.as_slice()).unwrap();
             assert_eq!(header, c.header);
-            assert_eq!(header.to_vec_u8().unwrap(), bytes);
+            assert_eq!(header.to_bytes().unwrap(), bytes);
         }
     }
 
@@ -340,11 +340,11 @@ mod tests {
                 &c.segment.payload[..c.segment.header.length as usize]
             );
 
-            let bytes = c.segment.to_vec_u8().unwrap();
+            let bytes = c.segment.to_bytes().unwrap();
             assert_eq!(bytes.len(), SEGMENT_HEADER_SIZE + c.segment.payload.len());
             let segment = Segment::try_from(bytes.as_slice()).unwrap();
             assert_eq!(segment, c.segment);
-            assert_eq!(segment.to_vec_u8().unwrap(), bytes);
+            assert_eq!(segment.to_bytes().unwrap(), bytes);
             assert_eq!(segment.payload(), c.segment.payload());
         }
     }

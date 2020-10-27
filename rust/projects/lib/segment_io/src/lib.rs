@@ -13,4 +13,4 @@ type Endian = LittleEndian;
 extern crate log;
 
 pub use error::{Error, Result};
-pub use seg_file::SegmentsFile;
+pub use seg_file::BytesIO;

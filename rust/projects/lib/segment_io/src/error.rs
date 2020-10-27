@@ -10,7 +10,7 @@ pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
-    FileHeaderMissing(PathBuf),
+    MetaMissing(PathBuf),
     FileExisted(PathBuf),
     ReadFromMiddle(u128, u128),
     WriteOnReadOnlyFile(PathBuf),
@@ -21,7 +21,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::FileHeaderMissing(path) => write!(f, "header of file missing: {:?}", path),
+            Self::MetaMissing(path) => write!(f, "header of file missing: {:?}", path),
             Self::FileExisted(path) => write!(f, "file already existed: {:?}", path),
             Self::ReadFromMiddle(seq, total) => {
                 write!(f, "read from middle segment: {}/{}", seq, total)
