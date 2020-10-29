@@ -18,19 +18,21 @@ use byteorder::{ReadBytesExt, WriteBytesExt};
 use crate::{
     error::{Error, Result},
     segment::{self, Segment},
-    Endian,
+    Endian, Version, CURRENT_VERSION, VERSION_BYTES,
 };
 
 #[derive(Debug, Clone, Default, PartialEq)]
 struct Meta {
+    version: Version,
     header_bytes: u128,
     payload_bytes: u128,
 }
-const META_SIZE: usize = mem::size_of::<Meta>();
+const META_BYTES: usize = mem::size_of::<Meta>();
 
 impl Meta {
     fn new(payload_bytes: u128) -> Self {
         Self {
+            version: Version::new(),
             header_bytes: segment::SEGMENT_HEADER_SIZE as u128,
             payload_bytes,
         }
@@ -42,26 +44,31 @@ impl Meta {
     }
 
     fn to_bytes(&self) -> Result<Vec<u8>> {
-        let mut wtr = Vec::new();
-        wtr.write_u128::<Endian>(self.header_bytes)?;
-        wtr.write_u128::<Endian>(self.payload_bytes)?;
+        let mut bytes = self.version.to_bytes()?;
+        bytes.write_u128::<Endian>(self.header_bytes)?;
+        bytes.write_u128::<Endian>(self.payload_bytes)?;
 
-        assert_eq!(wtr.len(), META_SIZE);
+        assert_eq!(bytes.len(), META_BYTES);
 
-        Ok(wtr)
+        Ok(bytes)
     }
 }
 
 impl TryFrom<&[u8]> for Meta {
     type Error = Error;
     fn try_from(bytes: &[u8]) -> result::Result<Self, Self::Error> {
-        assert_eq!(bytes.len(), META_SIZE);
+        assert_eq!(bytes.len(), META_BYTES);
 
-        let mut rdr = Cursor::new(Vec::from(bytes));
+        let version = Version::try_from(&bytes[..VERSION_BYTES])?;
+        if !version.is_compatible() {
+            return Err(Error::INCOMPATIBLE(CURRENT_VERSION, version));
+        }
+        let mut rdr = Cursor::new(Vec::from(&bytes[VERSION_BYTES..]));
         let header_bytes = rdr.read_u128::<Endian>()?;
         let payload_bytes = rdr.read_u128::<Endian>()?;
 
         Ok(Self {
+            version,
             header_bytes,
             payload_bytes,
         })
@@ -103,7 +110,7 @@ pub struct BytesIO {
     pub config: Config,
 
     meta: Meta,
-    offset: Arc<AtomicUsize>,
+    offset: Arc<AtomicUsize>, // offset for frames in file
 
     reader: BufReader<File>,
     writer: Option<Arc<Mutex<BufWriter<File>>>>,
@@ -117,7 +124,7 @@ impl Clone for BytesIO {
                 .open(self.config.path.as_path())
                 .unwrap(),
         );
-        reader.seek(SeekFrom::Start(META_SIZE as u64)).unwrap();
+        reader.seek(SeekFrom::Start(META_BYTES as u64)).unwrap();
         Self {
             config: self.config.clone(),
 
@@ -152,7 +159,11 @@ impl BytesIO {
     }
 
     pub fn create<P: AsRef<Path>>(path: P, payload_bytes: u128) -> Result<Self> {
-        debug!("creating segment file: {:?}", path.as_ref());
+        trace!(
+            "creating BytesIO file: on {:?}, with {} Bytes payload",
+            path.as_ref(),
+            payload_bytes
+        );
 
         if path.as_ref().exists() {
             return Err(Error::FileExisted(path.as_ref().to_path_buf()));
@@ -164,26 +175,28 @@ impl BytesIO {
             return Err(Error::PayloadLimitZero);
         }
 
-        let mut seg_file = Self::new(Config::new(path, true), Meta::new(payload_bytes))?;
-        trace!("header of new segment file, config={:?}", seg_file.config);
+        let mut file = Self::new(Config::new(path, true), Meta::new(payload_bytes))?;
 
         {
-            let mut seg_writer = seg_file.writer.as_ref().unwrap().lock().unwrap();
-            seg_writer.seek(SeekFrom::Start(0))?;
-            seg_writer.write_all(seg_file.meta.to_bytes()?.as_slice())?;
+            let mut writer = file.writer.as_ref().unwrap().lock().unwrap();
+            writer.seek(SeekFrom::Start(0))?;
+            writer.write_all(file.meta.to_bytes()?.as_slice())?;
         }
 
-        seg_file.reader.seek(SeekFrom::Start(META_SIZE as u64))?;
+        file.reader.seek(SeekFrom::Start(META_BYTES as u64))?;
 
-        trace!("inited: BytesIO={:?}", seg_file);
-        Ok(seg_file)
+        Ok(file)
     }
 
     pub fn open<P: AsRef<Path>>(path: P, write_enable: bool) -> Result<Self> {
-        debug!("open segment file: {:?}", path.as_ref());
+        trace!(
+            "open BytesIO file: {:?}, with write_permission={}",
+            path.as_ref(),
+            write_enable
+        );
 
         let mut reader = OpenOptions::new().read(true).open(path.as_ref())?;
-        let mut buf = [0u8; META_SIZE];
+        let mut buf = [0u8; META_BYTES];
         if let Err(err) = reader.read_exact(&mut buf) {
             match err.kind() {
                 io::ErrorKind::UnexpectedEof => {
@@ -194,28 +207,27 @@ impl BytesIO {
                 }
             };
         };
-        let header = Meta::try_from(&buf[..])?;
-        trace!("file-header={:?}", header);
-        let segment_bytes = (header.header_bytes + header.payload_bytes) as usize;
+        let meta = Meta::try_from(&buf[..])?;
+        debug!("read meta from BytesIO file existed: meta={:?}", meta);
         drop(reader);
 
-        let mut seg_file = Self::new(Config::new(path.as_ref(), write_enable), header)?;
+        let mut file = Self::new(Config::new(path.as_ref(), write_enable), meta)?;
 
-        let segments_bytes = seg_file.reader.seek(SeekFrom::End(0))? as usize - META_SIZE;
-        seg_file.reader.seek(SeekFrom::Start(META_SIZE as u64))?;
+        let frame_bytes_existed = file.reader.seek(SeekFrom::End(0))? as usize - META_BYTES;
+        file.reader.seek(SeekFrom::Start(META_BYTES as u64))?;
 
-        trace!("bytes of segments of file: bytes={}", segments_bytes);
-        if segments_bytes == 0 {
-            seg_file.offset.store(0, Ordering::SeqCst);
+        debug!("{} bytes of frames exists in file", frame_bytes_existed);
+        if frame_bytes_existed == 0 {
+            file.offset.store(0, Ordering::SeqCst);
         } else {
-            assert_eq!(segments_bytes % seg_file.meta.frame_len(), 0);
-            seg_file
-                .offset
-                .store(segments_bytes / seg_file.meta.frame_len(), Ordering::SeqCst);
+            assert_eq!(frame_bytes_existed % file.meta.frame_len(), 0);
+            file.offset.store(
+                frame_bytes_existed / file.meta.frame_len(),
+                Ordering::SeqCst,
+            );
         }
 
-        trace!("inited: BytesIO={:?}", seg_file);
-        Ok(seg_file)
+        Ok(file)
     }
 
     fn next_segment(&mut self) -> Result<Option<Segment>> {
@@ -269,7 +281,7 @@ impl BytesIO {
     pub fn seek_segment(&mut self, n: usize) -> Result<Option<u64>> {
         debug!("seeking segment: offset={}", n);
 
-        let bytes = META_SIZE + self.meta.frame_len() * n;
+        let bytes = META_BYTES + self.meta.frame_len() * n;
         trace!("seek bytes from start: bytes={}", bytes);
         if self.reader.seek(SeekFrom::Start(bytes as u64))? as usize == bytes {
             trace!("segment found");
@@ -384,7 +396,7 @@ mod tests {
 
             for c in cases.iter() {
                 let bytes = c.header.to_bytes().unwrap();
-                assert_eq!(bytes.len(), META_SIZE);
+                assert_eq!(bytes.len(), META_BYTES);
                 let header = Meta::try_from(bytes.as_slice()).unwrap();
                 assert_eq!(header, c.header);
                 assert_eq!(header.to_bytes().unwrap(), bytes);
@@ -668,7 +680,7 @@ mod tests {
                             .unwrap();
                         assert_eq!(
                             seek_bytes,
-                            (META_SIZE
+                            (META_BYTES
                                 + s_file.meta.frame_len()
                                     * index[&(case.dataset.len() - i - 1)].start)
                                 as u64
