@@ -13,9 +13,9 @@ pub type Result<T> = result::Result<T, Error>;
 #[derive(Debug)]
 pub enum Error {
     MetaMissing(PathBuf),
-    INCOMPATIBLE(Version, Version),
+    Incompatible(Version, Version),
     FileExisted(PathBuf),
-    ReadFromMiddle(u128, u128),
+    MeetIncompleteEntry(u128, u128),
     WriteOnReadOnlyFile(PathBuf),
     PayloadLimitZero,
     IO(io::Error),
@@ -25,15 +25,17 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::MetaMissing(path) => write!(f, "header of file missing: {:?}", path),
-            Self::INCOMPATIBLE(current_version, file_version) => write!(
+            Self::Incompatible(current_version, file_version) => write!(
                 f,
                 "incompatible version, major version should be equal: current={}, got={}",
                 current_version, file_version
             ),
             Self::FileExisted(path) => write!(f, "file already existed: {:?}", path),
-            Self::ReadFromMiddle(seq, total) => {
-                write!(f, "read from middle segment: {}/{}", seq, total)
-            }
+            Self::MeetIncompleteEntry(expect, actual) => write!(
+                f,
+                "meet incomplete entry: expect {} frames, got {}",
+                expect, actual
+            ),
             Self::WriteOnReadOnlyFile(path) => {
                 write!(f, "write segments on read-only file: {:?}", path)
             }

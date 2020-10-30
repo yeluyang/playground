@@ -17,6 +17,7 @@ pub(crate) struct SegmentHeader {
     // TODO add `segment_uuid`
     length: u128,
     size: u128,
+    pub(crate) entry_id: u128,
     pub(crate) partial_seq: u128,
     pub(crate) total: u128,
 }
@@ -27,6 +28,7 @@ impl SegmentHeader {
         Self {
             length,
             size,
+            entry_id: 0, // TODO
             partial_seq,
             total,
         }
@@ -37,6 +39,7 @@ impl SegmentHeader {
 
         wtr.write_u128::<Endian>(self.length)?;
         wtr.write_u128::<Endian>(self.size)?;
+        wtr.write_u128::<Endian>(self.entry_id)?;
         wtr.write_u128::<Endian>(self.partial_seq)?;
         wtr.write_u128::<Endian>(self.total)?;
 
@@ -57,6 +60,7 @@ impl TryFrom<&[u8]> for SegmentHeader {
         let mut rdr = Cursor::new(Vec::from(bytes));
         h.length = rdr.read_u128::<Endian>()?;
         h.size = rdr.read_u128::<Endian>()?;
+        h.entry_id = rdr.read_u128::<Endian>()?;
         h.partial_seq = rdr.read_u128::<Endian>()?;
         h.total = rdr.read_u128::<Endian>()?;
 
@@ -279,6 +283,7 @@ mod tests {
             header: SegmentHeader {
                 length: 128,
                 size: 128,
+                entry_id: 0, // TODO
                 partial_seq: 8,
                 total: 16,
             },
@@ -304,6 +309,7 @@ mod tests {
                     header: SegmentHeader {
                         length: 0,
                         size: 128,
+                        entry_id: 0, // TODO
                         partial_seq: 4,
                         total: 16,
                     },
@@ -315,6 +321,7 @@ mod tests {
                     header: SegmentHeader {
                         length: 128,
                         size: 128,
+                        entry_id: 0, // TODO
                         partial_seq: 8,
                         total: 16,
                     },
@@ -326,6 +333,7 @@ mod tests {
                     header: SegmentHeader {
                         length: 64,
                         size: 128,
+                        entry_id: 0, // TODO
                         partial_seq: 15,
                         total: 16,
                     },

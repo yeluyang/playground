@@ -61,7 +61,7 @@ impl TryFrom<&[u8]> for Meta {
 
         let version = Version::try_from(&bytes[..VERSION_BYTES])?;
         if !version.is_compatible() {
-            return Err(Error::INCOMPATIBLE(CURRENT_VERSION, version));
+            return Err(Error::Incompatible(CURRENT_VERSION, version));
         }
         let mut rdr = Cursor::new(Vec::from(&bytes[VERSION_BYTES..]));
         let header_bytes = rdr.read_u128::<Endian>()?;
@@ -139,6 +139,7 @@ impl Clone for BytesIO {
 
 impl BytesIO {
     fn new(config: Config, meta: Meta) -> Result<Self> {
+        trace!("new BytesIO with: config={:?}, meta={:?}", config, meta);
         let reader = BufReader::new(OpenOptions::new().read(true).open(config.path.as_path())?);
         let writer = if config.write_enable {
             Some(Arc::new(Mutex::new(BufWriter::new(
@@ -230,8 +231,63 @@ impl BytesIO {
         Ok(file)
     }
 
-    fn next_segment(&mut self) -> Result<Option<Segment>> {
-        debug!("reading next segment");
+    pub fn read_entry(&mut self) -> Result<Option<Vec<u8>>> {
+        trace!("reading entry");
+
+        if let Some(frame_first) = self.next_frame()? {
+            if frame_first.is_first() {
+                let mut frame_count = 0u128;
+                let mut bytes: Vec<u8> = Vec::with_capacity(
+                    self.meta.payload_bytes as usize * frame_first.header.total as usize,
+                );
+                bytes.extend(frame_first.payload());
+                for _ in 0..frame_first.header.total - 1 {
+                    if let Some(frame) = self.next_frame()? {
+                        trace!(
+                            "read a frame({}/{}) from an entry: header={:?}",
+                            frame.header.partial_seq + 1,
+                            frame_first.header.total,
+                            frame.header
+                        );
+                        assert_eq!(
+                            frame.header.entry_id,
+                            frame_first.header.entry_id,
+                            "remain part of entry missing: total={}, entry_id={}, last_partial_seq={}, meet_entry_id={}",
+                            frame_first.header.total, frame_first.header.entry_id, frame_count, frame.header.entry_id,
+                        );
+                        assert_eq!(
+                            frame.header.partial_seq, frame_count,
+                            "partial_seq of frame mismatch: expect={}, actual={}",
+                            frame_count, frame.header.partial_seq,
+                        );
+                        bytes.extend(frame.payload());
+                        frame_count += 1;
+                    } else {
+                        return Err(Error::MeetIncompleteEntry(
+                            frame_first.header.total,
+                            frame_count,
+                        ));
+                    }
+                }
+                debug!(
+                    "read entry: frames={}, frame_seq={}",
+                    frame_count, frame_first.header.entry_id
+                );
+                return Ok(Some(bytes));
+            } else {
+                panic!(
+                    "read from middle of entry: {} in {}",
+                    frame_first.header.partial_seq + 1,
+                    frame_first.header.total
+                );
+            }
+        } else {
+            return Ok(None);
+        };
+    }
+
+    fn next_frame(&mut self) -> Result<Option<Segment>> {
+        trace!("reading next frame");
         let mut buf: Vec<u8> = vec![0u8; self.meta.frame_len()];
         if let Err(err) = self.reader.read_exact(buf.as_mut_slice()) {
             match err.kind() {
@@ -289,66 +345,6 @@ impl BytesIO {
         } else {
             trace!("segment not found: encounter EOF");
             Ok(None)
-        }
-    }
-
-    pub fn next_payload(&mut self) -> Result<Option<Vec<u8>>> {
-        debug!("reading payload from segments");
-
-        let mut bytes: Vec<u8> = Vec::with_capacity(self.meta.payload_bytes as usize);
-        if let Some(seg) = self.next_segment()? {
-            if seg.is_first() {
-                if seg.is_last() {
-                    bytes.extend(seg.payload());
-                    trace!(
-                        "read success, first contains all: payload.len={}",
-                        bytes.len()
-                    );
-                    return Ok(Some(bytes));
-                } else {
-                    trace!(
-                        "read segments: {}/{}",
-                        seg.header.partial_seq + 1,
-                        seg.header.total
-                    );
-                    bytes.extend(seg.payload());
-                }
-            } else {
-                return Err(Error::ReadFromMiddle(
-                    seg.header.partial_seq,
-                    seg.header.total,
-                ));
-            }
-        } else {
-            return Ok(None);
-        };
-        // TODO use `next_n_segments`
-        while let Some(seg) = self.next_segment()? {
-            trace!(
-                "read segments: {}/{}",
-                seg.header.partial_seq + 1,
-                seg.header.total
-            );
-            // TODO: use `take_payload`
-            bytes.extend(seg.payload());
-            if seg.is_last() {
-                trace!("read success: payload.len={}", bytes.len());
-                return Ok(Some(bytes));
-            }
-        }
-        panic!("incomplete write")
-    }
-
-    pub fn read_payload_by(&mut self, n: usize) -> Result<Option<Vec<u8>>> {
-        match self.next_payload() {
-            Ok(opt) => Ok(opt),
-            Err(err) => match err {
-                Error::ReadFromMiddle(seq, _) => {
-                    self.seek_segment(n - seq as usize)?;
-                    self.next_payload()
-                }
-                _ => Err(err),
-            },
         }
     }
 
@@ -623,13 +619,13 @@ mod tests {
                 for i in 0..2 {
                     for data in &case.dataset {
                         let js_bytes = serde_json::to_vec(data).unwrap();
-                        let seg_bytes = s_file.next_payload().unwrap().unwrap();
+                        let seg_bytes = s_file.read_entry().unwrap().unwrap();
                         assert_eq!(seg_bytes, js_bytes);
 
                         let d: CaseData = serde_json::from_slice(seg_bytes.as_slice()).unwrap();
                         assert_eq!(&d, data);
                     }
-                    assert!(s_file.next_payload().unwrap().is_none());
+                    assert!(s_file.read_entry().unwrap().is_none());
 
                     if i == 0 {
                         // open then read
@@ -686,12 +682,12 @@ mod tests {
                                 as u64
                         );
                         let js_bytes = serde_json::to_vec(data).unwrap();
-                        let seg_bytes = s_file.next_payload().unwrap().unwrap();
+                        let seg_bytes = s_file.read_entry().unwrap().unwrap();
                         assert_eq!(seg_bytes, js_bytes);
                         let d: CaseData = serde_json::from_slice(seg_bytes.as_slice()).unwrap();
                         assert_eq!(&d, data);
                     }
-                    assert!(s_file.next_payload().unwrap().is_some());
+                    assert!(s_file.read_entry().unwrap().is_some());
 
                     if i == 0 {
                         // open then seek
