@@ -12,6 +12,7 @@ type Endian = LittleEndian;
 #[macro_use]
 extern crate log;
 
+mod entry;
 mod error;
 mod seg_file;
 mod segment;
