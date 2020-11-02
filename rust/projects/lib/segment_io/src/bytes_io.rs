@@ -18,7 +18,7 @@ use byteorder::{ReadBytesExt, WriteBytesExt};
 use crate::{
     entry::{EntryID, EntryOffset},
     error::{Error, Result},
-    segment::{self, Segment, SegmentHeader},
+    frame::{self, Frame, Header},
     Endian, Version, CURRENT_VERSION, VERSION_BYTES,
 };
 
@@ -36,7 +36,7 @@ impl Meta {
         Self {
             version: Version::new(),
             uuid: 0, // TODO
-            header_bytes: segment::SEGMENT_HEADER_SIZE as u128,
+            header_bytes: frame::HEADER_SIZE as u128,
             payload_bytes,
         }
     }
@@ -289,7 +289,7 @@ impl BytesIO {
 
     pub fn append(&mut self, payload: &[u8]) -> Result<EntryOffset> {
         trace!("writing {} bytes into BytesIO file", payload.len(),);
-        let frames = segment::create(payload.to_owned(), self.meta.payload_bytes as usize);
+        let frames = frame::create(payload.to_owned(), self.meta.payload_bytes as usize);
         let frames_num = frames.len();
         let first_frame = self.frame_offset.load(Ordering::SeqCst);
         let entry_seq = self.entry_current_seq;
@@ -305,6 +305,8 @@ impl BytesIO {
     }
 
     pub fn seek_entry(&mut self, offset: EntryOffset) -> Result<Option<()>> {
+        trace!("seek entry on offset={:?}", offset);
+
         if self.meta.uuid != offset.entry_id.file_id {
             Ok(None)
         } else if let Some(header) = self.seek_frame(offset.first_frame)? {
@@ -338,16 +340,16 @@ impl BytesIO {
 
     // TODO add `replace`, need `entry::Reserve`
 
-    fn read_frame(&mut self) -> Result<Option<Segment>> {
+    fn read_frame(&mut self) -> Result<Option<Frame>> {
         trace!("reading next frame");
         if let Some(buf) = self.read_into(self.meta.frame_len() as usize)? {
-            let segment = Segment::try_from(buf.as_slice())?;
+            let frame = Frame::try_from(buf.as_slice())?;
             debug!(
-                "read next segment success: segment={{header={:?}, payload.len={}}}",
-                segment.header,
-                segment.payload.len(),
+                "read next frame success: frame={{header={:?}, payload.len={}}}",
+                frame.header,
+                frame.payload.len(),
             );
-            Ok(Some(segment))
+            Ok(Some(frame))
         } else {
             debug!("next frame not found");
             Ok(None)
@@ -355,14 +357,14 @@ impl BytesIO {
     }
 
     /// TODO
-    fn read_batch_frames(batch: usize) -> Result<Option<Vec<Segment>>> {
+    fn read_batch_frames(batch: usize) -> Result<Option<Vec<Frame>>> {
         unimplemented!()
     }
 
-    fn read_header(&mut self) -> Result<Option<SegmentHeader>> {
+    fn read_header(&mut self) -> Result<Option<Header>> {
         trace!("reading next header of frame");
         if let Some(buf) = self.read_into(self.meta.header_bytes as usize)? {
-            let header = SegmentHeader::try_from(buf.as_slice())?;
+            let header = Header::try_from(buf.as_slice())?;
             debug!("read next header of frame success: header={:?}", header,);
             Ok(Some(header))
         } else {
@@ -384,7 +386,7 @@ impl BytesIO {
         }
     }
 
-    fn write_frames(&mut self, frames: Vec<Segment>) -> Result<()> {
+    fn write_frames(&mut self, frames: Vec<Frame>) -> Result<()> {
         match &self.writer {
             None => Err(Error::WriteOnReadOnlyFile(self.config.path.clone())),
             Some(writer) => {
@@ -399,18 +401,17 @@ impl BytesIO {
         }
     }
 
-    fn seek_frame(&mut self, n: usize) -> Result<Option<SegmentHeader>> {
+    fn seek_frame(&mut self, n: usize) -> Result<Option<Header>> {
         trace!("seeking frame on offset {}", n);
 
         let bytes = META_BYTES + self.meta.frame_len() * n;
         let offset = SeekFrom::Start(bytes as u64);
         if self.reader.seek(offset)? as usize == bytes {
-            trace!("segment found");
             let result = self.read_header();
             self.reader.seek(offset)?;
             return result;
         } else {
-            trace!("segment not found: encounter EOF");
+            trace!("frame seeking not found");
             self.reader.seek(SeekFrom::End(0))?;
             Ok(None)
         }
@@ -520,12 +521,9 @@ mod tests {
                         assert_eq!(s_file.frame_offset.load(Ordering::SeqCst), 0);
                         assert_eq!(
                             s_file.meta.frame_len(),
-                            segment::SEGMENT_HEADER_SIZE + case.payload_limits as usize
+                            frame::HEADER_SIZE + case.payload_limits as usize
                         );
-                        assert_eq!(
-                            s_file.meta.header_bytes as usize,
-                            segment::SEGMENT_HEADER_SIZE
-                        );
+                        assert_eq!(s_file.meta.header_bytes as usize, frame::HEADER_SIZE);
                         assert_eq!(s_file.meta.payload_bytes, case.payload_limits);
                         assert!(BytesIO::create(&path, case.payload_limits).is_err());
                     }
@@ -611,12 +609,9 @@ mod tests {
                         );
                         assert_eq!(
                             s_file.meta.frame_len(),
-                            segment::SEGMENT_HEADER_SIZE + case.payload_limits
+                            frame::HEADER_SIZE + case.payload_limits
                         );
-                        assert_eq!(
-                            s_file.meta.header_bytes as usize,
-                            segment::SEGMENT_HEADER_SIZE
-                        );
+                        assert_eq!(s_file.meta.header_bytes as usize, frame::HEADER_SIZE);
                         assert_eq!(s_file.meta.payload_bytes as usize, case.payload_limits);
                     }
                     Err(err) => {

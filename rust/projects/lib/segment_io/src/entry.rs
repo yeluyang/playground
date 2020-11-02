@@ -1,8 +1,10 @@
+#[derive(Debug)]
 pub struct EntryID {
     pub file_id: u128,
     pub entry_seq: u128,
 }
 
+#[derive(Debug)]
 pub struct EntryOffset {
     pub entry_id: EntryID,
     pub first_frame: usize,

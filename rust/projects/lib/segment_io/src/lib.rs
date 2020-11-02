@@ -12,17 +12,17 @@ type Endian = LittleEndian;
 #[macro_use]
 extern crate log;
 
+mod bytes_io;
 mod entry;
 mod error;
-mod seg_file;
-mod segment;
+mod frame;
 
 #[cfg(test)]
 mod tests;
 
 // public lists
 pub use error::{Error, Result};
-pub use seg_file::BytesIO;
+pub use bytes_io::BytesIO;
 
 // protocol version of BytesIO file
 const VERSION_MAJOR: u128 = 1;

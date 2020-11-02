@@ -43,7 +43,7 @@ impl fmt::Display for Error {
                 expect, actual
             ),
             Self::WriteOnReadOnlyFile(path) => {
-                write!(f, "write segments on read-only file: {:?}", path)
+                write!(f, "write entry in read-only file: {:?}", path)
             }
             Self::PayloadLimitZero => write!(f, "limit of bytes of payload must greater than zero"),
             Self::IO(err) => err.fmt(f),
