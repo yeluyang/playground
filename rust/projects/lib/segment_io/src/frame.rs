@@ -161,13 +161,13 @@ pub(crate) fn create(mut payload: Vec<u8>, partial_limits: usize) -> Vec<Frame> 
     };
 
     debug!(
-        "creating {} segments: data.len={}, partial.size={}",
+        "creating {} frames: data.len={}, partial.size={}",
         n,
         payload.len(),
         partial_limits
     );
 
-    let mut segments: Vec<Frame> = Vec::with_capacity(n);
+    let mut frames: Vec<Frame> = Vec::with_capacity(n);
 
     for i in 0..n {
         let next = if payload.len() >= partial_limits {
@@ -178,7 +178,7 @@ pub(crate) fn create(mut payload: Vec<u8>, partial_limits: usize) -> Vec<Frame> 
         assert!(!payload.is_empty());
         assert!(payload.len() <= partial_limits);
 
-        segments.push(Frame::new(
+        frames.push(Frame::new(
             Header::new(
                 payload.len() as u128,
                 partial_limits as u128,
@@ -190,9 +190,9 @@ pub(crate) fn create(mut payload: Vec<u8>, partial_limits: usize) -> Vec<Frame> 
 
         payload = next;
     }
-    assert_eq!(segments.len(), n);
+    assert_eq!(frames.len(), n);
 
-    segments
+    frames
 }
 
 #[cfg(test)]
