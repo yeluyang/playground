@@ -8,6 +8,6 @@ edition = "2018"
 
 [dependencies]
 
-segment_io = {path = "../segment_io"}
+bytes_io = {path = "../bytes_io"}
 serde = {version = "1.0.104", features = ["derive"]}
 serde_json = "1.0.44"

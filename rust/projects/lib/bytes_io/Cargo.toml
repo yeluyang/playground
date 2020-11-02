@@ -1,5 +1,5 @@
 [package]
-name = "segment_io"
+name = "bytes_io"
 version = "0.1.0"
 authors = ["yeluyang <ylycpg@gmail.com>"]
 edition = "2018"
