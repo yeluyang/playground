@@ -15,6 +15,7 @@ pub enum Error {
     MetaMissing(PathBuf),
     Incompatible(Version, Version),
     FileExisted(PathBuf),
+    EntryMismatch(u128, u128),
     MeetIncompleteEntry(u128, u128),
     WriteOnReadOnlyFile(PathBuf),
     PayloadLimitZero,
@@ -29,6 +30,11 @@ impl fmt::Display for Error {
                 f,
                 "incompatible version, major version should be equal: current={}, got={}",
                 current_version, file_version
+            ),
+            Self::EntryMismatch(expect, actual) => write!(
+                f,
+                "sequence of entry mismatch: expect={}, actual={}",
+                expect, actual
             ),
             Self::FileExisted(path) => write!(f, "file already existed: {:?}", path),
             Self::MeetIncompleteEntry(expect, actual) => write!(

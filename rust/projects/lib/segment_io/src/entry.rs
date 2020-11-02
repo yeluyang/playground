@@ -1,9 +1,18 @@
 pub struct EntryID {
-    file_id: u128,
-    entry_seq: u128,
+    pub file_id: u128,
+    pub entry_seq: u128,
 }
 
 pub struct EntryOffset {
-    entry_id: EntryID,
-    frame_first: usize,
+    pub entry_id: EntryID,
+    pub first_frame: usize,
+}
+
+impl EntryOffset {
+    pub fn new(file_id: u128, entry_seq: u128, first_frame: usize) -> EntryOffset {
+        return EntryOffset {
+            entry_id: EntryID { file_id, entry_seq },
+            first_frame,
+        };
+    }
 }

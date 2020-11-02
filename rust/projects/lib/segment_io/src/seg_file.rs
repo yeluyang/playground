@@ -16,6 +16,7 @@ extern crate byteorder;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 
 use crate::{
+    entry::{EntryID, EntryOffset},
     error::{Error, Result},
     segment::{self, Segment, SegmentHeader},
     Endian, Version, CURRENT_VERSION, VERSION_BYTES,
@@ -115,6 +116,7 @@ pub struct BytesIO {
     pub config: Config,
 
     meta: Meta,
+    entry_current_seq: u128,
     frame_offset: Arc<AtomicUsize>, // offset for frames in file
 
     reader: BufReader<File>,
@@ -134,6 +136,7 @@ impl Clone for BytesIO {
             config: self.config.clone(),
 
             meta: self.meta.clone(),
+            entry_current_seq: 0, // TODO
             frame_offset: self.frame_offset.clone(),
 
             reader,
@@ -157,6 +160,7 @@ impl BytesIO {
         Ok(Self {
             config,
             meta,
+            entry_current_seq: 0, // TODO
             frame_offset: Arc::new(AtomicUsize::new(0)),
 
             reader,
@@ -283,78 +287,100 @@ impl BytesIO {
         };
     }
 
-    pub fn append(&mut self, payload: &[u8]) -> Result<Range<usize>> {
+    pub fn append(&mut self, payload: &[u8]) -> Result<EntryOffset> {
         trace!("writing {} bytes into BytesIO file", payload.len(),);
         let frames = segment::create(payload.to_owned(), self.meta.payload_bytes as usize);
         let frames_num = frames.len();
-        let offset_before = self.frame_offset.load(Ordering::SeqCst);
+        let first_frame = self.frame_offset.load(Ordering::SeqCst);
+        let entry_seq = self.entry_current_seq;
         self.write_frames(frames)?;
-        let offset_after = self.frame_offset.load(Ordering::SeqCst);
-        assert_eq!(offset_after - offset_before, frames_num);
+        let offset_current = self.frame_offset.load(Ordering::SeqCst);
+        assert_eq!(offset_current - first_frame, frames_num);
 
         debug!(
             "write success, offset of frames: {} -> {})",
-            offset_before, offset_after
+            first_frame, offset_current
         );
-        Ok(Range {
-            start: offset_before,
-            end: offset_after,
-        })
+        Ok(EntryOffset::new(self.meta.uuid, entry_seq, first_frame))
     }
 
-    // TODO add `seek_entry`, need `EntryOffset and EntryID`
+    pub fn seek_entry(&mut self, offset: EntryOffset) -> Result<Option<()>> {
+        if self.meta.uuid != offset.entry_id.file_id {
+            Ok(None)
+        } else if let Some(header) = self.seek_frame(offset.first_frame)? {
+            if header.entry_seq != offset.entry_id.entry_seq {
+                Err(Error::EntryMismatch(
+                    offset.entry_id.entry_seq,
+                    header.entry_seq,
+                ))
+            } else {
+                Ok(Some(()))
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// TODO
+    pub fn first_entry(&mut self) -> Result<Option<EntryOffset>> {
+        unimplemented!()
+    }
+
+    /// TODO
+    pub fn last_entry(&mut self) -> Result<Option<EntryOffset>> {
+        unimplemented!()
+    }
+
+    /// TODO
+    pub fn find_entry(&mut self, entry_id: EntryID) -> Result<EntryOffset> {
+        unimplemented!()
+    }
 
     // TODO add `replace`, need `entry::Reserve`
 
     fn read_frame(&mut self) -> Result<Option<Segment>> {
         trace!("reading next frame");
-        let mut buf: Vec<u8> = vec![0u8; self.meta.frame_len()];
-        if let Err(err) = self.reader.read_exact(buf.as_mut_slice()) {
-            match err.kind() {
-                io::ErrorKind::UnexpectedEof => {
-                    trace!("read EOF");
-                    Ok(None)
-                }
-                _ => Err(Error::IO(err)),
-            }
-        } else {
-            assert_eq!(buf.len(), self.meta.frame_len());
+        if let Some(buf) = self.read_into(self.meta.frame_len() as usize)? {
             let segment = Segment::try_from(buf.as_slice())?;
-            trace!(
+            debug!(
                 "read next segment success: segment={{header={:?}, payload.len={}}}",
                 segment.header,
                 segment.payload.len(),
             );
             Ok(Some(segment))
+        } else {
+            debug!("next frame not found");
+            Ok(None)
         }
+    }
+
+    /// TODO
+    fn read_batch_frames(batch: usize) -> Result<Option<Vec<Segment>>> {
+        unimplemented!()
     }
 
     fn read_header(&mut self) -> Result<Option<SegmentHeader>> {
         trace!("reading next header of frame");
-        let mut buf: Vec<u8> = vec![0u8; self.meta.header_bytes as usize];
-        if let Err(err) = self.reader.read_exact(buf.as_mut_slice()) {
-            match err.kind() {
-                io::ErrorKind::UnexpectedEof => {
-                    trace!("read EOF");
-                    Ok(None)
-                }
-                _ => Err(Error::IO(err)),
-            }
-        } else {
-            assert_eq!(buf.len(), self.meta.frame_len());
+        if let Some(buf) = self.read_into(self.meta.header_bytes as usize)? {
             let header = SegmentHeader::try_from(buf.as_slice())?;
-            trace!("read next header of frame success: header={:?}", header,);
+            debug!("read next header of frame success: header={:?}", header,);
             Ok(Some(header))
+        } else {
+            debug!("next header of frame not found");
+            Ok(None)
         }
     }
 
-    // TODO add `next_n_segments(n)->Result<Option<Vec<Segment>>>`
-
-    pub fn last_segment_seq(&self) -> Option<usize> {
-        if self.frame_offset.load(Ordering::SeqCst) == 0 {
-            None
+    fn read_into(&mut self, bytes: usize) -> Result<Option<Vec<u8>>> {
+        trace!("reading {} bytes from BytesIO file", bytes);
+        let mut buf: Vec<u8> = vec![0u8; bytes];
+        if let Err(err) = self.reader.read_exact(buf.as_mut_slice()) {
+            match err.kind() {
+                io::ErrorKind::UnexpectedEof => Ok(None),
+                _ => Err(Error::IO(err)),
+            }
         } else {
-            Some(self.frame_offset.load(Ordering::SeqCst) - 1)
+            Ok(Some(buf))
         }
     }
 
