@@ -13,38 +13,40 @@ use crate::{
 };
 
 #[derive(Default, Debug, PartialEq)]
-pub(crate) struct Header {
-    length: u128,
-    size: u128,
-    pub(crate) entry_seq: u128,
-    pub(crate) partial_seq: u128,
-    pub(crate) total: u128,
+pub struct Header {
+    pub length: u128,
+    pub size: u128,
+    pub entry_seq: u128,
+    pub frame_seq: u128,
+    pub total: u128,
 }
-pub(crate) const HEADER_SIZE: usize = mem::size_of::<Header>();
+pub const HEADER_SIZE: usize = mem::size_of::<Header>();
 
 impl Header {
-    fn new(length: u128, size: u128, partial_seq: u128, total: u128) -> Self {
+    fn new(length: u128, size: u128, entry_seq: u128, frame_seq: u128, total: u128) -> Self {
+        assert!(length <= size);
+        assert!(total > 0);
+        assert!(frame_seq < total);
         Self {
             length,
             size,
-            entry_seq: 0, // TODO
-            partial_seq,
+            entry_seq,
+            frame_seq,
             total,
         }
     }
-
     fn to_bytes(&self) -> Result<Vec<u8>> {
-        let mut wtr = Vec::new();
+        let mut bytes = Vec::new();
 
-        wtr.write_u128::<Endian>(self.length)?;
-        wtr.write_u128::<Endian>(self.size)?;
-        wtr.write_u128::<Endian>(self.entry_seq)?;
-        wtr.write_u128::<Endian>(self.partial_seq)?;
-        wtr.write_u128::<Endian>(self.total)?;
+        bytes.write_u128::<Endian>(self.length)?;
+        bytes.write_u128::<Endian>(self.size)?;
+        bytes.write_u128::<Endian>(self.entry_seq)?;
+        bytes.write_u128::<Endian>(self.frame_seq)?;
+        bytes.write_u128::<Endian>(self.total)?;
 
-        assert_eq!(wtr.len(), HEADER_SIZE);
+        assert_eq!(bytes.len(), HEADER_SIZE);
 
-        Ok(wtr)
+        Ok(bytes)
     }
 }
 
@@ -56,12 +58,12 @@ impl TryFrom<&[u8]> for Header {
 
         let mut h = Self::default();
 
-        let mut rdr = Cursor::new(Vec::from(bytes));
-        h.length = rdr.read_u128::<Endian>()?;
-        h.size = rdr.read_u128::<Endian>()?;
-        h.entry_seq = rdr.read_u128::<Endian>()?;
-        h.partial_seq = rdr.read_u128::<Endian>()?;
-        h.total = rdr.read_u128::<Endian>()?;
+        let mut r = Cursor::new(Vec::from(bytes));
+        h.length = r.read_u128::<Endian>()?;
+        h.size = r.read_u128::<Endian>()?;
+        h.entry_seq = r.read_u128::<Endian>()?;
+        h.frame_seq = r.read_u128::<Endian>()?;
+        h.total = r.read_u128::<Endian>()?;
 
         Ok(h)
     }
@@ -84,9 +86,9 @@ impl TryInto<Vec<u8>> for Header {
 }
 
 #[derive(Default, Debug, PartialEq)]
-pub(crate) struct Frame {
-    pub(crate) header: Header,
-    pub(crate) payload: Vec<u8>,
+pub struct Frame {
+    pub header: Header,
+    pub payload: Vec<u8>,
 }
 
 impl Frame {
@@ -102,7 +104,7 @@ impl Frame {
         Self { header, payload }
     }
 
-    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut bytes = self.header.to_bytes()?;
         bytes.extend(self.payload.clone());
         assert_eq!(bytes.len(), HEADER_SIZE + self.payload.len());
@@ -111,16 +113,12 @@ impl Frame {
     }
 
     // TODO: add `take_payload`
-    pub(crate) fn payload(&self) -> &[u8] {
+    pub fn payload(&self) -> &[u8] {
         &self.payload[..self.header.length as usize]
     }
 
-    pub(crate) fn is_first(&self) -> bool {
-        self.header.partial_seq == 0
-    }
-
-    pub(crate) fn is_last(&self) -> bool {
-        self.header.partial_seq == self.header.total - 1
+    pub fn is_first(&self) -> bool {
+        self.header.frame_seq == 0
     }
 }
 
@@ -141,6 +139,7 @@ impl TryFrom<Vec<u8>> for Frame {
     type Error = Error;
 
     fn try_from(bytes: Vec<u8>) -> result::Result<Self, Self::Error> {
+        // XXX: should move `bytes[HEADER_SIZE..]` into `frame.payload` for performance
         Self::try_from(bytes.as_slice())
     }
 }
@@ -153,7 +152,7 @@ impl TryInto<Vec<u8>> for Frame {
     }
 }
 
-pub(crate) fn create(mut payload: Vec<u8>, partial_limits: usize) -> Vec<Frame> {
+pub fn create(mut payload: Vec<u8>, entry_seq: u128, partial_limits: usize) -> Vec<Frame> {
     let n = if payload.len() % partial_limits != 0 {
         payload.len() / partial_limits as usize + 1
     } else {
@@ -182,6 +181,7 @@ pub(crate) fn create(mut payload: Vec<u8>, partial_limits: usize) -> Vec<Frame> 
             Header::new(
                 payload.len() as u128,
                 partial_limits as u128,
+                entry_seq,
                 i as u128,
                 n as u128,
             ),
@@ -241,7 +241,7 @@ mod tests {
                 assert_eq!(last_seg.header.size as usize, c.partial_limits);
                 assert_eq!(last_seg.payload.len(), c.partial_limits);
                 assert!(last_seg.is_last());
-                assert_eq!(last_seg.header.partial_seq as usize, segments.len());
+                assert_eq!(last_seg.header.frame_seq as usize, segments.len());
 
                 if remain_bytes != 0 {
                     assert_eq!(last_seg.header.length as usize, remain_bytes);
@@ -262,7 +262,7 @@ mod tests {
                     assert_eq!(seg.header.length as usize, c.partial_limits);
                     assert_eq!(seg.header.size as usize, c.partial_limits);
                     assert_eq!(seg.payload.len(), c.partial_limits);
-                    assert_eq!(seg.header.partial_seq as usize, i);
+                    assert_eq!(seg.header.frame_seq as usize, i);
                     assert_eq!(
                         seg.payload.as_slice(),
                         &c.payload[last..last + seg.payload.len()]
@@ -283,7 +283,7 @@ mod tests {
                 length: 128,
                 size: 128,
                 entry_seq: 0, // TODO
-                partial_seq: 8,
+                frame_seq: 8,
                 total: 16,
             },
         }];
@@ -309,7 +309,7 @@ mod tests {
                         length: 0,
                         size: 128,
                         entry_seq: 0, // TODO
-                        partial_seq: 4,
+                        frame_seq: 4,
                         total: 16,
                     },
                     payload: vec![0; 0],
@@ -321,7 +321,7 @@ mod tests {
                         length: 128,
                         size: 128,
                         entry_seq: 0, // TODO
-                        partial_seq: 8,
+                        frame_seq: 8,
                         total: 16,
                     },
                     payload: vec![0; 128],
@@ -333,7 +333,7 @@ mod tests {
                         length: 64,
                         size: 128,
                         entry_seq: 0, // TODO
-                        partial_seq: 15,
+                        frame_seq: 15,
                         total: 16,
                     },
                     payload: vec![0; 64],

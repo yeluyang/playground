@@ -48,6 +48,8 @@ impl Meta {
 
     fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut bytes = self.version.to_bytes()?;
+        assert_eq!(bytes.len(), VERSION_BYTES);
+
         bytes.write_u128::<Endian>(self.uuid)?;
         bytes.write_u128::<Endian>(self.header_bytes)?;
         bytes.write_u128::<Endian>(self.payload_bytes)?;
@@ -67,10 +69,10 @@ impl TryFrom<&[u8]> for Meta {
         if !version.is_compatible() {
             return Err(Error::Incompatible(CURRENT_VERSION, version));
         }
-        let mut rdr = Cursor::new(Vec::from(&bytes[VERSION_BYTES..]));
-        let uuid = rdr.read_u128::<Endian>()?;
-        let header_bytes = rdr.read_u128::<Endian>()?;
-        let payload_bytes = rdr.read_u128::<Endian>()?;
+        let mut r = Cursor::new(Vec::from(&bytes[VERSION_BYTES..]));
+        let uuid = r.read_u128::<Endian>()?;
+        let header_bytes = r.read_u128::<Endian>()?;
+        let payload_bytes = r.read_u128::<Endian>()?;
 
         Ok(Self {
             version,
@@ -254,12 +256,12 @@ impl BytesIO {
                     if let Some(frame) = self.read_frame()? {
                         trace!(
                             "read a frame({}/{}) from an entry: header={:?}",
-                            frame.header.partial_seq + 1,
+                            frame.header.frame_seq + 1,
                             frame_first.header.total,
                             frame.header
                         );
                         assert_eq!(frame.header.entry_seq, frame_first.header.entry_seq,);
-                        assert_eq!(frame.header.partial_seq, frame_count,);
+                        assert_eq!(frame.header.frame_seq, frame_count,);
                         bytes.extend(frame.payload());
                         frame_count += 1;
                     } else {
@@ -270,7 +272,7 @@ impl BytesIO {
                     }
                 }
                 debug!(
-                    "read entry: frames={}, frame_seq={}",
+                    "read entry: frames={}, sequence={}",
                     frame_count, frame_first.header.entry_seq
                 );
                 return Ok(Some(bytes));
@@ -278,7 +280,7 @@ impl BytesIO {
                 // XXX: allow read from middle of entry?
                 panic!(
                     "read from middle of entry: {} in {}",
-                    frame_first.header.partial_seq + 1,
+                    frame_first.header.frame_seq + 1,
                     frame_first.header.total
                 );
             }
