@@ -202,65 +202,70 @@ mod tests {
     fn test_create() {
         struct Case {
             payload: Vec<u8>,
-            partial_limits: usize,
+            partial_size: usize,
+            entry_seq: u128,
             expected_segments: usize,
         }
         let cases = [
             Case {
                 payload: vec![1; 1024],
-                partial_limits: 128,
+                partial_size: 128,
+                entry_seq: 0,
                 expected_segments: 8,
             },
             Case {
                 payload: vec![2; 0],
-                partial_limits: 128,
+                partial_size: 128,
+                entry_seq: 1,
                 expected_segments: 0,
             },
             Case {
                 payload: vec![3; 1025],
-                partial_limits: 128,
+                partial_size: 128,
+                entry_seq: 3,
                 expected_segments: 9,
             },
             Case {
-                payload: vec![3; 125],
-                partial_limits: 128,
+                payload: vec![4; 125],
+                partial_size: 128,
+                entry_seq: 4,
                 expected_segments: 1,
             },
         ];
 
         for c in &cases {
-            let remain_bytes = c.payload.len() % c.partial_limits;
-            let segments = create(c.payload.clone(), c.partial_limits);
-            assert_eq!(segments.len(), c.expected_segments);
+            let remain_bytes = c.payload.len() % c.partial_size;
+            let frames = create(c.payload.clone(), c.entry_seq, c.partial_size);
+            assert_eq!(frames.len(), c.expected_segments);
 
             if c.expected_segments != 0 {
-                assert!(segments[0].is_first());
+                assert!(frames[0].is_first());
 
-                let (last_seg, segments) = segments.split_last().unwrap();
-                assert_eq!(last_seg.header.payload_size as usize, c.partial_limits);
-                assert_eq!(last_seg.payload.len(), c.partial_limits);
-                assert!(last_seg.is_last());
-                assert_eq!(last_seg.header.frame_seq as usize, segments.len());
+                let frame_last = frames.last().unwrap();
+                assert_eq!(frame_last.header.payload_size as usize, c.partial_size);
+                assert_eq!(frame_last.payload.len(), c.partial_size);
+                assert_eq!(frame_last.header.frame_seq, frame_last.header.total);
+                assert_eq!(frame_last.header.frame_seq as usize, frames.len() - 1);
 
                 if remain_bytes != 0 {
-                    assert_eq!(last_seg.header.payload_len as usize, remain_bytes);
+                    assert_eq!(frame_last.header.payload_len as usize, remain_bytes);
                     assert_eq!(
-                        &last_seg.payload[..remain_bytes],
+                        &frame_last.payload[..remain_bytes],
                         &c.payload[c.payload.len() - remain_bytes..]
                     );
                 } else {
-                    assert_eq!(last_seg.header.payload_len as usize, c.partial_limits);
+                    assert_eq!(frame_last.header.payload_len as usize, c.partial_size);
                     assert_eq!(
-                        last_seg.payload.as_slice(),
-                        &c.payload[c.payload.len() - last_seg.payload.len()..]
+                        frame_last.payload.as_slice(),
+                        &c.payload[c.payload.len() - frame_last.payload.len()..]
                     );
                 }
 
                 let mut last = 0usize;
-                for (i, seg) in segments.iter().enumerate() {
-                    assert_eq!(seg.header.payload_len as usize, c.partial_limits);
-                    assert_eq!(seg.header.payload_size as usize, c.partial_limits);
-                    assert_eq!(seg.payload.len(), c.partial_limits);
+                for (i, seg) in frames.iter().enumerate() {
+                    assert_eq!(seg.header.payload_len as usize, c.partial_size);
+                    assert_eq!(seg.header.payload_size as usize, c.partial_size);
+                    assert_eq!(seg.payload.len(), c.partial_size);
                     assert_eq!(seg.header.frame_seq as usize, i);
                     assert_eq!(
                         seg.payload.as_slice(),
@@ -343,7 +348,7 @@ mod tests {
         for c in cases.iter() {
             assert_eq!(
                 c.segment.payload(),
-                &c.segment.payload[..c.segment.header.length as usize]
+                &c.segment.payload[..c.segment.header.payload_len as usize]
             );
 
             let bytes = c.segment.to_bytes().unwrap();

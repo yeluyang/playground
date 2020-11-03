@@ -138,7 +138,7 @@ impl Clone for BytesIO {
             config: self.config.clone(),
 
             meta: self.meta.clone(),
-            entry_current_seq: 0, // TODO
+            entry_current_seq: self.entry_current_seq,
             frame_offset: self.frame_offset.clone(),
 
             reader,
