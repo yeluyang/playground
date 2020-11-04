@@ -204,41 +204,41 @@ mod tests {
             payload: Vec<u8>,
             partial_size: usize,
             entry_seq: u128,
-            expected_segments: usize,
+            expected_frames: usize,
         }
         let cases = [
             Case {
                 payload: vec![1; 1024],
                 partial_size: 128,
                 entry_seq: 0,
-                expected_segments: 8,
+                expected_frames: 8,
             },
             Case {
                 payload: vec![2; 0],
                 partial_size: 128,
                 entry_seq: 1,
-                expected_segments: 0,
+                expected_frames: 0,
             },
             Case {
                 payload: vec![3; 1025],
                 partial_size: 128,
                 entry_seq: 3,
-                expected_segments: 9,
+                expected_frames: 9,
             },
             Case {
                 payload: vec![4; 125],
                 partial_size: 128,
                 entry_seq: 4,
-                expected_segments: 1,
+                expected_frames: 1,
             },
         ];
 
         for c in &cases {
             let remain_bytes = c.payload.len() % c.partial_size;
             let frames = create(c.payload.clone(), c.entry_seq, c.partial_size);
-            assert_eq!(frames.len(), c.expected_segments);
+            assert_eq!(frames.len(), c.expected_frames);
 
-            if c.expected_segments != 0 {
+            if c.expected_frames != 0 {
                 assert!(frames[0].is_first());
 
                 let frame_last = frames.last().unwrap();
@@ -262,16 +262,16 @@ mod tests {
                 }
 
                 let mut last = 0usize;
-                for (i, seg) in frames.iter().enumerate() {
-                    assert_eq!(seg.header.payload_len as usize, c.partial_size);
-                    assert_eq!(seg.header.payload_size as usize, c.partial_size);
-                    assert_eq!(seg.payload.len(), c.partial_size);
-                    assert_eq!(seg.header.frame_seq as usize, i);
+                for (i, frame) in frames.iter().enumerate() {
+                    assert_eq!(frame.header.payload_len as usize, c.partial_size);
+                    assert_eq!(frame.header.payload_size as usize, c.partial_size);
+                    assert_eq!(frame.payload.len(), c.partial_size);
+                    assert_eq!(frame.header.frame_seq as usize, i);
                     assert_eq!(
-                        seg.payload.as_slice(),
-                        &c.payload[last..last + seg.payload.len()]
+                        frame.payload.as_slice(),
+                        &c.payload[last..last + frame.payload.len()]
                     );
-                    last += seg.payload.len();
+                    last += frame.payload.len();
                 }
             }
         }
@@ -302,13 +302,13 @@ mod tests {
     }
 
     #[test]
-    fn test_segment() {
+    fn test_frame() {
         struct Case {
-            segment: Frame,
+            frame: Frame,
         }
         let cases = [
             Case {
-                segment: Frame {
+                frame: Frame {
                     header: Header {
                         payload_len: 0,
                         payload_size: 128,
@@ -320,7 +320,7 @@ mod tests {
                 },
             },
             Case {
-                segment: Frame {
+                frame: Frame {
                     header: Header {
                         payload_len: 128,
                         payload_size: 128,
@@ -332,7 +332,7 @@ mod tests {
                 },
             },
             Case {
-                segment: Frame {
+                frame: Frame {
                     header: Header {
                         payload_len: 64,
                         payload_size: 128,
@@ -347,16 +347,16 @@ mod tests {
 
         for c in cases.iter() {
             assert_eq!(
-                c.segment.payload(),
-                &c.segment.payload[..c.segment.header.payload_len as usize]
+                c.frame.payload(),
+                &c.frame.payload[..c.frame.header.payload_len as usize]
             );
 
-            let bytes = c.segment.to_bytes().unwrap();
-            assert_eq!(bytes.len(), HEADER_SIZE + c.segment.payload.len());
-            let segment = Frame::try_from(bytes.as_slice()).unwrap();
-            assert_eq!(segment, c.segment);
-            assert_eq!(segment.to_bytes().unwrap(), bytes);
-            assert_eq!(segment.payload(), c.segment.payload());
+            let bytes = c.frame.to_bytes().unwrap();
+            assert_eq!(bytes.len(), HEADER_SIZE + c.frame.payload.len());
+            let frame = Frame::try_from(bytes.as_slice()).unwrap();
+            assert_eq!(frame, c.frame);
+            assert_eq!(frame.to_bytes().unwrap(), bytes);
+            assert_eq!(frame.payload(), c.frame.payload());
         }
     }
 }

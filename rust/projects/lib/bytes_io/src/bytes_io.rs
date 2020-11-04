@@ -226,8 +226,6 @@ impl BytesIO {
         let mut file = Self::new(Config::new(path.as_ref(), write_enable), meta)?;
 
         let frame_bytes_existed = file.reader.seek(SeekFrom::End(0))? as usize - META_BYTES;
-        file.reader.seek(SeekFrom::Start(META_BYTES as u64))?;
-
         debug!("{} bytes of frames exists in file", frame_bytes_existed);
         if frame_bytes_existed == 0 {
             file.frame_offset.store(0, Ordering::SeqCst);
@@ -238,6 +236,16 @@ impl BytesIO {
                 Ordering::SeqCst,
             );
         }
+
+        file.reader
+            .seek(SeekFrom::End(-1 * file.meta.frame_len() as i64));
+        file.entry_current_seq = if let Some(header_last) = file.read_header()? {
+            header_last.entry_seq + 1
+        } else {
+            0
+        };
+
+        file.reader.seek(SeekFrom::Start(META_BYTES as u64))?;
 
         Ok(file)
     }
@@ -291,7 +299,11 @@ impl BytesIO {
 
     pub fn append(&mut self, payload: &[u8]) -> Result<EntryOffset> {
         trace!("writing {} bytes into BytesIO file", payload.len(),);
-        let frames = frame::create(payload.to_owned(), self.meta.payload_bytes as usize);
+        let frames = frame::create(
+            payload.to_owned(),
+            self.entry_current_seq,
+            self.meta.payload_bytes as usize,
+        );
         let frames_num = frames.len();
         let first_frame = self.frame_offset.load(Ordering::SeqCst);
         let entry_seq = self.entry_current_seq;
@@ -349,7 +361,7 @@ impl BytesIO {
             debug!(
                 "read next frame success: frame={{header={:?}, payload.len={}}}",
                 frame.header,
-                frame.payload.len(),
+                frame.payload().len(),
             );
             Ok(Some(frame))
         } else {
@@ -425,7 +437,7 @@ mod tests {
     use super::*;
     use crate::tests::*;
 
-    mod file_header {
+    mod meta {
         use super::*;
 
         #[test]
@@ -448,7 +460,7 @@ mod tests {
         }
     }
 
-    mod segments_file {
+    mod bytes_io {
         use std::{collections::HashMap, fs};
 
         use super::*;
@@ -467,18 +479,18 @@ mod tests {
             dataset: &[T],
             path: P,
             payload_limits: usize,
-        ) -> (BytesIO, HashMap<usize, Range<usize>>)
+        ) -> (BytesIO, HashMap<usize, EntryOffset>)
         where
             T: Serialize,
             P: AsRef<Path>,
         {
-            let mut index: HashMap<usize, Range<usize>> = HashMap::new();
+            let mut index: HashMap<usize, EntryOffset> = HashMap::new();
             let mut s_file = BytesIO::create(path, payload_limits as u128).unwrap();
 
             for (i, data) in dataset.iter().enumerate() {
                 let bytes = serde_json::to_vec(data).unwrap();
-                let seq_rng = s_file.append(bytes.as_slice()).unwrap();
-                index.insert(i, seq_rng);
+                let entry_offset = s_file.append(bytes.as_slice()).unwrap();
+                index.insert(i, entry_offset);
             }
             assert_eq!(index.len(), dataset.len());
             (s_file, index)
@@ -500,17 +512,17 @@ mod tests {
             }
             let cases = &[
                 Case {
-                    path: "normal.segment".to_owned(),
+                    path: "normal.frame".to_owned(),
                     payload_limits: 128,
                     result: Ok(()),
                 },
                 Case {
-                    path: "non-existed-dir/non-existed.segment".to_owned(),
+                    path: "non-existed-dir/non-existed.frame".to_owned(),
                     payload_limits: 128,
                     result: Err(Error::IO(io::Error::from_raw_os_error(2))),
                 },
                 Case {
-                    path: "payload-limits-zero.segment".to_owned(),
+                    path: "payload-limits-zero.frame".to_owned(),
                     payload_limits: 0,
                     result: Err(Error::PayloadLimitZero),
                 },
@@ -554,7 +566,7 @@ mod tests {
             }
             let cases = &[
                 Case {
-                    path: "normal.segment".to_owned(),
+                    path: "normal.frame".to_owned(),
                     payload_limits: 128,
                     dataset: vec![
                         CaseData {
@@ -569,10 +581,10 @@ mod tests {
                     result: Ok(()),
                 },
                 Case {
-                    path: "no-header.segment".to_owned(),
+                    path: "no-header.frame".to_owned(),
                     payload_limits: 128,
                     dataset: vec![],
-                    result: Err(Error::MetaMissing(case_dir.join("no-header.segment"))),
+                    result: Err(Error::MetaMissing(case_dir.join("no-header.frame"))),
                 },
             ];
 
@@ -607,7 +619,7 @@ mod tests {
                     Ok(s_file) => {
                         assert_eq!(
                             s_file.frame_offset.load(Ordering::SeqCst),
-                            index[&(case.dataset.len() - 1)].end
+                            index[&(case.dataset.len() - 1)].first_frame,
                         );
                         assert_eq!(
                             s_file.meta.frame_len(),
@@ -641,7 +653,7 @@ mod tests {
                 dataset: Vec<CaseData>,
             }
             let cases = &[Case {
-                path: "normal.segment".to_owned(),
+                path: "normal.frame".to_owned(),
                 payload_limits: 128,
                 dataset: vec![
                     CaseData {
@@ -692,7 +704,7 @@ mod tests {
                 dataset: Vec<CaseData>,
             }
             let cases = &[Case {
-                path: "normal.segment".to_owned(),
+                path: "normal.frame".to_owned(),
                 payload_limits: 128,
                 dataset: vec![
                     CaseData {
