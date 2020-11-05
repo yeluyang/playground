@@ -129,7 +129,7 @@ impl TryFrom<&[u8]> for Frame {
     type Error = Error;
 
     fn try_from(bytes: &[u8]) -> result::Result<Self, Self::Error> {
-        assert!(bytes.len() > HEADER_SIZE);
+        assert!(bytes.len() >= HEADER_SIZE);
 
         let header = Header::try_from(&bytes[..HEADER_SIZE])?;
 
@@ -175,7 +175,11 @@ pub fn create(mut payload: Vec<u8>, entry_seq: u128, partial_size: usize) -> Vec
     let mut frames: Vec<Frame> = Vec::with_capacity(total);
 
     for frame_seq in 0..total {
-        let next = payload.split_off(partial_size);
+        let next = if partial_size < payload.len() {
+            payload.split_off(partial_size)
+        } else {
+            Vec::new()
+        };
 
         frames.push(Frame::new(
             Header::new(
@@ -197,9 +201,11 @@ pub fn create(mut payload: Vec<u8>, entry_seq: u128, partial_size: usize) -> Vec
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::*;
 
     #[test]
     fn test_create() {
+        init();
         struct Case {
             payload: Vec<u8>,
             partial_size: usize,
@@ -239,12 +245,24 @@ mod tests {
             assert_eq!(frames.len(), c.expected_frames);
 
             if c.expected_frames != 0 {
+                for i in 0..frames.len() - 1 {
+                    assert_eq!(frames[i].header.entry_seq, frames[i + 1].header.entry_seq);
+                    assert_eq!(
+                        frames[i].header.frame_seq + 1,
+                        frames[i + 1].header.frame_seq
+                    );
+                    assert_eq!(frames[i].header.total, frames[i + 1].header.total);
+                    assert_eq!(
+                        frames[i].header.payload_size,
+                        frames[i + 1].header.payload_size
+                    );
+                    assert_eq!(frames[i].payload.len(), frames[i + 1].payload.len());
+                }
+
                 assert!(frames[0].is_first());
 
                 let frame_last = frames.last().unwrap();
-                assert_eq!(frame_last.header.payload_size as usize, c.partial_size);
-                assert_eq!(frame_last.payload.len(), c.partial_size);
-                assert_eq!(frame_last.header.frame_seq, frame_last.header.total);
+                assert_eq!(frame_last.header.frame_seq + 1, frame_last.header.total);
                 assert_eq!(frame_last.header.frame_seq as usize, frames.len() - 1);
 
                 if remain_bytes != 0 {
@@ -263,13 +281,18 @@ mod tests {
 
                 let mut last = 0usize;
                 for (i, frame) in frames.iter().enumerate() {
-                    assert_eq!(frame.header.payload_len as usize, c.partial_size);
+                    assert_eq!(frame.header.entry_seq, c.entry_seq);
                     assert_eq!(frame.header.payload_size as usize, c.partial_size);
-                    assert_eq!(frame.payload.len(), c.partial_size);
+                    assert!(
+                        frame.header.payload_len as usize == c.partial_size
+                            || i == frames.len() - 1
+                    );
+                    assert_eq!(frame.header.total as usize, c.expected_frames);
                     assert_eq!(frame.header.frame_seq as usize, i);
+                    assert_eq!(frame.payload.len(), c.partial_size);
                     assert_eq!(
-                        frame.payload.as_slice(),
-                        &c.payload[last..last + frame.payload.len()]
+                        frame.payload(),
+                        &c.payload[last..last + frame.header.payload_len as usize]
                     );
                     last += frame.payload.len();
                 }
@@ -279,22 +302,18 @@ mod tests {
 
     #[test]
     fn test_header() {
+        init();
         struct Case {
             header: Header,
         }
         let cases = [Case {
-            header: Header {
-                payload_len: 128,
-                payload_size: 128,
-                entry_seq: 0, // TODO
-                frame_seq: 8,
-                total: 16,
-            },
+            header: Header::new(128, 128, 1, 8, 16),
         }];
 
         for c in cases.iter() {
             let bytes = c.header.to_bytes().unwrap();
             assert_eq!(bytes.len(), HEADER_SIZE);
+
             let header = Header::try_from(bytes.as_slice()).unwrap();
             assert_eq!(header, c.header);
             assert_eq!(header.to_bytes().unwrap(), bytes);
@@ -303,45 +322,46 @@ mod tests {
 
     #[test]
     fn test_frame() {
+        init();
         struct Case {
             frame: Frame,
         }
         let cases = [
             Case {
-                frame: Frame {
-                    header: Header {
+                frame: Frame::new(
+                    Header {
                         payload_len: 0,
                         payload_size: 128,
-                        entry_seq: 0, // TODO
+                        entry_seq: 0,
                         frame_seq: 4,
                         total: 16,
                     },
-                    payload: vec![0; 0],
-                },
+                    vec![0; 0],
+                ),
             },
             Case {
-                frame: Frame {
-                    header: Header {
+                frame: Frame::new(
+                    Header {
                         payload_len: 128,
                         payload_size: 128,
-                        entry_seq: 0, // TODO
+                        entry_seq: 1,
                         frame_seq: 8,
                         total: 16,
                     },
-                    payload: vec![0; 128],
-                },
+                    vec![0; 128],
+                ),
             },
             Case {
-                frame: Frame {
-                    header: Header {
+                frame: Frame::new(
+                    Header {
                         payload_len: 64,
                         payload_size: 128,
-                        entry_seq: 0, // TODO
+                        entry_seq: 2,
                         frame_seq: 15,
                         total: 16,
                     },
-                    payload: vec![0; 64],
-                },
+                    vec![0; 64],
+                ),
             },
         ];
 
@@ -353,9 +373,11 @@ mod tests {
 
             let bytes = c.frame.to_bytes().unwrap();
             assert_eq!(bytes.len(), HEADER_SIZE + c.frame.payload.len());
+
             let frame = Frame::try_from(bytes.as_slice()).unwrap();
             assert_eq!(frame, c.frame);
             assert_eq!(frame.to_bytes().unwrap(), bytes);
+            assert_eq!(frame.payload, c.frame.payload);
             assert_eq!(frame.payload(), c.frame.payload());
         }
     }

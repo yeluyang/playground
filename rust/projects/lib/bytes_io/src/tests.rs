@@ -4,6 +4,7 @@ extern crate env_logger;
 use env_logger::{Builder, Env};
 
 static INIT: std::sync::Once = std::sync::Once::new();
+
 pub fn init() {
     INIT.call_once(|| {
         Builder::from_env(Env::default().default_filter_or("trace"))
