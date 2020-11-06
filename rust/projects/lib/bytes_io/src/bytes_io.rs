@@ -3,7 +3,6 @@ use std::{
     fs::{File, OpenOptions},
     io::{self, BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
     mem,
-    ops::Range,
     path::{Path, PathBuf},
     result,
     sync::{
@@ -14,6 +13,8 @@ use std::{
 
 extern crate byteorder;
 use byteorder::{ReadBytesExt, WriteBytesExt};
+
+extern crate uuid;
 
 use crate::{
     entry::{EntryID, EntryOffset},
@@ -33,9 +34,10 @@ const META_BYTES: usize = mem::size_of::<Meta>();
 
 impl Meta {
     fn new(payload_bytes: u128) -> Self {
+        assert!(payload_bytes > 0);
         Self {
             version: Version::new(),
-            uuid: 0, // TODO
+            uuid: uuid::Uuid::new_v4().as_u128(),
             header_bytes: frame::HEADER_SIZE as u128,
             payload_bytes,
         }
@@ -171,6 +173,7 @@ impl BytesIO {
     }
 
     pub fn create<P: AsRef<Path>>(path: P, payload_bytes: u128) -> Result<Self> {
+        assert!(payload_bytes > 0);
         trace!(
             "creating BytesIO file: on {:?}, with {} Bytes payload",
             path.as_ref(),
@@ -183,16 +186,13 @@ impl BytesIO {
             File::create(path.as_ref())?;
         }
 
-        if payload_bytes == 0 {
-            return Err(Error::PayloadLimitZero);
-        }
-
         let mut file = Self::new(Config::new(path, true), Meta::new(payload_bytes))?;
 
         {
             let mut writer = file.writer.as_ref().unwrap().lock().unwrap();
             writer.seek(SeekFrom::Start(0))?;
             writer.write_all(file.meta.to_bytes()?.as_slice())?;
+            writer.flush()?;
         }
 
         file.reader.seek(SeekFrom::Start(META_BYTES as u64))?;
@@ -238,7 +238,7 @@ impl BytesIO {
         }
 
         file.reader
-            .seek(SeekFrom::End(-1 * file.meta.frame_len() as i64));
+            .seek(SeekFrom::End(-1 * file.meta.frame_len() as i64))?;
         file.entry_current_seq = if let Some(header_last) = file.read_header()? {
             header_last.entry_seq + 1
         } else {
@@ -388,14 +388,23 @@ impl BytesIO {
     }
 
     fn read_into(&mut self, bytes: usize) -> Result<Option<Vec<u8>>> {
-        trace!("reading {} bytes from BytesIO file", bytes);
+        trace!("reading {} bytes from {:?}", bytes, self.config.path);
         let mut buf: Vec<u8> = vec![0u8; bytes];
         if let Err(err) = self.reader.read_exact(buf.as_mut_slice()) {
             match err.kind() {
-                io::ErrorKind::UnexpectedEof => Ok(None),
+                io::ErrorKind::UnexpectedEof => {
+                    debug!("encounter EOF of {:?}", self.config.path);
+                    Ok(None)
+                }
                 _ => Err(Error::IO(err)),
             }
         } else {
+            debug!(
+                "read {}/{} bytes from {:?}",
+                buf.len(),
+                bytes,
+                self.config.path
+            );
             Ok(Some(buf))
         }
     }
@@ -441,21 +450,23 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_file_header() {
+        fn test_meta() {
             init();
             struct Case {
-                header: Meta,
+                meta: Meta,
             }
             let cases = [Case {
-                header: Meta::new(128),
+                meta: Meta::new(128),
             }];
 
             for c in cases.iter() {
-                let bytes = c.header.to_bytes().unwrap();
+                let bytes = c.meta.to_bytes().unwrap();
+                assert_ne!(c.meta.uuid, 0);
                 assert_eq!(bytes.len(), META_BYTES);
-                let header = Meta::try_from(bytes.as_slice()).unwrap();
-                assert_eq!(header, c.header);
-                assert_eq!(header.to_bytes().unwrap(), bytes);
+
+                let meta = Meta::try_from(bytes.as_slice()).unwrap();
+                assert_eq!(meta, c.meta);
+                assert_eq!(meta.to_bytes().unwrap(), bytes);
             }
         }
     }
@@ -521,30 +532,31 @@ mod tests {
                     payload_limits: 128,
                     result: Err(Error::IO(io::Error::from_raw_os_error(2))),
                 },
-                Case {
-                    path: "payload-limits-zero.frame".to_owned(),
-                    payload_limits: 0,
-                    result: Err(Error::PayloadLimitZero),
-                },
             ];
 
-            for case in cases {
-                let path = case_dir.join(&case.path);
-                match BytesIO::create(&path, case.payload_limits) {
-                    Ok(s_file) => {
-                        assert_eq!(s_file.frame_offset.load(Ordering::SeqCst), 0);
+            for c in cases {
+                let path = case_dir.join(&c.path);
+                match BytesIO::create(&path, c.payload_limits) {
+                    Ok(mut file) => {
+                        assert_eq!(file.frame_offset.load(Ordering::SeqCst), 0);
                         assert_eq!(
-                            s_file.meta.frame_len(),
-                            frame::HEADER_SIZE + case.payload_limits as usize
+                            file.meta.frame_len(),
+                            frame::HEADER_SIZE + c.payload_limits as usize
                         );
-                        assert_eq!(s_file.meta.header_bytes as usize, frame::HEADER_SIZE);
-                        assert_eq!(s_file.meta.payload_bytes, case.payload_limits);
-                        assert!(BytesIO::create(&path, case.payload_limits).is_err());
+                        assert_eq!(file.meta.header_bytes as usize, frame::HEADER_SIZE);
+                        assert_eq!(file.meta.payload_bytes, c.payload_limits);
+                        assert!(BytesIO::create(&path, c.payload_limits).is_err());
+
+                        file.reader.seek(SeekFrom::Start(0)).unwrap();
+                        let mut buf = vec![0; META_BYTES];
+                        file.reader.read_exact(buf.as_mut_slice()).unwrap();
+                        let meta = Meta::try_from(buf.as_slice()).unwrap();
+                        assert_eq!(meta, file.meta);
+                        assert_eq!(file.reader.read(buf.as_mut_slice()).unwrap(), 0);
                     }
-                    Err(err) => assert_eq!(
-                        err.to_string(),
-                        case.result.as_ref().unwrap_err().to_string()
-                    ),
+                    Err(err) => {
+                        assert_eq!(err.to_string(), c.result.as_ref().unwrap_err().to_string())
+                    }
                 };
             }
         }

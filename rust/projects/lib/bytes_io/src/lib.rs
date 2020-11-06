@@ -21,8 +21,8 @@ mod frame;
 mod tests;
 
 // public lists
-pub use error::{Error, Result};
 pub use bytes_io::BytesIO;
+pub use error::{Error, Result};
 
 // protocol version of BytesIO file
 const VERSION_MAJOR: u128 = 1;

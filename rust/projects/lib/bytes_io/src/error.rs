@@ -18,7 +18,6 @@ pub enum Error {
     EntryMismatch(u128, u128),
     MeetIncompleteEntry(u128, u128),
     WriteOnReadOnlyFile(PathBuf),
-    PayloadLimitZero,
     IO(io::Error),
 }
 
@@ -45,7 +44,6 @@ impl fmt::Display for Error {
             Self::WriteOnReadOnlyFile(path) => {
                 write!(f, "write entry in read-only file: {:?}", path)
             }
-            Self::PayloadLimitZero => write!(f, "limit of bytes of payload must greater than zero"),
             Self::IO(err) => err.fmt(f),
         }
     }
