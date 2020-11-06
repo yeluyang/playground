@@ -93,6 +93,11 @@ pub struct Frame {
 
 impl Frame {
     fn new(header: Header, mut payload: Vec<u8>) -> Self {
+        trace!(
+            "creating frame: header={:?}, payload.bytes={}",
+            header,
+            payload.len()
+        );
         assert_eq!(payload.len(), header.payload_len as usize);
 
         if payload.len() < header.payload_size as usize {
