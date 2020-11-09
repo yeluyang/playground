@@ -628,17 +628,17 @@ mod tests {
                 };
 
                 match open_result {
-                    Ok(s_file) => {
+                    Ok(file) => {
                         assert_eq!(
-                            s_file.frame_offset.load(Ordering::SeqCst),
+                            file.frame_offset.load(Ordering::SeqCst),
                             index[&(case.dataset.len() - 1)].first_frame,
                         );
                         assert_eq!(
-                            s_file.meta.frame_len(),
+                            file.meta.frame_len(),
                             frame::HEADER_SIZE + case.payload_limits
                         );
-                        assert_eq!(s_file.meta.header_bytes as usize, frame::HEADER_SIZE);
-                        assert_eq!(s_file.meta.payload_bytes as usize, case.payload_limits);
+                        assert_eq!(file.meta.header_bytes as usize, frame::HEADER_SIZE);
+                        assert_eq!(file.meta.payload_bytes as usize, case.payload_limits);
                     }
                     Err(err) => {
                         assert_eq!(
