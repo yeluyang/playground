@@ -120,7 +120,7 @@ pub struct BytesIO {
     pub config: Config,
 
     meta: Meta,
-    entry_next_seq: u128,        // XXX: should wrap by atomic?
+    entry_next_seq: u128,                // XXX: should wrap by atomic?
     frame_next_offset: Arc<AtomicUsize>, // offset for frames in file
 
     reader: BufReader<File>,
@@ -258,6 +258,7 @@ impl BytesIO {
                 bytes.extend(frame_first.payload());
                 for _ in 0..frame_first.header.total - 1 {
                     if let Some(frame) = self.read_frame()? {
+                        frame_count += 1;
                         trace!(
                             "read a frame({}/{}) from an entry: header={:?}",
                             frame.header.frame_seq + 1,
@@ -267,7 +268,6 @@ impl BytesIO {
                         assert_eq!(frame.header.entry_seq, frame_first.header.entry_seq,);
                         assert_eq!(frame.header.frame_seq, frame_count,);
                         bytes.extend(frame.payload());
-                        frame_count += 1;
                     } else {
                         return Err(Error::MeetIncompleteEntry(
                             frame_first.header.total,
@@ -641,21 +641,21 @@ mod tests {
 
             for case in cases {
                 let path = case_dir.join(&case.path);
-                let (mut s_file, _) = setup(case.dataset.as_slice(), &path, case.payload_limits);
+                let (mut file, _) = setup(case.dataset.as_slice(), &path, case.payload_limits);
                 for i in 0..2 {
                     for data in &case.dataset {
                         let js_bytes = serde_json::to_vec(data).unwrap();
-                        let seg_bytes = s_file.read_entry().unwrap().unwrap();
-                        assert_eq!(seg_bytes, js_bytes);
+                        let entry_bytes = file.read_entry().unwrap().unwrap();
+                        assert_eq!(entry_bytes, js_bytes);
 
-                        let d: CaseData = serde_json::from_slice(seg_bytes.as_slice()).unwrap();
+                        let d: CaseData = serde_json::from_slice(entry_bytes.as_slice()).unwrap();
                         assert_eq!(&d, data);
                     }
-                    assert!(s_file.read_entry().unwrap().is_none());
+                    assert!(file.read_entry().unwrap().is_none());
 
                     if i == 0 {
                         // open then read
-                        s_file = BytesIO::open(&path, false).unwrap();
+                        file = BytesIO::open(&path, false).unwrap();
                     }
                 }
             }
