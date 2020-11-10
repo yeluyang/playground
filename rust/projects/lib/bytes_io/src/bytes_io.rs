@@ -120,8 +120,8 @@ pub struct BytesIO {
     pub config: Config,
 
     meta: Meta,
-    entry_current_seq: u128,
-    frame_offset: Arc<AtomicUsize>, // offset for frames in file
+    entry_next_seq: u128,        // XXX: should wrap by atomic?
+    frame_next_offset: Arc<AtomicUsize>, // offset for frames in file
 
     reader: BufReader<File>,
     writer: Option<Arc<Mutex<BufWriter<File>>>>,
@@ -140,8 +140,8 @@ impl Clone for BytesIO {
             config: self.config.clone(),
 
             meta: self.meta.clone(),
-            entry_current_seq: self.entry_current_seq,
-            frame_offset: self.frame_offset.clone(),
+            entry_next_seq: self.entry_next_seq,
+            frame_next_offset: self.frame_next_offset.clone(),
 
             reader,
             writer: self.writer.clone(),
@@ -164,8 +164,8 @@ impl BytesIO {
         Ok(Self {
             config,
             meta,
-            entry_current_seq: 0, // TODO
-            frame_offset: Arc::new(AtomicUsize::new(0)),
+            entry_next_seq: 0,
+            frame_next_offset: Arc::new(AtomicUsize::new(0)),
 
             reader,
             writer,
@@ -228,22 +228,18 @@ impl BytesIO {
         let frame_bytes_existed = file.reader.seek(SeekFrom::End(0))? as usize - META_BYTES;
         debug!("{} bytes of frames exists in file", frame_bytes_existed);
         if frame_bytes_existed == 0 {
-            file.frame_offset.store(0, Ordering::SeqCst);
+            file.frame_next_offset.store(0, Ordering::SeqCst);
+            file.entry_next_seq = 0;
         } else {
             assert_eq!(frame_bytes_existed % file.meta.frame_len(), 0);
-            file.frame_offset.store(
+            file.frame_next_offset.store(
                 frame_bytes_existed / file.meta.frame_len(),
                 Ordering::SeqCst,
             );
+            file.reader
+                .seek(SeekFrom::End(-1 * file.meta.frame_len() as i64))?;
+            file.entry_next_seq = file.read_header()?.unwrap().entry_seq;
         }
-
-        file.reader
-            .seek(SeekFrom::End(-1 * file.meta.frame_len() as i64))?;
-        file.entry_current_seq = if let Some(header_last) = file.read_header()? {
-            header_last.entry_seq + 1
-        } else {
-            0
-        };
 
         file.reader.seek(SeekFrom::Start(META_BYTES as u64))?;
 
@@ -299,16 +295,18 @@ impl BytesIO {
 
     pub fn append(&mut self, payload: &[u8]) -> Result<EntryOffset> {
         trace!("writing {} bytes into BytesIO file", payload.len(),);
+        // FIXME: bug when multi mutex writer
+        let entry_seq = self.entry_next_seq;
+        self.entry_next_seq += 1;
         let frames = frame::create(
             payload.to_owned(),
-            self.entry_current_seq,
+            self.entry_next_seq,
             self.meta.payload_bytes as usize,
         );
         let frames_num = frames.len();
-        let first_frame = self.frame_offset.load(Ordering::SeqCst);
-        let entry_seq = self.entry_current_seq;
+        let first_frame = self.frame_next_offset.load(Ordering::SeqCst);
         self.write_frames(frames)?;
-        let offset_current = self.frame_offset.load(Ordering::SeqCst);
+        let offset_current = self.frame_next_offset.load(Ordering::SeqCst);
         assert_eq!(offset_current - first_frame, frames_num);
 
         debug!(
@@ -417,7 +415,7 @@ impl BytesIO {
                 for frame in frames {
                     writer.write_all(frame.to_bytes()?.as_slice())?;
                     writer.flush()?;
-                    self.frame_offset.fetch_add(1, Ordering::SeqCst);
+                    self.frame_next_offset.fetch_add(1, Ordering::SeqCst);
                 }
                 Ok(())
             }
@@ -489,7 +487,7 @@ mod tests {
         fn setup<T, P>(
             dataset: &[T],
             path: P,
-            payload_limits: usize,
+            payload_limits: u128,
         ) -> (BytesIO, HashMap<usize, EntryOffset>)
         where
             T: Serialize,
@@ -523,12 +521,12 @@ mod tests {
             }
             let cases = &[
                 Case {
-                    path: "normal.frame".to_owned(),
+                    path: "normal.bytesio".to_owned(),
                     payload_limits: 128,
                     result: Ok(()),
                 },
                 Case {
-                    path: "non-existed-dir/non-existed.frame".to_owned(),
+                    path: "non-existed-dir/non-existed.bytesio".to_owned(),
                     payload_limits: 128,
                     result: Err(Error::IO(io::Error::from_raw_os_error(2))),
                 },
@@ -538,7 +536,7 @@ mod tests {
                 let path = case_dir.join(&c.path);
                 match BytesIO::create(&path, c.payload_limits) {
                     Ok(mut file) => {
-                        assert_eq!(file.frame_offset.load(Ordering::SeqCst), 0);
+                        assert_eq!(file.frame_next_offset.load(Ordering::SeqCst), 0);
                         assert_eq!(
                             file.meta.frame_len(),
                             frame::HEADER_SIZE + c.payload_limits as usize
@@ -572,13 +570,17 @@ mod tests {
 
             struct Case {
                 path: String,
-                payload_limits: usize,
+                payload_limits: u128,
                 dataset: Vec<CaseData>,
-                result: Result<()>,
             }
             let cases = &[
                 Case {
-                    path: "normal.frame".to_owned(),
+                    path: "empty.bytesio".to_owned(),
+                    payload_limits: 128,
+                    dataset: vec![],
+                },
+                Case {
+                    path: "normal.bytesio".to_owned(),
                     payload_limits: 128,
                     dataset: vec![
                         CaseData {
@@ -590,63 +592,21 @@ mod tests {
                             data: vec![1; 256],
                         },
                     ],
-                    result: Ok(()),
-                },
-                Case {
-                    path: "no-header.frame".to_owned(),
-                    payload_limits: 128,
-                    dataset: vec![],
-                    result: Err(Error::MetaMissing(case_dir.join("no-header.frame"))),
                 },
             ];
 
-            for case in cases {
-                let path = case_dir.join(&case.path);
-                let err = BytesIO::open(&path, false).unwrap_err();
+            for c in cases {
+                let path = case_dir.join(&c.path);
+                setup(c.dataset.as_slice(), &path, c.payload_limits);
+
+                let file = BytesIO::open(&path, false).unwrap();
                 assert_eq!(
-                    err.to_string(),
-                    Error::IO(io::Error::from_raw_os_error(2)).to_string()
+                    file.meta.frame_len(),
+                    frame::HEADER_SIZE + c.payload_limits as usize
                 );
-
-                let (open_result, index) = match case.result.as_ref() {
-                    Ok(_) => {
-                        let (_, index) = setup(case.dataset.as_slice(), &path, case.payload_limits);
-
-                        (BytesIO::open(&path, false), index)
-                    }
-                    Err(err) => match err {
-                        Error::MetaMissing(_) => {
-                            OpenOptions::new()
-                                .create(true)
-                                .write(true)
-                                .open(&path)
-                                .unwrap();
-                            (BytesIO::open(&path, false), HashMap::new())
-                        }
-                        _ => unreachable!(),
-                    },
-                };
-
-                match open_result {
-                    Ok(file) => {
-                        assert_eq!(
-                            file.frame_offset.load(Ordering::SeqCst),
-                            index[&(case.dataset.len() - 1)].first_frame,
-                        );
-                        assert_eq!(
-                            file.meta.frame_len(),
-                            frame::HEADER_SIZE + case.payload_limits
-                        );
-                        assert_eq!(file.meta.header_bytes as usize, frame::HEADER_SIZE);
-                        assert_eq!(file.meta.payload_bytes as usize, case.payload_limits);
-                    }
-                    Err(err) => {
-                        assert_eq!(
-                            err.to_string(),
-                            case.result.as_ref().unwrap_err().to_string(),
-                        );
-                    }
-                }
+                assert_eq!(file.meta.header_bytes as usize, frame::HEADER_SIZE);
+                assert_eq!(file.meta.payload_bytes, c.payload_limits);
+                assert_eq!(file.entry_next_seq as usize, c.dataset.len());
             }
         }
 
@@ -661,11 +621,11 @@ mod tests {
 
             struct Case {
                 path: String,
-                payload_limits: usize,
+                payload_limits: u128,
                 dataset: Vec<CaseData>,
             }
             let cases = &[Case {
-                path: "normal.frame".to_owned(),
+                path: "normal.bytesio".to_owned(),
                 payload_limits: 128,
                 dataset: vec![
                     CaseData {
@@ -712,11 +672,11 @@ mod tests {
 
             struct Case {
                 path: String,
-                payload_limits: usize,
+                payload_limits: u128,
                 dataset: Vec<CaseData>,
             }
             let cases = &[Case {
-                path: "normal.frame".to_owned(),
+                path: "normal.bytesio".to_owned(),
                 payload_limits: 128,
                 dataset: vec![
                     CaseData {
