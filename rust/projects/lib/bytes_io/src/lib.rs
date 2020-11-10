@@ -21,7 +21,7 @@ mod frame;
 mod tests;
 
 // public lists
-pub use bytes_io::BytesIO;
+pub use self::bytes_io::BytesIO;
 pub use error::{Error, Result};
 
 // protocol version of BytesIO file

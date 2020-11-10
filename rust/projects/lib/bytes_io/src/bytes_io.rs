@@ -238,7 +238,7 @@ impl BytesIO {
             );
             file.reader
                 .seek(SeekFrom::End(-1 * file.meta.frame_len() as i64))?;
-            file.entry_next_seq = file.read_header()?.unwrap().entry_seq;
+            file.entry_next_seq = file.read_header()?.unwrap().entry_seq + 1;
         }
 
         file.reader.seek(SeekFrom::Start(META_BYTES as u64))?;
@@ -300,7 +300,7 @@ impl BytesIO {
         self.entry_next_seq += 1;
         let frames = frame::create(
             payload.to_owned(),
-            self.entry_next_seq,
+            entry_seq,
             self.meta.payload_bytes as usize,
         );
         let frames_num = frames.len();
@@ -316,7 +316,7 @@ impl BytesIO {
         Ok(EntryOffset::new(self.meta.uuid, entry_seq, first_frame))
     }
 
-    pub fn seek_entry(&mut self, offset: EntryOffset) -> Result<Option<()>> {
+    pub fn seek_entry(&mut self, offset: &EntryOffset) -> Result<Option<()>> {
         trace!("seek entry on offset={:?}", offset);
 
         if self.meta.uuid != offset.entry_id.file_id {
@@ -494,15 +494,15 @@ mod tests {
             P: AsRef<Path>,
         {
             let mut index: HashMap<usize, EntryOffset> = HashMap::new();
-            let mut s_file = BytesIO::create(path, payload_limits as u128).unwrap();
+            let mut file = BytesIO::create(path, payload_limits as u128).unwrap();
 
             for (i, data) in dataset.iter().enumerate() {
                 let bytes = serde_json::to_vec(data).unwrap();
-                let entry_offset = s_file.append(bytes.as_slice()).unwrap();
+                let entry_offset = file.append(bytes.as_slice()).unwrap();
                 index.insert(i, entry_offset);
             }
             assert_eq!(index.len(), dataset.len());
-            (s_file, index)
+            (file, index)
         }
 
         #[test]
@@ -692,33 +692,22 @@ mod tests {
 
             for case in cases {
                 let path = case_dir.join(&case.path);
-                let (mut s_file, index) =
-                    setup(case.dataset.as_slice(), &path, case.payload_limits);
+                let (mut file, index) = setup(case.dataset.as_slice(), &path, case.payload_limits);
                 for i in 0..2 {
                     for (i, data) in case.dataset.iter().rev().enumerate() {
-                        // FIXME: syntax error when `seek_frame` modified
-                        // let seek_bytes = s_file
-                        //     .seek_frame(index[&(case.dataset.len() - i - 1)].start)
-                        //     .unwrap()
-                        //     .unwrap();
-                        // assert_eq!(
-                        //     seek_bytes,
-                        //     (META_BYTES
-                        //         + s_file.meta.frame_len()
-                        //             * index[&(case.dataset.len() - i - 1)].start)
-                        //         as u64
-                        // );
+                        file.seek_entry(&index[&(case.dataset.len() - i - 1)])
+                            .unwrap();
                         let js_bytes = serde_json::to_vec(data).unwrap();
-                        let seg_bytes = s_file.read_entry().unwrap().unwrap();
-                        assert_eq!(seg_bytes, js_bytes);
-                        let d: CaseData = serde_json::from_slice(seg_bytes.as_slice()).unwrap();
+                        let entry_bytes = file.read_entry().unwrap().unwrap();
+                        assert_eq!(entry_bytes, js_bytes);
+                        let d: CaseData = serde_json::from_slice(entry_bytes.as_slice()).unwrap();
                         assert_eq!(&d, data);
                     }
-                    assert!(s_file.read_entry().unwrap().is_some());
+                    assert!(file.read_entry().unwrap().is_some());
 
                     if i == 0 {
                         // open then seek
-                        s_file = BytesIO::open(&path, false).unwrap();
+                        file = BytesIO::open(&path, false).unwrap();
                     }
                 }
             }
