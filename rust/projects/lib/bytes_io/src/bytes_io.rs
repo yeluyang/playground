@@ -17,10 +17,10 @@ use byteorder::{ReadBytesExt, WriteBytesExt};
 extern crate uuid;
 
 use crate::{
-    entry::{EntryID, EntryOffset},
+    common::{EntryID, EntryOffset, Version, CURRENT_VERSION, VERSION_BYTES},
     error::{Error, Result},
     frame::{self, Frame, Header},
-    Endian, Version, CURRENT_VERSION, VERSION_BYTES,
+    Endian,
 };
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -221,6 +221,9 @@ impl BytesIO {
         };
         let meta = Meta::try_from(&buf[..])?;
         debug!("read meta from BytesIO file existed: meta={:?}", meta);
+        if !meta.version.is_compatible() {
+            return Err(Error::Incompatible(CURRENT_VERSION, meta.version));
+        };
         drop(reader);
 
         let mut file = Self::new(Config::new(path.as_ref(), write_enable), meta)?;

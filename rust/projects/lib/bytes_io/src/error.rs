@@ -6,12 +6,13 @@ use std::{
     result,
 };
 
-use crate::Version;
+use crate::common::Version;
 
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    // TODO: use struct when enum have multi same type
     MetaMissing(PathBuf),
     Incompatible(Version, Version),
     FileExisted(PathBuf),
