@@ -118,12 +118,12 @@ impl Config {
 #[derive(Debug)]
 pub struct BytesIO {
     pub config: Config,
-
     meta: Meta,
+    reader: BufReader<File>,
+
+    // XXX: should package following members into one mutex?
     entry_next_seq: u128,                // XXX: should wrap by atomic?
     frame_next_offset: Arc<AtomicUsize>, // offset for frames in file
-
-    reader: BufReader<File>,
     writer: Option<Arc<Mutex<BufWriter<File>>>>,
 }
 
@@ -298,25 +298,37 @@ impl BytesIO {
 
     pub fn append(&mut self, payload: &[u8]) -> Result<EntryOffset> {
         trace!("writing {} bytes into BytesIO file", payload.len(),);
-        // FIXME: bug when multi mutex writer
-        let entry_seq = self.entry_next_seq;
-        self.entry_next_seq += 1;
-        let frames = frame::create(
-            payload.to_owned(),
-            entry_seq,
-            self.meta.payload_bytes as usize,
-        );
-        let frames_num = frames.len();
-        let first_frame = self.frame_next_offset.load(Ordering::SeqCst);
-        self.write_frames(frames)?;
-        let offset_current = self.frame_next_offset.load(Ordering::SeqCst);
-        assert_eq!(offset_current - first_frame, frames_num);
+        match &self.writer {
+            None => Err(Error::WriteOnReadOnlyFile(self.config.path.clone())),
+            Some(writer) => {
+                let frames = frame::create(payload.to_owned(), 0, self.meta.payload_bytes as usize);
 
-        debug!(
-            "write success, offset of frames: {} -> {})",
-            first_frame, offset_current
-        );
-        Ok(EntryOffset::new(self.meta.uuid, entry_seq, first_frame))
+                let mut writer = writer.lock().unwrap();
+
+                let entry_seq = self.entry_next_seq;
+                self.entry_next_seq += 1;
+                let first_frame = self.frame_next_offset.load(Ordering::SeqCst);
+
+                let frames_num = frames.len();
+                for mut frame in frames {
+                    frame.header.entry_seq = entry_seq;
+                    writer.write_all(frame.to_bytes()?.as_slice())?;
+                    writer.flush()?;
+                    self.frame_next_offset.fetch_add(1, Ordering::SeqCst);
+                }
+
+                let offset_current = self.frame_next_offset.load(Ordering::SeqCst);
+                writer.flush()?;
+
+                assert_eq!(offset_current - first_frame, frames_num);
+                debug!(
+                    "write success, offset of frames: {} -> {})",
+                    first_frame, offset_current
+                );
+
+                Ok(EntryOffset::new(self.meta.uuid, entry_seq, first_frame))
+            }
+        }
     }
 
     pub fn seek_entry(&mut self, offset: &EntryOffset) -> Result<Option<()>> {
@@ -407,21 +419,6 @@ impl BytesIO {
                 self.config.path
             );
             Ok(Some(buf))
-        }
-    }
-
-    fn write_frames(&mut self, frames: Vec<Frame>) -> Result<()> {
-        match &self.writer {
-            None => Err(Error::WriteOnReadOnlyFile(self.config.path.clone())),
-            Some(writer) => {
-                let mut writer = writer.lock().unwrap();
-                for frame in frames {
-                    writer.write_all(frame.to_bytes()?.as_slice())?;
-                    writer.flush()?;
-                    self.frame_next_offset.fetch_add(1, Ordering::SeqCst);
-                }
-                Ok(())
-            }
         }
     }
 
