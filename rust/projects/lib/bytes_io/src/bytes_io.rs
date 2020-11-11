@@ -508,11 +508,7 @@ mod tests {
         #[test]
         fn test_create() {
             init();
-            let case_dir = case_dir(module_path!(), "test_create");
-            if case_dir.exists() {
-                fs::remove_dir_all(&case_dir).unwrap();
-            }
-            fs::create_dir_all(&case_dir).unwrap();
+            let case_dir = make_clean_case_dir(module_path!(), "test_create");
 
             struct Case {
                 path: String,
@@ -562,11 +558,7 @@ mod tests {
         #[test]
         fn test_open() {
             init();
-            let case_dir = case_dir(module_path!(), "test_open");
-            if case_dir.exists() {
-                fs::remove_dir_all(&case_dir).unwrap();
-            }
-            fs::create_dir_all(&case_dir).unwrap();
+            let case_dir = make_clean_case_dir(module_path!(), "test_open");
 
             struct Case {
                 path: String,
@@ -613,11 +605,7 @@ mod tests {
         #[test]
         fn test_read() {
             init();
-            let case_dir = case_dir(module_path!(), "test_read");
-            if case_dir.exists() {
-                fs::remove_dir_all(&case_dir).unwrap();
-            }
-            fs::create_dir_all(&case_dir).unwrap();
+            let case_dir = make_clean_case_dir(module_path!(), "test_read");
 
             struct Case {
                 path: String,
@@ -664,11 +652,7 @@ mod tests {
         #[test]
         fn test_seek() {
             init();
-            let case_dir = case_dir(module_path!(), "test_seek");
-            if case_dir.exists() {
-                fs::remove_dir_all(&case_dir).unwrap();
-            }
-            fs::create_dir_all(&case_dir).unwrap();
+            let case_dir = make_clean_case_dir(module_path!(), "test_seek");
 
             struct Case {
                 path: String,

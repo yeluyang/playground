@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 extern crate env_logger;
 use env_logger::{Builder, Env};
@@ -13,10 +13,18 @@ pub fn init() {
     })
 }
 
-pub fn case_dir(mod_path: &str, case_name: &str) -> PathBuf {
+pub fn make_clean_case_dir(mod_path: &str, case_name: &str) -> PathBuf {
     let mut path = PathBuf::from("tmp");
     for com in mod_path[mod_path.find("tests::").unwrap()..].split("::") {
         path = path.join(com);
     }
-    path.join(case_name)
+
+    let case_dir = path.join(case_name);
+
+    if case_dir.exists() {
+        fs::remove_dir_all(&case_dir).unwrap();
+    }
+    fs::create_dir_all(&case_dir).unwrap();
+
+    case_dir
 }
