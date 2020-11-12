@@ -99,7 +99,7 @@ impl TryInto<Vec<u8>> for Meta {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Config {
     pub path: PathBuf,
     pub write_enable: bool,
@@ -122,8 +122,8 @@ pub struct BytesIO {
     reader: BufReader<File>,
 
     // XXX: should package following members into one mutex?
-    entry_next_seq: u128,                // XXX: should wrap by atomic?
-    frame_next_offset: Arc<AtomicUsize>, // offset for frames in file
+    entry_next_seq: u128,     // XXX: should wrap by atomic?
+    frame_next_offset: usize, // offset for frames in file
     writer: Option<Arc<Mutex<BufWriter<File>>>>,
 }
 
@@ -165,7 +165,7 @@ impl BytesIO {
             config,
             meta,
             entry_next_seq: 0,
-            frame_next_offset: Arc::new(AtomicUsize::new(0)),
+            frame_next_offset: 0,
 
             reader,
             writer,
@@ -215,7 +215,7 @@ impl BytesIO {
                     return Err(Error::MetaMissing(path.as_ref().to_path_buf()));
                 }
                 _ => {
-                    return Err(Error::IO(err));
+                    return Err(Error::from(err));
                 }
             };
         };
@@ -231,14 +231,11 @@ impl BytesIO {
         let frame_bytes_existed = file.reader.seek(SeekFrom::End(0))? as usize - META_BYTES;
         debug!("{} bytes of frames exists in file", frame_bytes_existed);
         if frame_bytes_existed == 0 {
-            file.frame_next_offset.store(0, Ordering::SeqCst);
+            file.frame_next_offset = 0;
             file.entry_next_seq = 0;
         } else {
             assert_eq!(frame_bytes_existed % file.meta.frame_len(), 0);
-            file.frame_next_offset.store(
-                frame_bytes_existed / file.meta.frame_len(),
-                Ordering::SeqCst,
-            );
+            file.frame_next_offset = frame_bytes_existed / file.meta.frame_len();
             file.reader
                 .seek(SeekFrom::End(-1 * file.meta.frame_len() as i64))?;
             file.entry_next_seq = file.read_header()?.unwrap().entry_seq + 1;
@@ -307,17 +304,17 @@ impl BytesIO {
 
                 let entry_seq = self.entry_next_seq;
                 self.entry_next_seq += 1;
-                let first_frame = self.frame_next_offset.load(Ordering::SeqCst);
+                let first_frame = self.frame_next_offset;
 
                 let frames_num = frames.len();
                 for mut frame in frames {
                     frame.header.entry_seq = entry_seq;
                     writer.write_all(frame.to_bytes()?.as_slice())?;
                     writer.flush()?;
-                    self.frame_next_offset.fetch_add(1, Ordering::SeqCst);
+                    self.frame_next_offset += 1;
                 }
 
-                let offset_current = self.frame_next_offset.load(Ordering::SeqCst);
+                let offset_current = self.frame_next_offset;
                 writer.flush()?;
 
                 assert_eq!(offset_current - first_frame, frames_num);
@@ -409,7 +406,7 @@ impl BytesIO {
                     debug!("encounter EOF of {:?}", self.config.path);
                     Ok(None)
                 }
-                _ => Err(Error::IO(err)),
+                _ => Err(Error::from(err)),
             }
         } else {
             debug!(
@@ -506,6 +503,71 @@ mod tests {
         }
 
         #[test]
+        fn test_new() {
+            init();
+            let case_dir = make_clean_case_dir(module_path!(), "test_new");
+            let file_path = case_dir.join("normal.bytesio");
+            OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(file_path.as_path())
+                .unwrap();
+
+            struct Case {
+                // input
+                config: Config,
+                meta: Meta,
+                // output
+                no_writer: bool,
+                err: Option<Error>,
+            }
+            let cases = &mut [
+                Case {
+                    config: Config::new(file_path.as_path(), false),
+                    meta: Meta::new(128),
+                    no_writer: true,
+                    err: None,
+                },
+                Case {
+                    config: Config::new(file_path.as_path(), true),
+                    meta: Meta::new(128),
+                    no_writer: false,
+                    err: None,
+                },
+                Case {
+                    config: Config::new(case_dir.join("not-existed.bytesio"), false),
+                    meta: Meta::new(128),
+                    no_writer: true,
+                    err: Some(Error::from(io::Error::from_raw_os_error(2))),
+                },
+            ];
+
+            for c in cases {
+                match BytesIO::new(c.config.clone(), c.meta.clone()) {
+                    Err(err) => {
+                        assert!(c.err.is_some());
+                        assert_eq!(err, c.err.clone().unwrap());
+                    }
+                    Ok(file) => {
+                        assert_eq!(file.config, c.config);
+                        assert_eq!(file.meta, c.meta);
+                        assert_eq!(file.entry_next_seq, 0);
+                        assert_eq!(file.frame_next_offset, 0);
+                        let meta = file.reader.into_inner().metadata().unwrap();
+                        assert!(meta.is_file());
+                        match file.writer {
+                            None => assert!(c.no_writer),
+                            Some(_) => {
+                                assert!(!c.no_writer);
+                                // TODO check more about writer
+                            }
+                        };
+                    }
+                };
+            }
+        }
+
+        #[test]
         fn test_create() {
             init();
             let case_dir = make_clean_case_dir(module_path!(), "test_create");
@@ -524,7 +586,7 @@ mod tests {
                 Case {
                     path: "non-existed-dir/non-existed.bytesio".to_owned(),
                     payload_limits: 128,
-                    result: Err(Error::IO(io::Error::from_raw_os_error(2))),
+                    result: Err(Error::from(io::Error::from_raw_os_error(2))),
                 },
             ];
 
@@ -532,7 +594,7 @@ mod tests {
                 let path = case_dir.join(&c.path);
                 match BytesIO::create(&path, c.payload_limits) {
                     Ok(mut file) => {
-                        assert_eq!(file.frame_next_offset.load(Ordering::SeqCst), 0);
+                        assert_eq!(file.frame_next_offset, 0);
                         assert_eq!(
                             file.meta.frame_len(),
                             frame::HEADER_SIZE + c.payload_limits as usize
