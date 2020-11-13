@@ -172,6 +172,7 @@ impl BytesIO {
         })
     }
 
+    /// create a new bytes_io file with write permission
     pub fn create<P: AsRef<Path>>(path: P, payload_bytes: u128) -> Result<Self> {
         assert!(payload_bytes > 0);
         trace!(
@@ -438,7 +439,10 @@ impl BytesIO {
 
 #[cfg(test)]
 mod tests {
+    use std::panic;
+
     use super::*;
+
     use crate::tests::*;
 
     mod meta {
@@ -448,26 +452,45 @@ mod tests {
         fn test_meta() {
             init();
             struct Case {
-                meta: Meta,
+                // input
+                payload_limit: u128,
+                // output
+                should_panic: bool,
             }
-            let cases = [Case {
-                meta: Meta::new(128),
-            }];
+            let cases = &[
+                Case {
+                    payload_limit: 128,
+                    should_panic: false,
+                },
+                Case {
+                    payload_limit: 0,
+                    should_panic: true,
+                },
+            ];
 
-            for c in cases.iter() {
-                let bytes = c.meta.to_bytes().unwrap();
-                assert_ne!(c.meta.uuid, 0);
-                assert_eq!(bytes.len(), META_BYTES);
+            for c in cases {
+                match panic::catch_unwind(|| Meta::new(c.payload_limit)) {
+                    Err(_) => assert!(c.should_panic),
+                    Ok(meta_new) => {
+                        assert_ne!(meta_new.uuid, 0);
+                        assert_eq!(meta_new.version, CURRENT_VERSION);
+                        assert_eq!(meta_new.header_bytes as usize, frame::HEADER_SIZE);
+                        assert_eq!(meta_new.payload_bytes, c.payload_limit);
 
-                let meta = Meta::try_from(bytes.as_slice()).unwrap();
-                assert_eq!(meta, c.meta);
-                assert_eq!(meta.to_bytes().unwrap(), bytes);
+                        let bytes = meta_new.to_bytes().unwrap();
+                        assert_eq!(bytes.len(), META_BYTES);
+
+                        let meta_from = Meta::try_from(bytes.as_slice()).unwrap();
+                        assert_eq!(meta_from, meta_new);
+                        assert_eq!(meta_from.to_bytes().unwrap(), bytes);
+                    }
+                }
             }
         }
     }
 
     mod bytes_io {
-        use std::{collections::HashMap, fs};
+        use std::collections::HashMap;
 
         use super::*;
 
@@ -506,11 +529,11 @@ mod tests {
         fn test_new() {
             init();
             let case_dir = make_clean_case_dir(module_path!(), "test_new");
-            let file_path = case_dir.join("normal.bytesio");
+            let existed_path = case_dir.join("normal.bytesio");
             OpenOptions::new()
                 .write(true)
                 .create(true)
-                .open(file_path.as_path())
+                .open(existed_path.as_path())
                 .unwrap();
 
             struct Case {
@@ -523,13 +546,13 @@ mod tests {
             }
             let cases = &mut [
                 Case {
-                    config: Config::new(file_path.as_path(), false),
+                    config: Config::new(existed_path.as_path(), false),
                     meta: Meta::new(128),
                     no_writer: true,
                     err: None,
                 },
                 Case {
-                    config: Config::new(file_path.as_path(), true),
+                    config: Config::new(existed_path.as_path(), true),
                     meta: Meta::new(128),
                     no_writer: false,
                     err: None,
@@ -546,15 +569,15 @@ mod tests {
                 match BytesIO::new(c.config.clone(), c.meta.clone()) {
                     Err(err) => {
                         assert!(c.err.is_some());
-                        assert_eq!(err, c.err.clone().unwrap());
+                        assert_eq!(&err, c.err.as_ref().unwrap());
                     }
                     Ok(file) => {
                         assert_eq!(file.config, c.config);
                         assert_eq!(file.meta, c.meta);
                         assert_eq!(file.entry_next_seq, 0);
                         assert_eq!(file.frame_next_offset, 0);
-                        let meta = file.reader.into_inner().metadata().unwrap();
-                        assert!(meta.is_file());
+                        let reader_meta = file.reader.into_inner().metadata().unwrap();
+                        assert!(reader_meta.is_file());
                         match file.writer {
                             None => assert!(c.no_writer),
                             Some(_) => {
@@ -571,49 +594,72 @@ mod tests {
         fn test_create() {
             init();
             let case_dir = make_clean_case_dir(module_path!(), "test_create");
+            let path_existed = case_dir.join("existed.bytesio");
+            File::create(path_existed.as_path()).unwrap();
 
             struct Case {
+                // input
                 path: String,
-                payload_limits: u128,
-                result: Result<()>,
+                payload_limit: u128,
+                // output
+                is_panic: bool,
+                err: Option<Error>,
             }
             let cases = &[
                 Case {
                     path: "normal.bytesio".to_owned(),
-                    payload_limits: 128,
-                    result: Ok(()),
+                    payload_limit: 128,
+                    is_panic: false,
+                    err: None,
+                },
+                Case {
+                    path: "should_panic_for_zero_payload_limit.bytesio".to_owned(),
+                    payload_limit: 0,
+                    is_panic: true,
+                    err: None,
+                },
+                Case {
+                    path: "existed.bytesio".to_owned(),
+                    payload_limit: 128,
+                    is_panic: false,
+                    err: Some(Error::FileExisted(path_existed.clone())),
                 },
                 Case {
                     path: "non-existed-dir/non-existed.bytesio".to_owned(),
-                    payload_limits: 128,
-                    result: Err(Error::from(io::Error::from_raw_os_error(2))),
+                    payload_limit: 128,
+                    is_panic: false,
+                    err: Some(Error::from(io::Error::from_raw_os_error(2))),
                 },
             ];
 
             for c in cases {
                 let path = case_dir.join(&c.path);
-                match BytesIO::create(&path, c.payload_limits) {
-                    Ok(mut file) => {
-                        assert_eq!(file.frame_next_offset, 0);
-                        assert_eq!(
-                            file.meta.frame_len(),
-                            frame::HEADER_SIZE + c.payload_limits as usize
-                        );
-                        assert_eq!(file.meta.header_bytes as usize, frame::HEADER_SIZE);
-                        assert_eq!(file.meta.payload_bytes, c.payload_limits);
-                        assert!(BytesIO::create(&path, c.payload_limits).is_err());
+                match panic::catch_unwind(|| BytesIO::create(&path, c.payload_limit)) {
+                    Err(_) => assert!(c.is_panic),
+                    Ok(r) => match r {
+                        Err(err) => assert_eq!(&err, c.err.as_ref().unwrap()),
+                        Ok(mut file) => {
+                            assert!(file.config.write_enable);
+                            assert_eq!(file.config.path, path);
 
-                        file.reader.seek(SeekFrom::Start(0)).unwrap();
-                        let mut buf = vec![0; META_BYTES];
-                        file.reader.read_exact(buf.as_mut_slice()).unwrap();
-                        let meta = Meta::try_from(buf.as_slice()).unwrap();
-                        assert_eq!(meta, file.meta);
-                        assert_eq!(file.reader.read(buf.as_mut_slice()).unwrap(), 0);
-                    }
-                    Err(err) => {
-                        assert_eq!(err.to_string(), c.result.as_ref().unwrap_err().to_string())
-                    }
-                };
+                            assert_eq!(file.meta.payload_bytes, c.payload_limit);
+                            assert_eq!(file.meta.header_bytes as usize, frame::HEADER_SIZE);
+                            assert_eq!(
+                                file.meta.frame_len(),
+                                frame::HEADER_SIZE + c.payload_limit as usize
+                            );
+                            assert!(BytesIO::create(&path, c.payload_limit).is_err());
+                            assert_eq!(file.frame_next_offset, 0);
+
+                            file.reader.seek(SeekFrom::Start(0)).unwrap();
+                            let mut buf = vec![0; META_BYTES];
+                            file.reader.read_exact(buf.as_mut_slice()).unwrap();
+                            let meta = Meta::try_from(buf.as_slice()).unwrap();
+                            assert_eq!(meta, file.meta);
+                            assert_eq!(file.reader.read(buf.as_mut_slice()).unwrap(), 0);
+                        }
+                    },
+                }
             }
         }
 
