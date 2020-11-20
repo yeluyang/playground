@@ -69,7 +69,7 @@ impl TryFrom<&[u8]> for Meta {
 
         let version = Version::try_from(&bytes[..VERSION_BYTES])?;
         if !version.is_compatible() {
-            return Err(Error::Incompatible(CURRENT_VERSION, version));
+            return Err(Error::Incompatible(version));
         }
         let mut r = Cursor::new(Vec::from(&bytes[VERSION_BYTES..]));
         let uuid = r.read_u128::<Endian>()?;
@@ -223,7 +223,7 @@ impl BytesIO {
         let meta = Meta::try_from(&buf[..])?;
         debug!("read meta from BytesIO file existed: meta={:?}", meta);
         if !meta.version.is_compatible() {
-            return Err(Error::Incompatible(CURRENT_VERSION, meta.version));
+            return Err(Error::Incompatible(meta.version));
         };
         drop(reader);
 
@@ -439,8 +439,6 @@ impl BytesIO {
 
 #[cfg(test)]
 mod tests {
-    use std::panic;
-
     use super::*;
 
     use crate::tests::*;

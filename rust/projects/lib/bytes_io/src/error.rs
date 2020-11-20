@@ -6,7 +6,7 @@ use std::{
     result,
 };
 
-use crate::common::Version;
+use crate::common::{self, Version};
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -14,7 +14,7 @@ pub type Result<T> = result::Result<T, Error>;
 pub enum Error {
     // TODO: use struct when enum have multi same type
     MetaMissing(PathBuf),
-    Incompatible(Version, Version),
+    Incompatible(Version),
     FileExisted(PathBuf),
     EntryMismatch(u128, u128),
     MeetIncompleteEntry(u128, u128),
@@ -26,10 +26,11 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::MetaMissing(path) => write!(f, "header of file missing: {:?}", path),
-            Self::Incompatible(current_version, file_version) => write!(
+            Self::Incompatible(file_version) => write!(
                 f,
                 "incompatible version, major version should be equal: current={}, got={}",
-                current_version, file_version
+                common::CURRENT_VERSION,
+                file_version
             ),
             Self::EntryMismatch(expect, actual) => write!(
                 f,
