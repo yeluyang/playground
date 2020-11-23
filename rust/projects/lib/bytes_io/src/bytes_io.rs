@@ -487,6 +487,34 @@ mod tests {
         }
     }
 
+    mod config {
+        use super::*;
+
+        struct Case {
+            path: String,
+            write_enable: bool,
+        }
+
+        #[test]
+        fn test_new() {
+            let cases = [
+                Case {
+                    path: "/path/to/bytesio/file".to_owned(),
+                    write_enable: false,
+                },
+                Case {
+                    path: "/path/to/bytesio/file".to_owned(),
+                    write_enable: true,
+                },
+            ];
+            for c in &cases {
+                let config = Config::new(c.path.as_str(), c.write_enable);
+                assert_eq!(config.path, PathBuf::from(c.path.as_str()));
+                assert_eq!(config.write_enable, c.write_enable);
+            }
+        }
+    }
+
     mod bytes_io {
         use std::collections::HashMap;
 
