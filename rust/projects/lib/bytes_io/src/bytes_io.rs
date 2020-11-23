@@ -5,10 +5,7 @@ use std::{
     mem,
     path::{Path, PathBuf},
     result,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
 };
 
 extern crate byteorder;
@@ -17,7 +14,7 @@ use byteorder::{ReadBytesExt, WriteBytesExt};
 extern crate uuid;
 
 use crate::{
-    common::{EntryID, EntryOffset, Version, CURRENT_VERSION, VERSION_BYTES},
+    common::{self, EntryID, EntryOffset, Version},
     error::{Error, Result},
     frame::{self, Frame, Header},
     Endian,
@@ -44,13 +41,13 @@ impl Meta {
     }
 
     /// length of frame in file, unit=bytes
-    fn frame_len(&self) -> usize {
+    fn frame_bytes(&self) -> usize {
         self.header_bytes as usize + self.payload_bytes as usize
     }
 
     fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut bytes = self.version.to_bytes()?;
-        assert_eq!(bytes.len(), VERSION_BYTES);
+        assert_eq!(bytes.len(), common::VERSION_BYTES);
 
         bytes.write_u128::<Endian>(self.uuid)?;
         bytes.write_u128::<Endian>(self.header_bytes)?;
@@ -67,11 +64,11 @@ impl TryFrom<&[u8]> for Meta {
     fn try_from(bytes: &[u8]) -> result::Result<Self, Self::Error> {
         assert_eq!(bytes.len(), META_BYTES);
 
-        let version = Version::try_from(&bytes[..VERSION_BYTES])?;
+        let version = Version::try_from(&bytes[..common::VERSION_BYTES])?;
         if !version.is_compatible() {
             return Err(Error::Incompatible(version));
         }
-        let mut r = Cursor::new(Vec::from(&bytes[VERSION_BYTES..]));
+        let mut r = Cursor::new(Vec::from(&bytes[common::VERSION_BYTES..]));
         let uuid = r.read_u128::<Endian>()?;
         let header_bytes = r.read_u128::<Endian>()?;
         let payload_bytes = r.read_u128::<Endian>()?;
@@ -235,10 +232,10 @@ impl BytesIO {
             file.frame_next_offset = 0;
             file.entry_next_seq = 0;
         } else {
-            assert_eq!(frame_bytes_existed % file.meta.frame_len(), 0);
-            file.frame_next_offset = frame_bytes_existed / file.meta.frame_len();
+            assert_eq!(frame_bytes_existed % file.meta.frame_bytes(), 0);
+            file.frame_next_offset = frame_bytes_existed / file.meta.frame_bytes();
             file.reader
-                .seek(SeekFrom::End(-1 * file.meta.frame_len() as i64))?;
+                .seek(SeekFrom::End(-1 * file.meta.frame_bytes() as i64))?;
             file.entry_next_seq = file.read_header()?.unwrap().entry_seq + 1;
         }
 
@@ -367,7 +364,7 @@ impl BytesIO {
 
     fn read_frame(&mut self) -> Result<Option<Frame>> {
         trace!("reading next frame");
-        if let Some(buf) = self.read_into(self.meta.frame_len() as usize)? {
+        if let Some(buf) = self.read_into(self.meta.frame_bytes() as usize)? {
             let frame = Frame::try_from(buf.as_slice())?;
             debug!(
                 "read next frame success: frame={{header={:?}, payload.len={}}}",
@@ -423,7 +420,7 @@ impl BytesIO {
     fn seek_frame(&mut self, n: usize) -> Result<Option<Header>> {
         trace!("seeking frame on offset {}", n);
 
-        let bytes = META_BYTES + self.meta.frame_len() * n;
+        let bytes = META_BYTES + self.meta.frame_bytes() * n;
         let offset = SeekFrom::Start(bytes as u64);
         if self.reader.seek(offset)? as usize == bytes {
             let result = self.read_header();
@@ -444,6 +441,8 @@ mod tests {
     use crate::tests::*;
 
     mod meta {
+        use crate::common;
+
         use super::*;
 
         #[test]
@@ -471,9 +470,13 @@ mod tests {
                     Err(_) => assert!(c.should_panic),
                     Ok(meta_new) => {
                         assert_ne!(meta_new.uuid, 0);
-                        assert_eq!(meta_new.version, CURRENT_VERSION);
+                        assert_eq!(meta_new.version, common::CURRENT_VERSION);
                         assert_eq!(meta_new.header_bytes as usize, frame::HEADER_SIZE);
                         assert_eq!(meta_new.payload_bytes, c.payload_limit);
+                        assert_eq!(
+                            meta_new.frame_bytes(),
+                            frame::HEADER_SIZE + c.payload_limit as usize
+                        );
 
                         let bytes = meta_new.to_bytes().unwrap();
                         assert_eq!(bytes.len(), META_BYTES);
@@ -520,34 +523,19 @@ mod tests {
 
         use super::*;
 
-        extern crate serde;
-        use serde::{Deserialize, Serialize};
-        extern crate serde_json;
-
-        #[derive(Debug, PartialEq, Serialize, Deserialize)]
-        struct CaseData {
-            id: usize,
-            data: Vec<u8>,
-        }
-
-        fn setup<T, P>(
-            dataset: &[T],
+        fn setup<P: AsRef<Path>>(
+            payload: &[&[u8]],
             path: P,
             payload_limits: u128,
-        ) -> (BytesIO, HashMap<usize, EntryOffset>)
-        where
-            T: Serialize,
-            P: AsRef<Path>,
-        {
+        ) -> (BytesIO, HashMap<usize, EntryOffset>) {
             let mut index: HashMap<usize, EntryOffset> = HashMap::new();
             let mut file = BytesIO::create(path, payload_limits as u128).unwrap();
 
-            for (i, data) in dataset.iter().enumerate() {
-                let bytes = serde_json::to_vec(data).unwrap();
-                let entry_offset = file.append(bytes.as_slice()).unwrap();
+            for (i, data) in payload.iter().enumerate() {
+                let entry_offset = file.append(data).unwrap();
                 index.insert(i, entry_offset);
             }
-            assert_eq!(index.len(), dataset.len());
+            assert_eq!(index.len(), payload.len());
             (file, index)
         }
 
@@ -669,12 +657,12 @@ mod tests {
                             assert_eq!(file.config.path, path);
 
                             assert_eq!(file.meta.payload_bytes, c.payload_limit);
-                            assert_eq!(file.meta.header_bytes as usize, frame::HEADER_SIZE);
                             assert_eq!(
-                                file.meta.frame_len(),
+                                file.meta.frame_bytes(),
                                 frame::HEADER_SIZE + c.payload_limit as usize
                             );
-                            assert!(BytesIO::create(&path, c.payload_limit).is_err());
+
+                            assert_eq!(file.entry_next_seq, 0);
                             assert_eq!(file.frame_next_offset, 0);
 
                             file.reader.seek(SeekFrom::Start(0)).unwrap();
@@ -683,6 +671,8 @@ mod tests {
                             let meta = Meta::try_from(buf.as_slice()).unwrap();
                             assert_eq!(meta, file.meta);
                             assert_eq!(file.reader.read(buf.as_mut_slice()).unwrap(), 0);
+
+                            assert!(BytesIO::create(&path, c.payload_limit).is_err());
                         }
                     },
                 }
@@ -696,43 +686,45 @@ mod tests {
 
             struct Case {
                 path: String,
-                payload_limits: u128,
-                dataset: Vec<CaseData>,
+                payload_limit: u128,
+                write_enable: bool,
+                dataset: &'static [&'static [u8]],
             }
             let cases = &[
                 Case {
                     path: "empty.bytesio".to_owned(),
-                    payload_limits: 128,
-                    dataset: vec![],
+                    payload_limit: 128,
+                    write_enable: false,
+                    dataset: &[],
                 },
                 Case {
                     path: "normal.bytesio".to_owned(),
-                    payload_limits: 128,
-                    dataset: vec![
-                        CaseData {
-                            id: 0,
-                            data: vec![0; 64],
-                        },
-                        CaseData {
-                            id: 1,
-                            data: vec![1; 256],
-                        },
-                    ],
+                    payload_limit: 128,
+                    write_enable: false,
+                    dataset: &[&[0; 64], &[1; 256]],
                 },
             ];
 
             for c in cases {
                 let path = case_dir.join(&c.path);
-                setup(c.dataset.as_slice(), &path, c.payload_limits);
+                setup(c.dataset, &path, c.payload_limit);
 
-                let file = BytesIO::open(&path, false).unwrap();
+                let file = BytesIO::open(&path, c.write_enable).unwrap();
+
+                assert_eq!(file.config.path, path);
+                assert_eq!(file.config.write_enable, c.write_enable);
+                assert_eq!(file.meta.payload_bytes, c.payload_limit);
                 assert_eq!(
-                    file.meta.frame_len(),
-                    frame::HEADER_SIZE + c.payload_limits as usize
+                    file.meta.frame_bytes(),
+                    frame::HEADER_SIZE + c.payload_limit as usize
                 );
-                assert_eq!(file.meta.header_bytes as usize, frame::HEADER_SIZE);
-                assert_eq!(file.meta.payload_bytes, c.payload_limits);
+
                 assert_eq!(file.entry_next_seq as usize, c.dataset.len());
+                let mut frames = 0usize;
+                for d in c.dataset {
+                    frames += (d.len() as f64 / c.payload_limit as f64).ceil() as usize;
+                }
+                assert_eq!(frames, file.frame_next_offset);
             }
         }
 
@@ -744,34 +736,21 @@ mod tests {
             struct Case {
                 path: String,
                 payload_limits: u128,
-                dataset: Vec<CaseData>,
+                dataset: &'static [&'static [u8]],
             }
             let cases = &[Case {
                 path: "normal.bytesio".to_owned(),
                 payload_limits: 128,
-                dataset: vec![
-                    CaseData {
-                        id: 0,
-                        data: vec![0; 64],
-                    },
-                    CaseData {
-                        id: 1,
-                        data: vec![1; 256],
-                    },
-                ],
+                dataset: &[&[0; 64], &[1; 256]],
             }];
 
             for case in cases {
                 let path = case_dir.join(&case.path);
-                let (mut file, _) = setup(case.dataset.as_slice(), &path, case.payload_limits);
+                let (mut file, _) = setup(case.dataset, &path, case.payload_limits);
                 for i in 0..2 {
-                    for data in &case.dataset {
-                        let js_bytes = serde_json::to_vec(data).unwrap();
+                    for data in case.dataset {
                         let entry_bytes = file.read_entry().unwrap().unwrap();
-                        assert_eq!(entry_bytes, js_bytes);
-
-                        let d: CaseData = serde_json::from_slice(entry_bytes.as_slice()).unwrap();
-                        assert_eq!(&d, data);
+                        assert_eq!(&entry_bytes, data);
                     }
                     assert!(file.read_entry().unwrap().is_none());
 
@@ -791,35 +770,23 @@ mod tests {
             struct Case {
                 path: String,
                 payload_limits: u128,
-                dataset: Vec<CaseData>,
+                dataset: &'static [&'static [u8]],
             }
             let cases = &[Case {
                 path: "normal.bytesio".to_owned(),
                 payload_limits: 128,
-                dataset: vec![
-                    CaseData {
-                        id: 0,
-                        data: vec![0; 64],
-                    },
-                    CaseData {
-                        id: 1,
-                        data: vec![1; 256],
-                    },
-                ],
+                dataset: &[&[0; 64], &[1; 256]],
             }];
 
             for case in cases {
                 let path = case_dir.join(&case.path);
-                let (mut file, index) = setup(case.dataset.as_slice(), &path, case.payload_limits);
+                let (mut file, index) = setup(case.dataset, &path, case.payload_limits);
                 for i in 0..2 {
                     for (i, data) in case.dataset.iter().rev().enumerate() {
                         file.seek_entry(&index[&(case.dataset.len() - i - 1)])
                             .unwrap();
-                        let js_bytes = serde_json::to_vec(data).unwrap();
                         let entry_bytes = file.read_entry().unwrap().unwrap();
-                        assert_eq!(entry_bytes, js_bytes);
-                        let d: CaseData = serde_json::from_slice(entry_bytes.as_slice()).unwrap();
-                        assert_eq!(&d, data);
+                        assert_eq!(&entry_bytes, data);
                     }
                     assert!(file.read_entry().unwrap().is_some());
 
