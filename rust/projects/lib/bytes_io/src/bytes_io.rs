@@ -249,7 +249,7 @@ impl BytesIO {
 
         if let Some(frame_first) = self.read_frame()? {
             if frame_first.is_first() {
-                let mut frame_count = 0u128;
+                let mut frame_count = 1u128;
                 let mut bytes: Vec<u8> = Vec::with_capacity(
                     self.meta.payload_bytes as usize * frame_first.header.total as usize,
                 );
@@ -264,7 +264,7 @@ impl BytesIO {
                             frame.header
                         );
                         assert_eq!(frame.header.entry_seq, frame_first.header.entry_seq,);
-                        assert_eq!(frame.header.frame_seq, frame_count,);
+                        assert_eq!(frame.header.frame_seq + 1, frame_count,);
                         bytes.extend(frame.payload());
                     } else {
                         return Err(Error::MeetIncompleteEntry(
@@ -274,8 +274,10 @@ impl BytesIO {
                     }
                 }
                 debug!(
-                    "read entry: frames={}, sequence={}",
-                    frame_count, frame_first.header.entry_seq
+                    "read entry: frames={}, sequence={}, bytes={}",
+                    frame_count,
+                    frame_first.header.entry_seq,
+                    bytes.len(),
                 );
                 return Ok(Some(bytes));
             } else {
@@ -296,29 +298,29 @@ impl BytesIO {
         match &self.writer {
             None => Err(Error::WriteOnReadOnlyFile(self.config.path.clone())),
             Some(writer) => {
-                let frames = frame::create(payload.to_owned(), 0, self.meta.payload_bytes as usize);
-
                 let mut writer = writer.lock().unwrap();
 
+                let frames = frame::create(
+                    payload.to_owned(),
+                    self.entry_next_seq,
+                    self.meta.payload_bytes as usize,
+                );
+                let frames_num = frames.len();
+
                 let entry_seq = self.entry_next_seq;
-                self.entry_next_seq += 1;
                 let first_frame = self.frame_next_offset;
 
-                let frames_num = frames.len();
-                for mut frame in frames {
-                    frame.header.entry_seq = entry_seq;
+                for frame in frames {
                     writer.write_all(frame.to_bytes()?.as_slice())?;
                     writer.flush()?;
                     self.frame_next_offset += 1;
                 }
+                self.entry_next_seq += 1;
 
-                let offset_current = self.frame_next_offset;
-                writer.flush()?;
-
-                assert_eq!(offset_current - first_frame, frames_num);
+                assert_eq!(self.frame_next_offset - first_frame, frames_num);
                 debug!(
-                    "write success, offset of frames: {} -> {})",
-                    first_frame, offset_current
+                    "write success, entry.seq.next: {}->{}, frames.offset.next: {}->{})",
+                    entry_seq, self.entry_next_seq, first_frame, self.frame_next_offset
                 );
 
                 Ok(EntryOffset::new(self.meta.uuid, entry_seq, first_frame))
@@ -343,6 +345,11 @@ impl BytesIO {
         } else {
             Ok(None)
         }
+    }
+
+    pub fn reader_reset(&mut self) -> Result<()> {
+        self.seek_entry(&EntryOffset::new(self.meta.uuid, 0, 0))?;
+        Ok(())
     }
 
     /// TODO
@@ -520,6 +527,8 @@ mod tests {
 
     mod bytes_io {
         use std::collections::HashMap;
+
+        use crate::frame;
 
         use super::*;
 
@@ -722,79 +731,69 @@ mod tests {
                 assert_eq!(file.entry_next_seq as usize, c.dataset.len());
                 let mut frames = 0usize;
                 for d in c.dataset {
-                    frames += (d.len() as f64 / c.payload_limit as f64).ceil() as usize;
+                    frames += frame::frames_total(d.len(), c.payload_limit as usize);
                 }
                 assert_eq!(frames, file.frame_next_offset);
             }
         }
 
         #[test]
-        fn test_read() {
+        fn test_io() {
             init();
-            let case_dir = make_clean_case_dir(module_path!(), "test_read");
+            let case_dir = make_clean_case_dir(module_path!(), "test_io");
 
             struct Case {
                 path: String,
-                payload_limits: u128,
+                payload_limit: u128,
                 dataset: &'static [&'static [u8]],
             }
             let cases = &[Case {
                 path: "normal.bytesio".to_owned(),
-                payload_limits: 128,
-                dataset: &[&[0; 64], &[1; 256]],
+                payload_limit: 128,
+                dataset: &[&[0; 64], &[1; 256], &[2; 482]],
             }];
 
-            for case in cases {
-                let path = case_dir.join(&case.path);
-                let (mut file, _) = setup(case.dataset, &path, case.payload_limits);
-                for i in 0..2 {
-                    for data in case.dataset {
-                        let entry_bytes = file.read_entry().unwrap().unwrap();
-                        assert_eq!(&entry_bytes, data);
-                    }
-                    assert!(file.read_entry().unwrap().is_none());
+            for c in cases {
+                let mut file = BytesIO::create(&case_dir.join(&c.path), c.payload_limit).unwrap();
+                let mut index: Vec<EntryOffset> = vec![];
 
-                    if i == 0 {
-                        // open then read
-                        file = BytesIO::open(&path, false).unwrap();
-                    }
+                let mut first_frame_expected = 0usize;
+                let mut entry_seq_expected = 0u128;
+                for d in c.dataset {
+                    let frames = frame::frames_total(d.len(), c.payload_limit as usize);
+                    let offset = file.append(d).unwrap();
+
+                    assert_eq!(offset.entry_id.file_id, file.meta.uuid);
+
+                    assert_eq!(offset.entry_id.entry_seq, entry_seq_expected);
+                    assert_eq!(entry_seq_expected + 1, file.entry_next_seq);
+                    entry_seq_expected = file.entry_next_seq;
+
+                    assert_eq!(offset.first_frame, first_frame_expected);
+                    assert_eq!(first_frame_expected + frames, file.frame_next_offset);
+                    first_frame_expected = file.frame_next_offset;
+
+                    let payload = file.read_entry().unwrap().unwrap();
+                    assert_eq!(&payload, d);
+
+                    index.push(offset);
                 }
-            }
-        }
+                assert!(file.read_entry().unwrap().is_none());
 
-        #[test]
-        fn test_seek() {
-            init();
-            let case_dir = make_clean_case_dir(module_path!(), "test_seek");
-
-            struct Case {
-                path: String,
-                payload_limits: u128,
-                dataset: &'static [&'static [u8]],
-            }
-            let cases = &[Case {
-                path: "normal.bytesio".to_owned(),
-                payload_limits: 128,
-                dataset: &[&[0; 64], &[1; 256]],
-            }];
-
-            for case in cases {
-                let path = case_dir.join(&case.path);
-                let (mut file, index) = setup(case.dataset, &path, case.payload_limits);
-                for i in 0..2 {
-                    for (i, data) in case.dataset.iter().rev().enumerate() {
-                        file.seek_entry(&index[&(case.dataset.len() - i - 1)])
-                            .unwrap();
-                        let entry_bytes = file.read_entry().unwrap().unwrap();
-                        assert_eq!(&entry_bytes, data);
-                    }
-                    assert!(file.read_entry().unwrap().is_some());
-
-                    if i == 0 {
-                        // open then seek
-                        file = BytesIO::open(&path, false).unwrap();
-                    }
+                for (i, offset) in index.iter().enumerate() {
+                    file.seek_entry(offset).unwrap().unwrap();
+                    let payload = file.read_entry().unwrap().unwrap();
+                    assert!(i < c.dataset.len());
+                    assert_eq!(&payload, &c.dataset[i]);
                 }
+                assert!(file.read_entry().unwrap().is_none());
+
+                file.reader_reset().unwrap();
+                for d in c.dataset {
+                    let payload = file.read_entry().unwrap().unwrap();
+                    assert_eq!(&payload, d);
+                }
+                assert!(file.read_entry().unwrap().is_none());
             }
         }
 

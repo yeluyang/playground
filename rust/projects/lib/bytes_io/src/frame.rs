@@ -162,13 +162,15 @@ impl TryInto<Vec<u8>> for Frame {
     }
 }
 
+pub fn frames_total(payload: usize, partial_size: usize) -> usize {
+    assert!(partial_size > 0);
+    let remain = if payload % partial_size != 0 { 1 } else { 0 };
+    payload / partial_size as usize + remain
+}
+
 pub fn create(mut payload: Vec<u8>, entry_seq: u128, partial_size: usize) -> Vec<Frame> {
     assert!(partial_size > 0);
-    let total = if payload.len() % partial_size != 0 {
-        payload.len() / partial_size as usize + 1
-    } else {
-        payload.len() / partial_size as usize
-    };
+    let total = frames_total(payload.len(), partial_size);
 
     trace!(
         "creating {} frames: data.len={}, partial.size={}",
@@ -207,6 +209,11 @@ pub fn create(mut payload: Vec<u8>, entry_seq: u128, partial_size: usize) -> Vec
 mod tests {
     use super::*;
     use crate::tests::*;
+
+    #[test]
+    fn test_frame_total() {
+        // TODO
+    }
 
     #[test]
     fn test_create() {
