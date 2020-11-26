@@ -149,7 +149,7 @@ impl TryFrom<Vec<u8>> for Frame {
     type Error = Error;
 
     fn try_from(bytes: Vec<u8>) -> result::Result<Self, Self::Error> {
-        // XXX: should move `bytes[HEADER_SIZE..]` into `frame.payload` for performance
+        // XXX: should move `bytes[HEADER_SIZE..]` into `frame.payload` for performance ?
         Self::try_from(bytes.as_slice())
     }
 }
@@ -162,28 +162,28 @@ impl TryInto<Vec<u8>> for Frame {
     }
 }
 
-pub fn frames_total(payload: usize, partial_size: usize) -> usize {
-    assert!(partial_size > 0);
-    let remain = if payload % partial_size != 0 { 1 } else { 0 };
-    payload / partial_size as usize + remain
+pub fn frames_total(payload: usize, partial: usize) -> usize {
+    assert!(partial > 0);
+    let remain = if payload % partial != 0 { 1 } else { 0 };
+    payload / partial as usize + remain
 }
 
-pub fn create(mut payload: Vec<u8>, entry_seq: u128, partial_size: usize) -> Vec<Frame> {
-    assert!(partial_size > 0);
-    let total = frames_total(payload.len(), partial_size);
+pub fn create(mut payload: Vec<u8>, entry_seq: u128, partial: usize) -> Vec<Frame> {
+    assert!(partial > 0);
+    let total = frames_total(payload.len(), partial);
 
     trace!(
         "creating {} frames: data.len={}, partial.size={}",
         total,
         payload.len(),
-        partial_size
+        partial
     );
 
     let mut frames: Vec<Frame> = Vec::with_capacity(total);
 
     for frame_seq in 0..total {
-        let next = if partial_size < payload.len() {
-            payload.split_off(partial_size)
+        let next = if partial < payload.len() {
+            payload.split_off(partial)
         } else {
             Vec::new()
         };
@@ -191,7 +191,7 @@ pub fn create(mut payload: Vec<u8>, entry_seq: u128, partial_size: usize) -> Vec
         frames.push(Frame::new(
             Header::new(
                 payload.len() as u128,
-                partial_size as u128,
+                partial as u128,
                 entry_seq,
                 frame_seq as u128,
                 total as u128,
@@ -212,7 +212,23 @@ mod tests {
 
     #[test]
     fn test_frame_total() {
-        // TODO
+        init();
+        struct Case {
+            payloads: usize,
+            partial: usize,
+            frames: usize,
+        }
+
+        let cases = [Case {
+            payloads: 1024,
+            partial: 128,
+            frames: 8,
+        }];
+
+        for c in &cases {
+            let frames = frames_total(c.payloads, c.partial);
+            assert_eq!(frames, c.frames)
+        }
     }
 
     #[test]
@@ -220,43 +236,43 @@ mod tests {
         init();
         struct Case {
             payload: Vec<u8>,
-            partial_size: usize,
+            partial: usize,
             entry_seq: u128,
-            expected_frames: usize,
+            frames_num: usize,
         }
         let cases = [
             Case {
                 payload: vec![1; 1024],
-                partial_size: 128,
+                partial: 128,
                 entry_seq: 0,
-                expected_frames: 8,
+                frames_num: 8,
             },
             Case {
                 payload: vec![2; 0],
-                partial_size: 128,
+                partial: 128,
                 entry_seq: 1,
-                expected_frames: 0,
+                frames_num: 0,
             },
             Case {
                 payload: vec![3; 1025],
-                partial_size: 128,
+                partial: 128,
                 entry_seq: 3,
-                expected_frames: 9,
+                frames_num: 9,
             },
             Case {
                 payload: vec![4; 125],
-                partial_size: 128,
+                partial: 128,
                 entry_seq: 4,
-                expected_frames: 1,
+                frames_num: 1,
             },
         ];
 
         for c in &cases {
-            let remain_bytes = c.payload.len() % c.partial_size;
-            let frames = create(c.payload.clone(), c.entry_seq, c.partial_size);
-            assert_eq!(frames.len(), c.expected_frames);
+            let remain_bytes = c.payload.len() % c.partial;
+            let frames = create(c.payload.clone(), c.entry_seq, c.partial);
+            assert_eq!(frames.len(), c.frames_num);
 
-            if c.expected_frames != 0 {
+            if c.frames_num != 0 {
                 for i in 0..frames.len() - 1 {
                     assert_eq!(frames[i].header.entry_seq, frames[i + 1].header.entry_seq);
                     assert_eq!(
@@ -284,7 +300,7 @@ mod tests {
                         &c.payload[c.payload.len() - remain_bytes..]
                     );
                 } else {
-                    assert_eq!(frame_last.header.payload_len as usize, c.partial_size);
+                    assert_eq!(frame_last.header.payload_len as usize, c.partial);
                     assert_eq!(
                         frame_last.payload.as_slice(),
                         &c.payload[c.payload.len() - frame_last.payload.len()..]
@@ -294,14 +310,14 @@ mod tests {
                 let mut last = 0usize;
                 for (i, frame) in frames.iter().enumerate() {
                     assert_eq!(frame.header.entry_seq, c.entry_seq);
-                    assert_eq!(frame.header.payload_size as usize, c.partial_size);
+                    assert_eq!(frame.header.payload_size as usize, c.partial);
                     assert!(
-                        frame.header.payload_len as usize == c.partial_size
+                        frame.header.payload_len as usize == c.partial
                             || i == frames.len() - 1
                     );
-                    assert_eq!(frame.header.total as usize, c.expected_frames);
+                    assert_eq!(frame.header.total as usize, c.frames_num);
                     assert_eq!(frame.header.frame_seq as usize, i);
-                    assert_eq!(frame.payload.len(), c.partial_size);
+                    assert_eq!(frame.payload.len(), c.partial);
                     assert_eq!(
                         frame.payload(),
                         &c.payload[last..last + frame.header.payload_len as usize]

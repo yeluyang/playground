@@ -112,38 +112,16 @@ impl Config {
 }
 
 // TODO ReadOnly and WriteOnly
+// TODO Concurrency-Safety
 #[derive(Debug)]
 pub struct BytesIO {
     pub config: Config,
     meta: Meta,
     reader: BufReader<File>,
 
-    // XXX: should package following members into one mutex?
-    entry_next_seq: u128,     // XXX: should wrap by atomic?
-    frame_next_offset: usize, // offset for frames in file
-    writer: Option<Arc<Mutex<BufWriter<File>>>>,
-}
-
-impl Clone for BytesIO {
-    fn clone(&self) -> Self {
-        let mut reader = BufReader::new(
-            OpenOptions::new()
-                .read(true)
-                .open(self.config.path.as_path())
-                .unwrap(),
-        );
-        reader.seek(SeekFrom::Start(META_BYTES as u64)).unwrap();
-        Self {
-            config: self.config.clone(),
-
-            meta: self.meta.clone(),
-            entry_next_seq: self.entry_next_seq,
-            frame_next_offset: self.frame_next_offset.clone(),
-
-            reader,
-            writer: self.writer.clone(),
-        }
-    }
+    entry_next_seq: u128,
+    frame_next_offset: usize,
+    writer: Option<BufWriter<File>>,
 }
 
 impl BytesIO {
@@ -151,9 +129,9 @@ impl BytesIO {
         trace!("new BytesIO with: config={:?}, meta={:?}", config, meta);
         let reader = BufReader::new(OpenOptions::new().read(true).open(config.path.as_path())?);
         let writer = if config.write_enable {
-            Some(Arc::new(Mutex::new(BufWriter::new(
+            Some(BufWriter::new(
                 OpenOptions::new().write(true).open(config.path.as_path())?,
-            ))))
+            ))
         } else {
             None
         };
@@ -187,7 +165,7 @@ impl BytesIO {
         let mut file = Self::new(Config::new(path, true), Meta::new(payload_bytes))?;
 
         {
-            let mut writer = file.writer.as_ref().unwrap().lock().unwrap();
+            let writer = file.writer.as_mut().unwrap();
             writer.seek(SeekFrom::Start(0))?;
             writer.write_all(file.meta.to_bytes()?.as_slice())?;
             writer.flush()?;
@@ -295,11 +273,9 @@ impl BytesIO {
 
     pub fn append(&mut self, payload: &[u8]) -> Result<EntryOffset> {
         trace!("writing {} bytes into BytesIO file", payload.len(),);
-        match &self.writer {
+        match &mut self.writer {
             None => Err(Error::WriteOnReadOnlyFile(self.config.path.clone())),
             Some(writer) => {
-                let mut writer = writer.lock().unwrap();
-
                 let frames = frame::create(
                     payload.to_owned(),
                     self.entry_next_seq,
@@ -347,7 +323,7 @@ impl BytesIO {
         }
     }
 
-    pub fn reader_reset(&mut self) -> Result<()> {
+    pub fn reset_reader(&mut self) -> Result<()> {
         self.seek_entry(&EntryOffset::new(self.meta.uuid, 0, 0))?;
         Ok(())
     }
@@ -363,11 +339,14 @@ impl BytesIO {
     }
 
     /// TODO
-    pub fn find_entry(&mut self, entry_id: EntryID) -> Result<EntryOffset> {
+    pub fn find_entry(&mut self, id: EntryID) -> Result<EntryOffset> {
         unimplemented!()
     }
 
-    // TODO add `replace`, need `entry::Reserve`
+    /// TODO need `entry::Reserve`
+    pub fn replace(&mut self, offset: EntryOffset) -> Result<()> {
+        unimplemented!()
+    }
 
     fn read_frame(&mut self) -> Result<Option<Frame>> {
         trace!("reading next frame");
@@ -788,18 +767,13 @@ mod tests {
                 }
                 assert!(file.read_entry().unwrap().is_none());
 
-                file.reader_reset().unwrap();
+                file.reset_reader().unwrap();
                 for d in c.dataset {
                     let payload = file.read_entry().unwrap().unwrap();
                     assert_eq!(&payload, d);
                 }
                 assert!(file.read_entry().unwrap().is_none());
             }
-        }
-
-        #[test]
-        fn test_concurrence() {
-            // TODO add concurrence test
         }
     }
 }
