@@ -228,16 +228,16 @@ impl BytesIO {
             if frame_first.is_first() {
                 let mut frame_count = 1u128;
                 let mut bytes: Vec<u8> = Vec::with_capacity(
-                    self.meta.payload_bytes as usize * frame_first.header.total as usize,
+                    self.meta.payload_bytes as usize * frame_first.header.frame_total as usize,
                 );
                 bytes.extend(frame_first.payload());
-                for _ in 0..frame_first.header.total - 1 {
+                for _ in 0..frame_first.header.frame_total - 1 {
                     if let Some(frame) = self.read_frame()? {
                         frame_count += 1;
                         trace!(
                             "read a frame({}/{}) from an entry: header={:?}",
                             frame.header.frame_seq + 1,
-                            frame_first.header.total,
+                            frame_first.header.frame_total,
                             frame.header
                         );
                         assert_eq!(frame.header.entry_seq, frame_first.header.entry_seq,);
@@ -245,7 +245,7 @@ impl BytesIO {
                         bytes.extend(frame.payload());
                     } else {
                         return Err(Error::MeetIncompleteEntry(
-                            frame_first.header.total,
+                            frame_first.header.frame_total,
                             frame_count,
                         ));
                     }
@@ -262,7 +262,7 @@ impl BytesIO {
                 panic!(
                     "read from middle of entry: {} in {}",
                     frame_first.header.frame_seq + 1,
-                    frame_first.header.total
+                    frame_first.header.frame_total
                 );
             }
         } else {

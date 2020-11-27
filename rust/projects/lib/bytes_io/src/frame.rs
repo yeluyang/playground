@@ -18,7 +18,7 @@ pub struct Header {
     pub payload_size: u128,
     pub entry_seq: u128,
     pub frame_seq: u128,
-    pub total: u128,
+    pub frame_total: u128,
 }
 pub const HEADER_SIZE: usize = mem::size_of::<Header>();
 
@@ -32,7 +32,7 @@ impl Header {
             payload_size: size,
             entry_seq,
             frame_seq,
-            total,
+            frame_total: total,
         }
     }
     fn to_bytes(&self) -> Result<Vec<u8>> {
@@ -42,7 +42,7 @@ impl Header {
         bytes.write_u128::<Endian>(self.payload_size)?;
         bytes.write_u128::<Endian>(self.entry_seq)?;
         bytes.write_u128::<Endian>(self.frame_seq)?;
-        bytes.write_u128::<Endian>(self.total)?;
+        bytes.write_u128::<Endian>(self.frame_total)?;
 
         assert_eq!(bytes.len(), HEADER_SIZE);
 
@@ -63,7 +63,7 @@ impl TryFrom<&[u8]> for Header {
         h.payload_size = r.read_u128::<Endian>()?;
         h.entry_seq = r.read_u128::<Endian>()?;
         h.frame_seq = r.read_u128::<Endian>()?;
-        h.total = r.read_u128::<Endian>()?;
+        h.frame_total = r.read_u128::<Endian>()?;
 
         Ok(h)
     }
@@ -290,7 +290,7 @@ mod tests {
                             assert!(frame.header.payload_len <= frame.header.payload_size);
                             assert_eq!(frame.header.payload_size as usize, c.partial);
                             assert_eq!(frame.header.entry_seq, c.entry_seq);
-                            assert_eq!(frame.header.total as usize, c.frames_num);
+                            assert_eq!(frame.header.frame_total as usize, c.frames_num);
                             assert_eq!(frame.header.frame_seq as usize, i);
                             assert_eq!(frame.payload.len(), c.partial);
                             assert_eq!(
@@ -304,7 +304,10 @@ mod tests {
                             assert_eq!(frames[i].header.payload_len as usize, c.partial);
 
                             assert_eq!(frames[i].payload.len(), frames[i + 1].payload.len());
-                            assert_eq!(frames[i].header.total, frames[i + 1].header.total);
+                            assert_eq!(
+                                frames[i].header.frame_total,
+                                frames[i + 1].header.frame_total
+                            );
                             assert_eq!(frames[i].header.entry_seq, frames[i + 1].header.entry_seq);
                             assert_eq!(
                                 frames[i].header.payload_size,
@@ -319,7 +322,10 @@ mod tests {
                         assert!(frames[0].is_first());
 
                         let frame_last = frames.last().unwrap();
-                        assert_eq!(frame_last.header.frame_seq + 1, frame_last.header.total);
+                        assert_eq!(
+                            frame_last.header.frame_seq + 1,
+                            frame_last.header.frame_total
+                        );
                         assert_eq!((frame_last.header.frame_seq + 1) as usize, frames.len());
 
                         let remain_bytes = c.payload.len() % c.partial;
@@ -374,7 +380,7 @@ mod tests {
                 payload_len: 128,
                 payload_size: 128,
                 entry_seq: 1,
-                frame_seq: 16, // frame_seq should less than total
+                frame_seq: 16, // frame_seq should less than frame_total
                 frame_total: 16,
                 should_panic: true,
             },
@@ -383,7 +389,7 @@ mod tests {
                 payload_size: 128,
                 entry_seq: 1,
                 frame_seq: 8,
-                frame_total: 0, // total should greater than zero
+                frame_total: 0, // frame_total should greater than zero
                 should_panic: true,
             },
         ];
