@@ -5,7 +5,6 @@ use std::{
     mem,
     path::{Path, PathBuf},
     result,
-    sync::{Arc, Mutex},
 };
 
 extern crate byteorder;
