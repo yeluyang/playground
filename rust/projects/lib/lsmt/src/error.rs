@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-extern crate segment_io;
+extern crate bytes_io;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -16,7 +16,7 @@ pub enum Error {
     EmptyFile(String),
     InvalidPath(OsString),
     IncompleteWrite(String),
-    SegmentsFile(segment_io::Error),
+    SegmentsFile(bytes_io::Error),
 }
 
 impl Display for Error {
@@ -56,8 +56,8 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<segment_io::Error> for Error {
-    fn from(err: segment_io::Error) -> Self {
+impl From<bytes_io::Error> for Error {
+    fn from(err: bytes_io::Error) -> Self {
         Error::SegmentsFile(err)
     }
 }

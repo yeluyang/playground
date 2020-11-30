@@ -1,5 +1,3 @@
-#![feature(is_sorted)]
-
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -39,8 +37,13 @@ fn main() {
     loop {
         thread::sleep(Duration::from_secs(1));
         let counts = counts.lock().unwrap();
-        assert!(counts.is_sorted());
-        assert_eq!(counts.len(), counter.load(Ordering::SeqCst));
-        println!("count={{sorted={}, val={:?}}}", counts.is_sorted(), counts);
+        let mut iter = counts.iter();
+        if let Some(last) = iter.next() {
+            for item in iter {
+                assert!(item > last);
+            }
+            assert_eq!(counts.len(), counter.load(Ordering::SeqCst));
+            println!("count={:?}", counts);
+        }
     }
 }

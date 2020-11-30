@@ -1,7 +1,5 @@
 //! try to challenge safety of rust
 
-#![feature(is_sorted)]
-
 use std::{
     sync::{mpsc, Arc, Mutex},
     thread,
@@ -25,9 +23,13 @@ fn main() {
 
     thread::spawn(move || loop {
         let mut counts = shared_a.lock().unwrap();
-        sender_a.send("A hold counts, wait for counter".to_owned());
+        sender_a
+            .send("A hold counts, wait for counter".to_owned())
+            .unwrap();
         let mut counter = counter_a.lock().unwrap();
-        sender_a.send("A hold both counts and counter".to_owned());
+        sender_a
+            .send("A hold both counts and counter".to_owned())
+            .unwrap();
 
         *counter += 1;
         counts.push(*counter);
@@ -35,9 +37,13 @@ fn main() {
 
     thread::spawn(move || loop {
         let mut counter = counter_b.lock().unwrap();
-        sender_b.send("B hold counter, wait for counts".to_owned());
+        sender_b
+            .send("B hold counter, wait for counts".to_owned())
+            .unwrap();
         let mut counts = shared_b.lock().unwrap();
-        sender_b.send("B hold both counts and counter".to_owned());
+        sender_b
+            .send("B hold both counts and counter".to_owned())
+            .unwrap();
 
         *counter += 1;
         counts.push(*counter);

@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, fs, path::Path};
 
-extern crate segment_io;
-use segment_io::SegmentsFile;
+extern crate bytes_io;
+use bytes_io::SegmentsFile;
 
 use crate::error::{self, Error, Result};
 
