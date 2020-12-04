@@ -1,24 +1,55 @@
 package main
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
+
+type Foo struct {
+	Num int
+}
 
 func main() {
-	a := []int{1, 2, 3, 4}
-	for _, e := range a {
-		e = e * 2
+	foos := []*Foo{&Foo{Num: 0}, nil, &Foo{Num: 2}}
+	s, err := json.Marshal(foos)
+	if err != nil {
+		panic(err)
 	}
-	fmt.Printf("a=%#v\n", a)
-	for i := range a {
-		a[i] = a[i] * 2
+	fmt.Printf("foos=%s\n", s)
+
+	for _, f := range foos {
+		if f != nil {
+			f.Num += 1
+		} else {
+			f = &Foo{Num: 1}
+		}
 	}
-	fmt.Printf("a=%#v\n", a)
+	s, err = json.Marshal(foos)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("foos=%s\n", s)
+
+	for i, f := range foos {
+		if f == nil {
+			f = &Foo{Num: 1}
+			foos[i] = f
+		}
+		f.Num += 1
+	}
+	s, err = json.Marshal(foos)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("foos=%s\n", s)
+
 	m := map[string]int{
 		"1": 1,
 		"2": 2,
 		"3": 3,
 	}
-	for k, v := range m {
-		m[k] = v * 2
+	for _, v := range m {
+		v = v * 2
 	}
 	fmt.Printf("m=%#v\n", m)
 	for k := range m {
