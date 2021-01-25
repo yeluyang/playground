@@ -373,5 +373,5 @@ impl<C: PeerClientRPC> Peer<C> {
 }
 
 fn get_raft_sleep_deadline_rand() -> Duration {
-    Duration::from_millis(rand::thread_rng().gen_range(100, 500 + 1))
+    Duration::from_millis(rand::thread_rng().gen_range(100..=500))
 }

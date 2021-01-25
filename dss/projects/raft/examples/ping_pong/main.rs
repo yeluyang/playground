@@ -12,6 +12,8 @@ use env_logger::{Builder, Env};
 
 extern crate serde_json;
 
+extern crate grpcio;
+
 mod rpc;
 use rpc::{Config, PeerServer};
 

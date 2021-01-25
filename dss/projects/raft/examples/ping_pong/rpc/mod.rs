@@ -11,7 +11,7 @@ use grpc::{
     AppendRequest, AppendResponse, PeerGrpcClient, PeerGrpcServer, VoteRequest, VoteResponse,
 };
 
-use raft::{EndPoint, Error, LogSeq, PeerClientRPC, RPCError, Receipt, Result, Vote};
+use raft::{EndPoint, Error, LogSeq, PeerClientRPC, Receipt, Result, Vote};
 
 #[derive(Clone, Deserialize)]
 pub struct Config {
@@ -88,7 +88,7 @@ impl PeerClientRPC for PeerClient {
                     success: rsp.get_success(),
                 })
             }
-            Err(err) => Err(Error::from((self.target.clone(), RPCError::from(err)))),
+            Err(err) => Err(Error::from((self.target.clone(), err.to_string()))),
         }
     }
 
@@ -119,7 +119,7 @@ impl PeerClientRPC for PeerClient {
                     log_seq: grpc::crate_log_seq_from(rsp.take_last_log_seq()),
                 })
             }
-            Err(err) => Err(Error::from((self.target.clone(), RPCError::from(err)))),
+            Err(err) => Err(Error::from((self.target.clone(), err.to_string()))),
         }
     }
 }

@@ -1,5 +1,5 @@
 AUTHOR = github.com/yeluyang
-PROJECT = rust_with_grpc_template
+PROJECT = yeluyang_raft_rs
 
 ENV_NAME = $(PROJECT)_env_devel
 ENV_IMAGE = yeluyang/rust_grpc
@@ -17,10 +17,6 @@ env:
 		-v $(shell pwd):$(ENV_WD) -w $(ENV_WD) \
 		$(ENV_IMAGE) bash || docker start $(ENV_NAME)
 	docker exec -it $(ENV_NAME) bash
-
-dep:
-	cargo install protobuf-codegen
-	cargo install grpcio-compiler
 
 .PHONY: debug
 debug:

@@ -2,7 +2,7 @@
 extern crate log;
 
 mod error;
-pub use error::{Error, Result,RPCError};
+pub use error::{Error, Result};
 
 mod rpc;
 pub use rpc::{EndPoint, PeerClientRPC};
