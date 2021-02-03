@@ -32,6 +32,7 @@ class SmoothWeightRoundRobin:
     def run(self):
         while True:
             idx = -1
+            first = str(self)
             for i, n in enumerate(self.nodes):
                 n.over()
                 if idx == -1:
@@ -41,7 +42,7 @@ class SmoothWeightRoundRobin:
             before = str(self)
             self.nodes[idx].choose()
             after = str(self)
-            print("%s -> %s" % (before, after))
+            print("%16s-> %16s -> %16s" % (first, before, after))
 
 
 if __name__ == "__main__":
