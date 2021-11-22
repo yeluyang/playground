@@ -474,6 +474,10 @@
     - 【动态规划+数学建模：通项公式】
       - 分析
         - 【TODO】
+          - 对任意的$a_{n+2} = pa_{n+1} + qa_n$，都可以令$a_n = x^n$代入求得$x^2 = px + q$。该性质对$f(n) = f(n-1) + f(n-2)$也是成立的
+          - 令$f(n) = x^n$，可得$x^2 = x + 1$，求解得$x_1 = \frac{1 + \sqrt{5}}{2}$，$x_2 = \frac{1 - \sqrt{5}}{2}$
+          - 设通解为$f(n) = c_1 x^n_{1} + c_2 x^n_{2}$，代入递推初始条件$f(0) = 1$和$f(1) = 1$，可得$c_1 = \frac{1}{\sqrt{5}}$，$c_2 = -\frac{1}{\sqrt{5}}$
+          - 则$f(n) = \frac{1}{\sqrt{5}} \left[ \left( \frac{1 + \sqrt{5}}{2} \right)^n - \left( \frac{1 - \sqrt{5}}{2} \right)^n \right]$
       - 步骤
         1. TODO
       - 复杂度
