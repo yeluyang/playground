@@ -1068,6 +1068,65 @@
         - 时间：O(TODO)
         - 空间：O(TODO)
 
+- [160.相交链表](https://leetcode-cn.com/problems/intersection-of-two-linked-lists/)（[我的实现](questions/wrong/160.相交链表.c)）
+  - 条件
+    - 【TODO】
+  - 分析
+    - 【TODO】
+  - 解法
+    - 【TODO】
+      - 分析
+        - 【TODO】
+          - 因为两个链不一定长度相同，使得遍历时不能保证同时迭代到相交节点，导致无法通过比对指针来确定是否共链
+          - 可以先确定两个链表长度，计算长度差，让较长的链表先行迭代到长度差被抹平，再两个链表同时迭代，就能保证相交节点可以被同时遍历到
+      - 算法
+
+        ```TODO
+        ```
+
+      - 复杂度
+        - 时间：O(n)
+        - 空间：O(1)
+    - 【TODO】
+      - 分析
+        - 【TODO】
+          - 两个指针分别对两个链表同时遍历，一旦指针所在链表遍历完后就立刻从另一个链表头开始继续遍历，直到两个指针相遇，此时相遇节点就是相交点
+          - 这个算法我不知道是怎么想出来发明出来的，但是其正确性是可以简单证明的：
+            - 两个链表分别是：
+              - $a_1 \rightarrow a_2 \rightarrow c_1 \rightarrow c_2 \rightarrow c_3$
+              - $b_1 \rightarrow b_2 \rightarrow b_3 \rightarrow c_1 \rightarrow c_2 \rightarrow c_3$
+            - 该算法下两个指针的遍历路径如下：
+              - $a_1, a_2, c_1, c_2, c_3, b_1, b_2, b_3, c_1$
+              - $b_1, b_2, b_3, c_1, c_2, c_3, a_1, a_2, c_1$
+            - 显然无论链表如何变化，都会如同以上遍历路径，最终只需要$2n+2m+k+1$步即可相遇，其中n和m是链表各自不相交的节点数，k是相交共享的节点数
+      - 算法
+
+        ```TODO
+        ```
+
+      - 复杂度
+        - 时间：O(TODO)
+        - 空间：O(TODO)
+
+- [103.二叉树的锯齿形层序遍历](https://leetcode-cn.com/problems/binary-tree-zigzag-level-order-traversal/)（[我的实现](questions/optimizable/103.二叉树的锯齿形层序遍历.rs)）
+  - 条件
+    - 【TODO】
+  - 分析
+    - 【TODO】
+      - 因为输出结果要求按层序组织，所以层序遍历时稍微修改一下，每次出队都把整队列所有节点出队即可实现按层序处理该层所有节点，从而实现结果按层序组织
+  - 解法
+    - 【TODO】
+      - 分析
+        - 【TODO】
+      - 算法
+
+        ```TODO
+        ```
+
+      - 复杂度
+        - 时间：O(TODO)
+        - 空间：O(TODO)
+
 ## 哈希
 
 最优解为哈希的问题一般有如下特性：
