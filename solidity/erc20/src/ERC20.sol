@@ -7,6 +7,7 @@ contract ERC20 is IERC20 {
     error ErrAuthDenied(address owner, address sender);
     error ErrBalanceNotEnough(address sender, uint256 balance, uint256 amount);
     error ErrAllowanceNotEnough(address from, address to, uint256 allowance, uint256 amount);
+    error ErrSupplyNotEnough(uint256 supply, uint256 amount);
 
     mapping(address => uint256) public override balanceOf;
     mapping(address => mapping(address => uint256)) public override allowance;
@@ -36,6 +37,12 @@ contract ERC20 is IERC20 {
         }
     }
 
+    function checkSupply(uint256 amount) internal view {
+        if (totalSupply < amount) {
+            revert ErrSupplyNotEnough(totalSupply, amount);
+        }
+    }
+
     function checkAllowance(address from, address to, uint256 amount) internal view {
         if (allowance[from][to] < amount) {
             revert ErrAllowanceNotEnough(from, to, allowance[from][to], amount);
@@ -51,14 +58,14 @@ contract ERC20 is IERC20 {
         return true;
     }
 
-    function approve(address spender, uint256 amount) external returns (bool) {
+    function approve(address spender, uint256 amount) external override returns (bool) {
         allowance[msg.sender][spender] = amount;
         emit Approval(msg.sender, spender, amount);
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        checkAllowance(from, to, amount);
+    function transferFrom(address from, address to, uint256 amount) external override returns (bool) {
+        checkAllowance(from, msg.sender, amount);
         allowance[from][msg.sender] -= amount;
 
         checkBalance(from, amount);
@@ -76,6 +83,8 @@ contract ERC20 is IERC20 {
     }
 
     function burn(uint256 amount) external onlyOwner {
+        checkBalance(msg.sender, amount);
+        checkSupply(amount);
         balanceOf[msg.sender] -= amount;
         totalSupply -= amount;
         emit Transfer(msg.sender, address(0), amount);
