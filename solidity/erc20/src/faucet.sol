@@ -5,26 +5,31 @@ import {IERC20} from "./IERC20.sol";
 
 contract Faucet {
     error ErrAlreadyRequested(address sender);
+    error ErrBalanceNotEnough(address owner, uint256 balance);
 
     uint256 public constant amountAllowed = 100;
-    address public immutable tokenContract;
+    IERC20 public immutable token;
     mapping(address => bool) public requestedAddress;
 
     event SendToken(address indexed receiver, uint256 amount);
 
     constructor(address _tokenContract) {
-        tokenContract = _tokenContract;
+        token = IERC20(_tokenContract);
     }
 
     modifier onlyNewComer() {
-        if (requestedAddress[msg.sender] == false) {
+        if (requestedAddress[msg.sender]) {
             revert ErrAlreadyRequested(msg.sender);
         }
         _;
     }
 
     function requestTokens() external onlyNewComer {
-        IERC20 token = IERC20(tokenContract);
+        uint256 balance = token.balanceOf(address(this));
+        if (balance < amountAllowed) {
+            revert ErrBalanceNotEnough(address(this), balance);
+        }
+
         token.transfer(msg.sender, amountAllowed);
         requestedAddress[msg.sender] = true;
 
